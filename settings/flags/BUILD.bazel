@@ -1,5 +1,7 @@
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "int_flag", "string_flag", "string_setting")
 
+package(default_visibility = ["//:__subpackages__"])
+
 ### Bazel-ification of optional flags accepted by ./configure ###
 
 # JEMALLOC_CACHE_OBLIVIOUS
@@ -135,7 +137,6 @@ string_setting(
     name = "jemalloc_cprefix",
     build_setting_default = "",
     make_variable = "JEMALLOC_CPREFIX",
-    visibility = ["//:__subpackages__"],
 )
 
 # LG_QUANTUM Base 2 log of minimum allocation alignment (--with-lg-quantum), -1 is undefined for resolution internal
