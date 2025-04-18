@@ -1,3 +1,11 @@
 common:prof --//settings/flags:enable_xmalloc
 common:prof --//settings/flags:enable_prof
 common:prof --//settings/flags:enable_prof_libunwind
+
+common:prof-libgcc --//settings/flags:enable_xmalloc
+common:prof-libgcc --//settings/flags:enable_prof
+common:prof-libgcc --//settings/flags:enable_prof_libgcc
+
+common:prof-gcc --//settings/flags:enable_xmalloc
+common:prof-gcc --//settings/flags:enable_prof
+common:prof-gcc --//settings/flags:enable_prof_gcc

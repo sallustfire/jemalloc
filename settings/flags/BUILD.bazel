@@ -204,3 +204,27 @@ config_setting(
     name = "prof_libunwind",
     flag_values = {":enable_prof_libunwind": "True"},
 )
+
+# JEMALLOC_PROF_LIBGCC
+bool_flag(
+    name = "enable_prof_libgcc",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "prof_libgcc",
+    flag_values = {":enable_prof_libgcc": "True"},
+)
+
+# JEMALLOC_PROF_GCC
+bool_flag(
+    name = "enable_prof_gcc",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "prof_gcc",
+    flag_values = {":enable_prof_gcc": "True"},
+)
