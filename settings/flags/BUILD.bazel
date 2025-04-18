@@ -180,3 +180,27 @@ config_setting(
     name = "zone_allocator",
     flag_values = {":enable_zone_allocator": "yes"},
 )
+
+# JEMALLOC_PROF
+bool_flag(
+    name = "enable_prof",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "prof",
+    flag_values = {":enable_prof": "True"},
+)
+
+# JEMALLOC_PROF_LIBUNWIND
+bool_flag(
+    name = "enable_prof_libunwind",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "prof_libunwind",
+    flag_values = {":enable_prof_libunwind": "True"},
+)
