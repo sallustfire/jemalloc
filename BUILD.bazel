@@ -22,13 +22,6 @@ alias(
     visibility = ["//visibility:public"],
 )
 
-alias(
-    name = "jemalloc_core",
-    actual = ":lib/jemalloc",
-    tags = ["manual"],
-    visibility = ["//:__subpackages__"],
-)
-
 cc_library(
     name = "lib/jemalloc",
     srcs = [
