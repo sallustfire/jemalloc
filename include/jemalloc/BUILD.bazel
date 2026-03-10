@@ -60,7 +60,6 @@ sh_binary(
 genrule(
     name = "jemalloc_mangle",
     srcs = [
-        "jemalloc_mangle.sh",
         "//include/jemalloc/internal:public_symbols",
     ],
     outs = ["jemalloc_mangle.h"],
