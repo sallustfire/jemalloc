@@ -1,4 +1,3 @@
-load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:expand_template.bzl", "expand_template")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
@@ -24,11 +23,13 @@ configure_header(
         define_macro_if("JEMALLOC_OVERRIDE_VALLOC", "//settings/platform:has_valloc") |
         define_macro_with("JEMALLOC_USABLE_SIZE_CONST", "$(JEMALLOC_USABLE_SIZE_CONST)") |
         define_macro_if("JEMALLOC_USE_CXX_THROW", "@platforms//os:linux") |
-        selects.with_or(
+        select(
             {
                 "//settings/compiler:msvc_compatible": define_macro_with("LG_SIZEOF_PTR", "LG_SIZEOF_PTR_WIN"),
-                ("@platforms//cpu:aarch32", "@platforms//cpu:x86_32"): define_macro_with("LG_SIZEOF_PTR", "2"),
-                ("@platforms//cpu:aarch64", "@platforms//cpu:x86_64"): define_macro_with("LG_SIZEOF_PTR", "3"),
+                "@platforms//cpu:aarch32": define_macro_with("LG_SIZEOF_PTR", "2"),
+                "@platforms//cpu:x86_32": define_macro_with("LG_SIZEOF_PTR", "2"),
+                "@platforms//cpu:aarch64": define_macro_with("LG_SIZEOF_PTR", "3"),
+                "@platforms//cpu:x86_64": define_macro_with("LG_SIZEOF_PTR", "3"),
             },
             no_match_error = "Cannot determine LG_SIZEOF_PTR value, missing support for platform.",
         ),
