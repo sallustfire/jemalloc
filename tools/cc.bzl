@@ -1,7 +1,5 @@
 "Project specific configuration of rules_cc"
 
-load("@bazel_skylib//lib:selects.bzl", "selects")
-
 _COPTS_GCC_COMPATIBLE = [
     "-Wall",
     "-Wextra",
@@ -32,12 +30,17 @@ COPTS = ["-D_REENTRANT"] + select({
     "@rules_cc//cc/compiler:msvc-cl": _COPTS_MSVC_COMPATIBLE,
     "@rules_cc//cc/compiler:clang-cl": _COPTS_MSVC_COMPATIBLE,
     "//conditions:default": [],
-}) + selects.with_or({
-    ("@platforms//os:windows", "//settings/platform:darwin"): [],
+}) + select({
+    "@platforms//os:windows": [],
+    "//settings/platform:darwin": [],
     "//settings/compiler:gcc_compatible": ["-fvisibility=hidden"],
     "//conditions:default": [],
-}) + selects.with_or({
-    ("@platforms//os:android", "@platforms//os:linux"): [
+}) + select({
+    "@platforms//os:android": [
+        "-DPIC",
+        "-D_GNU_SOURCE",
+    ],
+    "@platforms//os:linux": [
         "-DPIC",
         "-D_GNU_SOURCE",
     ],
