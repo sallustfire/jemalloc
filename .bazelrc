@@ -1,4 +1,5 @@
-common --incompatible_resolve_select_keys_eagerly
+common:bazel8 --incompatible_resolve_select_keys_eagerly
+common:bazel9 --incompatible_resolve_select_keys_eagerly
 
 common:prof-libunwind --//settings/flags:enable_xmalloc
 common:prof-libunwind --//settings/flags:enable_prof=libunwind
