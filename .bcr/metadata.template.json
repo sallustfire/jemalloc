@@ -9,6 +9,7 @@
         }
     ],
     "repository": [
+        "github:sallustfire/jemalloc",
         "github:jemalloc/jemalloc"
     ],
     "versions": [],

@@ -11,10 +11,25 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  upload-tarball:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag_name || github.ref_name }}
+      - name: Create and upload release tarball
+        env:
+          GH_TOKEN: ${{ secrets.BCR_PUBLISH_TOKEN }}
+        run: |
+          TAG="${{ inputs.tag_name || github.ref_name }}"
+          git archive --format=tar.gz --prefix=jemalloc-${TAG}/ HEAD -o jemalloc-${TAG}.tar.gz
+          gh release upload "${TAG}" jemalloc-${TAG}.tar.gz
+
   publish:
+    needs: upload-tarball
     uses: bazel-contrib/publish-to-bcr/.github/workflows/publish.yaml@v1.1.0
     with:
       tag_name: ${{ inputs.tag_name || github.ref_name }}
