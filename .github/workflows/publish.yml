@@ -26,7 +26,7 @@ jobs:
         run: |
           TAG="${{ inputs.tag_name || github.ref_name }}"
           git archive --format=tar.gz --prefix=jemalloc-${TAG}/ HEAD -o jemalloc-${TAG}.tar.gz
-          gh release upload "${TAG}" jemalloc-${TAG}.tar.gz
+          gh release upload "${TAG}" jemalloc-${TAG}.tar.gz --clobber
 
   publish:
     needs: upload-tarball
