@@ -1,1 +1,6 @@
 * text=auto eol=lf
+
+# Exclude CI, specs, and BCR template files from release tarballs.
+.github/ export-ignore
+.bcr/ export-ignore
+specs/ export-ignore

@@ -1,0 +1,20 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*-bcr.*"
+
+permissions:
+  id-token: write
+  attestations: write
+  contents: write
+
+jobs:
+  release:
+    uses: bazel-contrib/.github/.github/workflows/release_ruleset.yaml@v7.4.0
+    with:
+      release_files: "jemalloc-*.tar.gz"
+      prerelease: true
+      draft: false
+      bazel_test_command: "bazel test //... --config=bazel8"

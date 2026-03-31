@@ -1,0 +1,10 @@
+diff --git a/test/src/test.c b/test/src/test.c
+--- a/test/src/test.c
++++ b/test/src/test.c
+@@ -181,7 +181,7 @@
+ 	    test_status_string(test_status_fail),
+ 	    test_counts[test_status_fail], test_count);
+
+-	return ret;
++	return (ret == test_status_skip) ? test_status_pass : ret;
+ }
