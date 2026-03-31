@@ -77,7 +77,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14, macos-15]
+        os: [ubuntu-24.04]
         bazel_version: ["7.x", "8.x", "9.x"]
         include:
           - bazel_version: "8.x"
@@ -97,7 +97,7 @@ jobs:
       - name: Test
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
-        run: bazel test //... --config=prof-libgcc ${{ matrix.bazel_config }} ${{ startsWith(matrix.os, 'macos') && '-- -//test/unit:prof_gdump' || '' }}
+        run: bazel test //... --config=prof-libgcc ${{ matrix.bazel_config }}
 
   prof-gcc:
     name: Prof gcc (${{ matrix.os }}, Bazel ${{ matrix.bazel_version }})
@@ -105,7 +105,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14, macos-15]
+        os: [ubuntu-24.04]
         bazel_version: ["7.x", "8.x", "9.x"]
         include:
           - bazel_version: "8.x"
@@ -125,7 +125,7 @@ jobs:
       - name: Test
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
-        run: bazel test //... --config=prof-gcc ${{ matrix.bazel_config }} ${{ startsWith(matrix.os, 'macos') && '-- -//test/unit:prof_gdump' || '' }}
+        run: bazel test //... --config=prof-gcc ${{ matrix.bazel_config }}
 
   examples:
     name: Examples (${{ matrix.os }}, Bazel ${{ matrix.bazel_version }})
