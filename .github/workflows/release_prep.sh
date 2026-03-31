@@ -12,6 +12,10 @@ TAG="${1:?usage: release_prep.sh TAG}"
 # 5.3.0-bcr.3 -> 5.3.0
 UPSTREAM="${TAG%%-bcr.*}"
 
+# All diagnostic output goes to stderr so stdout is clean for release notes.
+exec 3>&1  # save stdout
+exec 1>&2  # redirect stdout to stderr
+
 echo "::group::Verify source against upstream ${UPSTREAM}"
 
 # Download the official upstream release tarball (immutable release asset).
@@ -79,6 +83,9 @@ echo "::endgroup::"
 ARCHIVE="jemalloc-${TAG}.tar.gz"
 git archive --format=tar.gz --prefix="jemalloc-${TAG}/" HEAD -o "${ARCHIVE}"
 echo "Created ${ARCHIVE}"
+
+# Restore stdout for release notes.
+exec 1>&3 3>&-
 
 # Output release notes to stdout.
 cat <<EOF
