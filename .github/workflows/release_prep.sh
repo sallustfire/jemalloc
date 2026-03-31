@@ -61,6 +61,7 @@ FULL_DIFF=$(diff -r "jemalloc-${UPSTREAM}" . \
   --exclude='specs' \
   --exclude='bazel-*' \
   --exclude='upstream.tar.bz2' \
+  --exclude='release_notes.txt' \
   --exclude="jemalloc-${UPSTREAM}" \
   || true)
 
