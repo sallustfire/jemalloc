@@ -1,5 +1,5 @@
 #!/bin/sh
 
-for symbol in `cat "$@"` ; do
-  echo "#define ${symbol} JEMALLOC_N(${symbol})"
+for symbol in `"$CAT" "$@"` ; do
+  "$ECHO" "#define ${symbol} JEMALLOC_N(${symbol})"
 done

@@ -1,2 +1,16 @@
 common:bazel8 --incompatible_resolve_select_keys_eagerly
 common:bazel9 --incompatible_resolve_select_keys_eagerly
+
+common --repo_env=BAZEL_NO_APPLE_CPP_TOOLCHAIN=1
+common --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+common --incompatible_strict_action_env
+common --@protobuf//bazel/toolchains:prefer_prebuilt_protoc
+
+# if using https://github.com/hermeticbuild/actiond/
+build:actiond --remote_executor=grpc://127.0.0.1:8980
+build:actiond --remote_cache=grpc://127.0.0.1:8980
+build:actiond --spawn_strategy=remote
+build:actiond --genrule_strategy=remote
+build:actiond --remote_local_fallback=false
+build:actiond --remote_upload_local_results=false
+build:actiond --noremote_cache_compression

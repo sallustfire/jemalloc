@@ -1,8 +1,17 @@
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolchain")
 
+_CAT_TOOLCHAIN = "@rules_coreutils//coreutils/toolchain/cat:type"
+_ECHO_TOOLCHAIN = "@rules_coreutils//coreutils/toolchain/echo:type"
+_TR_TOOLCHAIN = "@rules_coreutils//coreutils/toolchain/tr:type"
+
 def _private_namespace_impl(ctx):
     cc_toolchain = find_cc_toolchain(ctx)
+    cat = ctx.toolchains[_CAT_TOOLCHAIN]
+    echo = ctx.toolchains[_ECHO_TOOLCHAIN]
+    tr = ctx.toolchains[_TR_TOOLCHAIN]
+    coreutils_env = {"CAT": cat.executable.path, "ECHO": echo.executable.path, "TR": tr.executable.path}
+    coreutils_tools = [cat.run, echo.run, tr.run]
     output = ctx.actions.declare_file(ctx.attr.out)
 
     # Extract private symbols
@@ -28,8 +37,9 @@ def _private_namespace_impl(ctx):
             output = output_awk.path,
             sym_prefix = sym_prefix,
         ),
+        env = coreutils_env,
         mnemonic = "PrivateSymbols",
-        tools = [ctx.file._private_symbols_sh],
+        tools = [ctx.file._private_symbols_sh] + coreutils_tools,
     )
 
     inputs = [src for src in ctx.files.input if src.path.endswith(".a")]
@@ -38,13 +48,14 @@ def _private_namespace_impl(ctx):
     ctx.actions.run_shell(
         inputs = depset(inputs, transitive = [cc_toolchain.all_files]),
         outputs = [output_symbols],
-        command = "{nm} -a {inputs} | awk -f {script} > {output}".format(
-            nm = cc_toolchain.nm_executable,
+        command = "{nm} -a {inputs} | {awk} -f {script} > {output}".format(
+            nm = ctx.file._llvm_nm.path,
             inputs = " ".join([input.path for input in inputs]),
+            awk = ctx.executable._gawk.path,
             script = output_awk.path,
             output = output_symbols.path,
         ),
-        tools = [output_awk],
+        tools = [output_awk, ctx.file._llvm_nm, ctx.executable._gawk],
         mnemonic = "PrivateNamespaceNM",
     )
 
@@ -56,8 +67,9 @@ def _private_namespace_impl(ctx):
             symbols = output_symbols.path,
             output = output.path,
         ),
+        env = coreutils_env,
         mnemonic = "PrivateNamespace",
-        tools = [ctx.file._private_namespace_sh],
+        tools = [ctx.file._private_namespace_sh] + coreutils_tools,
     )
 
     return [DefaultInfo(files = depset([output]))]
@@ -101,6 +113,8 @@ private_namespace = rule(
         ),
         "_prefix": attr.label(default = "//settings/flags:jemalloc_prefix"),
         "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
+        "_llvm_nm": attr.label(default = "@llvm//tools:llvm-nm", allow_single_file = True, cfg = "exec"),
+        "_gawk": attr.label(default = "@gawk//:gawk", executable = True, cfg = "exec"),
         "_constraint_macos": attr.label(default = "@platforms//os:macos", cfg = "target"),
         "_private_namespace_sh": attr.label(
             default = "//include/jemalloc/internal:private_namespace.sh",
@@ -113,5 +127,5 @@ private_namespace = rule(
             cfg = "exec",
         ),
     },
-    toolchains = use_cc_toolchain(True),
+    toolchains = use_cc_toolchain(True) + [_CAT_TOOLCHAIN, _ECHO_TOOLCHAIN, _TR_TOOLCHAIN],
 )

@@ -3,7 +3,7 @@
 public_symbols_txt=$1
 symbol_prefix=$2
 
-cat <<EOF
+"$CAT" <<EOF
 /*
  * By default application code must explicitly refer to mangled symbol names,
  * so that it is possible to use jemalloc in conjunction with another allocator
@@ -17,12 +17,12 @@ cat <<EOF
 #  endif
 EOF
 
-for nm in `cat ${public_symbols_txt}` ; do
-  n=`echo ${nm} |tr ':' ' ' |awk '{print $1}'`
-  echo "#  define ${n} ${symbol_prefix}${n}"
+for nm in `"$CAT" ${public_symbols_txt}` ; do
+  n=`"$ECHO" ${nm} |"$TR" ':' ' ' |"$AWK" '{print $1}'`
+  "$ECHO" "#  define ${n} ${symbol_prefix}${n}"
 done
 
-cat <<EOF
+"$CAT" <<EOF
 #endif
 
 /*
@@ -35,11 +35,11 @@ cat <<EOF
 #ifndef JEMALLOC_NO_DEMANGLE
 EOF
 
-for nm in `cat ${public_symbols_txt}` ; do
-  n=`echo ${nm} |tr ':' ' ' |awk '{print $1}'`
-  echo "#  undef ${symbol_prefix}${n}"
+for nm in `"$CAT" ${public_symbols_txt}` ; do
+  n=`"$ECHO" ${nm} |"$TR" ':' ' ' |"$AWK" '{print $1}'`
+  "$ECHO" "#  undef ${symbol_prefix}${n}"
 done
 
-cat <<EOF
+"$CAT" <<EOF
 #endif
 EOF
