@@ -100,3 +100,5 @@ test/include/test/jemalloc_test_defs.h
 /msvc/projects/*/*/x64/
 
 bazel-*
+.idea/
+.bazelbsp/

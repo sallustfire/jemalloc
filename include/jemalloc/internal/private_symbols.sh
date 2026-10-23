@@ -9,7 +9,7 @@
 sym_prefix=$1
 shift
 
-cat <<EOF
+"$CAT" <<EOF
 #!/usr/bin/env awk -f
 
 BEGIN {
@@ -23,7 +23,7 @@ for public_sym in "$@" ; do
 EOF
 done
 
-cat <<"EOF"
+"$CAT" <<"EOF"
         ", exported_symbol_names)
   # Store exported symbol names as keys in exported_symbols.
   for (i in exported_symbol_names) {

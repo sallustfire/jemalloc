@@ -64,10 +64,11 @@ genrule(
         "//include/jemalloc/internal:public_symbols",
     ],
     outs = ["jemalloc_mangle.h"],
-    cmd = "$(execpath :jemalloc_mangle_sh) $(execpath //include/jemalloc/internal:public_symbols) je_ > $@",
-    cmd_bat = "$(execpath :jemalloc_mangle_sh) $(execpath //include/jemalloc/internal:public_symbols) je_ > $@",
+    cmd = "AWK=$(execpath @gawk//:gawk) CAT=$(CAT) ECHO=$(ECHO) TR=$(TR) $(execpath :jemalloc_mangle_sh) $(execpath //include/jemalloc/internal:public_symbols) je_ > $@",
+    cmd_bat = "AWK=$(execpath @gawk//:gawk) CAT=$(CAT) ECHO=$(ECHO) TR=$(TR) $(execpath :jemalloc_mangle_sh) $(execpath //include/jemalloc/internal:public_symbols) je_ > $@",
     tags = ["manual"],
-    tools = [":jemalloc_mangle_sh"],
+    tools = [":jemalloc_mangle_sh", "@gawk//:gawk"],
+    toolchains = ["@rules_coreutils//coreutils/toolchain/cat:type", "@rules_coreutils//coreutils/toolchain/echo:type", "@rules_coreutils//coreutils/toolchain/tr:type"],
     visibility = ["//visibility:public"],
 )
 
@@ -78,10 +79,11 @@ genrule(
         "//include/jemalloc/internal:public_symbols",
     ],
     outs = ["jemalloc_mangle_jet.h"],
-    cmd = "$(execpath :jemalloc_mangle_sh) $(execpath //include/jemalloc/internal:public_symbols) jet_ > $@",
-    cmd_bat = "$(execpath :jemalloc_mangle_sh) $(execpath //include/jemalloc/internal:public_symbols) jet_ > $@",
+    cmd = "AWK=$(execpath @gawk//:gawk) CAT=$(CAT) ECHO=$(ECHO) TR=$(TR) $(execpath :jemalloc_mangle_sh) $(execpath //include/jemalloc/internal:public_symbols) jet_ > $@",
+    cmd_bat = "AWK=$(execpath @gawk//:gawk) CAT=$(CAT) ECHO=$(ECHO) TR=$(TR) $(execpath :jemalloc_mangle_sh) $(execpath //include/jemalloc/internal:public_symbols) jet_ > $@",
     tags = ["manual"],
-    tools = [":jemalloc_mangle_sh"],
+    tools = [":jemalloc_mangle_sh", "@gawk//:gawk"],
+    toolchains = ["@rules_coreutils//coreutils/toolchain/cat:type", "@rules_coreutils//coreutils/toolchain/echo:type", "@rules_coreutils//coreutils/toolchain/tr:type"],
     visibility = ["//visibility:public"],
 )
 
@@ -117,10 +119,11 @@ genrule(
         "//include/jemalloc/internal:public_symbols",
     ],
     outs = ["jemalloc_rename.h"],
-    cmd = "$(execpath :jemalloc_rename_sh) $(execpath //include/jemalloc/internal:public_symbols) > $@",
-    cmd_bat = "$(execpath :jemalloc_rename_sh) $(execpath //include/jemalloc/internal:public_symbols) > $@",
+    cmd = "AWK=$(execpath @gawk//:gawk) CAT=$(CAT) ECHO=$(ECHO) TR=$(TR) $(execpath :jemalloc_rename_sh) $(execpath //include/jemalloc/internal:public_symbols) > $@",
+    cmd_bat = "AWK=$(execpath @gawk//:gawk) CAT=$(CAT) ECHO=$(ECHO) TR=$(TR) $(execpath :jemalloc_rename_sh) $(execpath //include/jemalloc/internal:public_symbols) > $@",
     tags = ["manual"],
-    tools = [":jemalloc_rename_sh"],
+    tools = [":jemalloc_rename_sh", "@gawk//:gawk"],
+    toolchains = ["@rules_coreutils//coreutils/toolchain/cat:type", "@rules_coreutils//coreutils/toolchain/echo:type", "@rules_coreutils//coreutils/toolchain/tr:type"],
     visibility = ["//visibility:public"],
 )
 
