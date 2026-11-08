@@ -151,7 +151,10 @@ UNIT_TESTS = [
     {"src": "rb.c"},
     {"src": "retained.c"},
     {"src": "rtree.c"},
-    {"src": "safety_check.c"},
+    {
+        "src": "safety_check.c",
+        "prof_conf": "prof:true,prof_active:true,lg_prof_sample:0",
+    },
     {"src": "sc.c"},
     {"src": "sec.c"},
     {"src": "seq.c"},

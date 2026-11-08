@@ -30,7 +30,7 @@ def _platform_constraints_transition_impl(settings, attr):
         result[label] = (platform_defaults.get(attr.platform, platform_defaults["default"]) if configured_value == "__auto__" else configured_value)
 
     # Apply explicitly passed settings
-    boolean_settings = ["//settings:enable_jet", "//settings/flags:enable_fill"]
+    boolean_settings = ["//settings:enable_jet", "//settings/flags:enable_experimental_smallocx", "//settings/flags:enable_fill"]
     for setting in boolean_settings:
         result[setting] = attr.settings[Label(setting)] == "True" if Label(setting) in attr.settings else settings[setting]
 
@@ -50,6 +50,7 @@ _platform_constraints_transition = transition(
         "//settings:with_test",
         "//settings/flags:jemalloc_prefix",
         "//settings/flags:jemalloc_cprefix",
+        "//settings/flags:enable_experimental_smallocx",
         "//settings/flags:enable_fill",
         "//settings/flags:enable_zone_allocator",
         "//settings/platform:glibc_overrides_support",
@@ -64,6 +65,7 @@ _platform_constraints_transition = transition(
         "//settings:with_test",
         "//settings/flags:jemalloc_prefix",
         "//settings/flags:jemalloc_cprefix",
+        "//settings/flags:enable_experimental_smallocx",
         "//settings/flags:enable_fill",
         "//settings/flags:enable_zone_allocator",
         "//settings/platform:glibc_overrides_support",
