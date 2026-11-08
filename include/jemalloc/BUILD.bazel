@@ -2,10 +2,10 @@ load("@bazel_skylib//rules:expand_template.bzl", "expand_template")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//tools:autoconf.bzl", "configure_header", "define_macro_if", "define_macro_with")
-load("//tools:version.bzl", "parse_version")
+load("//tools:version.bzl", "UPSTREAM_VERSION", "parse_version")
 load(":jemalloc_hdr.bzl", "jemalloc_hdr")
 
-version = parse_version(module_version())
+version = parse_version(UPSTREAM_VERSION)
 
 configure_header(
     name = "jemalloc_defs",
