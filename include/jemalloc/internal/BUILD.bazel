@@ -3,11 +3,9 @@ load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//tools:autoconf.bzl", "configure_header", "define_macro", "define_macro_if", "define_macro_if_any", "define_macro_if_with", "define_macro_with", "undefine_macro")
-load("//tools:version.bzl", "UPSTREAM_VERSION", "parse_version")
+load("//tools:version.bzl", "VERSION")
 load(":private_namespace.bzl", "private_namespace")
 load(":public_symbols.bzl", "public_symbols")
-
-version = parse_version(UPSTREAM_VERSION)
 
 cc_library(
     name = "internal",
@@ -544,7 +542,7 @@ PUBLIC_SYMBOLS = [
     "malloc_stats_print",
     "malloc_usable_size",
     "mallocx",
-    "smallocx_%s" % version.gid,
+    "smallocx_%s" % VERSION.gid,
     "nallocx",
     "posix_memalign",
     "rallocx",

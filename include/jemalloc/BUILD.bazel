@@ -2,10 +2,8 @@ load("@bazel_skylib//rules:expand_template.bzl", "expand_template")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//tools:autoconf.bzl", "configure_header", "define_macro_if", "define_macro_with")
-load("//tools:version.bzl", "UPSTREAM_VERSION", "parse_version")
+load("//tools:version.bzl", "VERSION")
 load(":jemalloc_hdr.bzl", "jemalloc_hdr")
-
-version = parse_version(UPSTREAM_VERSION)
 
 configure_header(
     name = "jemalloc_defs",
@@ -42,12 +40,12 @@ expand_template(
     name = "jemalloc_macros",
     out = "jemalloc_macros.h",
     substitutions = {
-        "@jemalloc_version@": version.full,
-        "@jemalloc_version_major@": version.major,
-        "@jemalloc_version_minor@": version.minor,
-        "@jemalloc_version_bugfix@": version.bugfix,
-        "@jemalloc_version_nrev@": version.nrev,
-        "@jemalloc_version_gid@": version.gid,
+        "@jemalloc_version@": VERSION.full,
+        "@jemalloc_version_major@": VERSION.major,
+        "@jemalloc_version_minor@": VERSION.minor,
+        "@jemalloc_version_bugfix@": VERSION.bugfix,
+        "@jemalloc_version_nrev@": VERSION.nrev,
+        "@jemalloc_version_gid@": VERSION.gid,
     },
     template = "jemalloc_macros.h.in",
 )

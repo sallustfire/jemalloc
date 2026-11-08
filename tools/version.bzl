@@ -4,15 +4,8 @@
 # read a source file while BUILD files load.
 UPSTREAM_VERSION = "5.3.0-0-g54eaed1d8b56b1aa528be3bdd1877e59c56fa90c"
 
-def parse_version(version):
-    """Parses upstream's VERSION string into configure's version components.
-
-    Args:
-        version: upstream's VERSION string, `<major>.<minor>.<bugfix>-<nrev>-g<gid>`.
-
-    Returns:
-        struct: full (the VERSION string), major, minor, bugfix, nrev and gid.
-    """
+def _parse_version(version):
+    """Splits a VERSION string, `<major>.<minor>.<bugfix>-<nrev>-g<gid>`, into configure's components."""
     release, nrev, gid = version.split("-", 2)
     major, minor, bugfix = release.split(".")
 
@@ -24,3 +17,6 @@ def parse_version(version):
         nrev = nrev,
         gid = gid.removeprefix("g"),
     )
+
+# UPSTREAM_VERSION's components: full (the whole string), major, minor, bugfix, nrev and gid (without the "g").
+VERSION = _parse_version(UPSTREAM_VERSION)
