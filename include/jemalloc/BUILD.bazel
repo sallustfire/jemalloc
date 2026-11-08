@@ -48,6 +48,7 @@ expand_template(
         "@jemalloc_version_gid@": VERSION.gid,
     },
     template = "jemalloc_macros.h.in",
+    visibility = ["//test:__subpackages__"],
 )
 
 sh_binary(
