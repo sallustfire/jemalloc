@@ -4,6 +4,7 @@ load("//tools:test.bzl", "join_conf", "test_name")
 load("//tools:transition.bzl", "PLATFORM", "transition_default_constraints")
 
 INTEGRATION_TESTS = [
+    {"src": "aligned_alloc.c"},
     {"src": "allocated.c"},
     {
         "src": "extent.c",
