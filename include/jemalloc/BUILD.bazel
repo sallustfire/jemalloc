@@ -142,6 +142,7 @@ cc_binary(
 jemalloc_hdr(
     name = "jemalloc",
     srcs = [
+        # do not sort: jemalloc.h concatenates them in this order
         ":jemalloc_defs",
         ":jemalloc_rename",
         ":jemalloc_macros",

@@ -633,8 +633,8 @@ genrule(
     outs = ["public_namespace.h"],
     cmd = "$(execpath :public_namespace_sh) $(execpath :public_symbols) > $@",
     cmd_bat = "$(execpath :public_namespace_sh) $(execpath :public_symbols) > $@",
-    tools = [":public_namespace_sh"],
     tags = ["manual"],
+    tools = [":public_namespace_sh"],
     visibility = ["//visibility:public"],
 )
 
@@ -651,7 +651,7 @@ genrule(
     outs = ["public_unnamespace.h"],
     cmd = "$(execpath :public_unnamespace_sh) $(execpath :public_symbols) > $@",
     cmd_bat = "$(execpath :public_unnamespace_sh) $(execpath :public_symbols) > $@",
-    tools = [":public_unnamespace_sh"],
     tags = ["manual"],
+    tools = [":public_unnamespace_sh"],
     visibility = ["//visibility:public"],
 )

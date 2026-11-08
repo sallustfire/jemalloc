@@ -107,9 +107,9 @@ transition_default_constraints(
     srcs = [test["src"]],
     copts = COPTS,
     env = {"JE_TEST_MALLOC_CONF": test.get("conf", "")},
+    flaky = test.get("flaky", False),
     local_defines = ["JEMALLOC_INTEGRATION_TEST"],
     target_compatible_with = test.get("target_compatible_with", []),
-    flaky = test.get("flaky", False),
     deps = [":testlib"],
 ) for test in INTEGRATION_TESTS + INTEGRATION_DECAY_TESTS + INTEGRATION_PROF_TESTS]
 
