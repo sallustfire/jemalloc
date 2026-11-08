@@ -1,27 +1,22 @@
 "Version string utilities."
 
-def parse_version(version):
-    """Parses raw version string into a structured version object.
+# Upstream's VERSION file (`git describe --long --abbrev=40`), which configure reads. A constant because Starlark cannot
+# read a source file while BUILD files load.
+UPSTREAM_VERSION = "5.3.0-0-g54eaed1d8b56b1aa528be3bdd1877e59c56fa90c"
 
-    Returns:
-        struct: Contains version components:
-            - full: Full version
-            - gid: Version git id
-            - major: Major version number
-            - minor: Minor version number
-            - patch: Patch version number
-            - bugfix: Bugfix version
-            - nrev: Revision number
-    """
-    prefix, gid = version.split("-bcr", 2)
-    major, minor, patch = prefix.split(".", 3)
+def _parse_version(version):
+    """Splits a VERSION string, `<major>.<minor>.<bugfix>-<nrev>-g<gid>`, into configure's components."""
+    release, nrev, gid = version.split("-", 2)
+    major, minor, bugfix = release.split(".")
 
     return struct(
-        full = prefix,
-        gid = "0",
+        full = version,
         major = major,
         minor = minor,
-        patch = patch,
-        bugfix = "0",
-        nrev = "0",
+        bugfix = bugfix,
+        nrev = nrev,
+        gid = gid.removeprefix("g"),
     )
+
+# UPSTREAM_VERSION's components: full (the whole string), major, minor, bugfix, nrev and gid (without the "g").
+VERSION = _parse_version(UPSTREAM_VERSION)

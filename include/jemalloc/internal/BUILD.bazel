@@ -3,11 +3,9 @@ load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//tools:autoconf.bzl", "configure_header", "define_macro", "define_macro_if", "define_macro_if_any", "define_macro_if_with", "define_macro_with", "undefine_macro")
-load("//tools:version.bzl", "parse_version")
+load("//tools:version.bzl", "VERSION")
 load(":private_namespace.bzl", "private_namespace")
 load(":public_symbols.bzl", "public_symbols")
-
-version = parse_version(module_version())
 
 cc_library(
     name = "internal",
@@ -544,7 +542,7 @@ PUBLIC_SYMBOLS = [
     "malloc_stats_print",
     "malloc_usable_size",
     "mallocx",
-    "smallocx_%s" % version.gid,
+    "smallocx_%s" % VERSION.gid,
     "nallocx",
     "posix_memalign",
     "rallocx",
@@ -635,8 +633,8 @@ genrule(
     outs = ["public_namespace.h"],
     cmd = "$(execpath :public_namespace_sh) $(execpath :public_symbols) > $@",
     cmd_bat = "$(execpath :public_namespace_sh) $(execpath :public_symbols) > $@",
-    tools = [":public_namespace_sh"],
     tags = ["manual"],
+    tools = [":public_namespace_sh"],
     visibility = ["//visibility:public"],
 )
 
@@ -653,7 +651,7 @@ genrule(
     outs = ["public_unnamespace.h"],
     cmd = "$(execpath :public_unnamespace_sh) $(execpath :public_symbols) > $@",
     cmd_bat = "$(execpath :public_unnamespace_sh) $(execpath :public_symbols) > $@",
-    tools = [":public_unnamespace_sh"],
     tags = ["manual"],
+    tools = [":public_unnamespace_sh"],
     visibility = ["//visibility:public"],
 )

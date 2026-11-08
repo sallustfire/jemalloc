@@ -1,0 +1,21 @@
+load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load(":version.bzl", "UPSTREAM_VERSION")
+
+write_file(
+    name = "upstream_version",
+    testonly = True,
+    out = "upstream_version.txt",
+    # The trailing "" ends the file with a newline, as the VERSION file does.
+    content = [
+        UPSTREAM_VERSION,
+        "",
+    ],
+    newline = "unix",
+)
+
+diff_test(
+    name = "version_test",
+    file1 = ":upstream_version",
+    file2 = "//:VERSION",
+)

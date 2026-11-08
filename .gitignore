@@ -79,8 +79,6 @@ test/include/test/jemalloc_test_defs.h
 /test/analyze/*.[od]
 /test/analyze/*.out
 
-/VERSION
-
 *.pdb
 *.sdf
 *.opendb
