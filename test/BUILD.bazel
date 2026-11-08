@@ -1,4 +1,4 @@
-load("@bazel_skylib//rules:expand_template.bzl", "expand_template")
+load("@bazel_lib//lib:expand_template.bzl", "expand_template")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//tools:cc.bzl", "COPTS")
 
@@ -6,18 +6,21 @@ expand_template(
     name = "jemalloc_test",
     testonly = True,
     out = "include/test/jemalloc_test.h",
+    stamp = 0,
     substitutions = {
         "@install_suffix@": "",
         "@je_@": "je_",
-        "@private_namespace@": "je_",
+        "@private_namespace@": "$(PRIVATE_NAMESPACE)je_",
     },
     template = "include/test/jemalloc_test.h.in",
+    toolchains = ["//settings/flags:private_namespace"],
 )
 
 expand_template(
     name = "jemalloc_test_defs",
     testonly = True,
     out = "include/test/jemalloc_test_defs.h",
+    stamp = 0,
     substitutions = {
         "#undef HAVE_SSE2": "/* #undef HAVE_SSE2 */",
         "#undef HAVE_ALTIVEC": "/* #undef HAVE_ALTIVEC */",

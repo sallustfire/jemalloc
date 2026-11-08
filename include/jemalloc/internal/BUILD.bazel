@@ -152,9 +152,10 @@ expand_template(
     stamp = 0,
     substitutions = {
         "@install_suffix@": "",
-        "@private_namespace@": "je_",
+        "@private_namespace@": "$(PRIVATE_NAMESPACE)je_",
     },
     template = "jemalloc_preamble.h.in",
+    toolchains = ["//settings/flags:private_namespace"],
 )
 
 # jemalloc is built to be the default allocator
@@ -243,8 +244,8 @@ configure_header(
         define_macro_if("JEMALLOC_OVERRIDE___LIBC_VALLOC", ":override_glibc_allocator") |
         # Internal symbol that no longer appears to exist or be public on modern linux + glibc
         undefine_macro("JEMALLOC_OVERRIDE___POSIX_MEMALIGN") |
-        # JEMALLOC_PRIVATE_NAMESPACE: Default to "je_" as in autoconf
-        define_macro_with("JEMALLOC_PRIVATE_NAMESPACE", "$(PRIVATE_NAMESPACE)je") |
+        # JEMALLOC_PRIVATE_NAMESPACE: Configurable flag, prepended to "je_" as in autoconf
+        define_macro_with("JEMALLOC_PRIVATE_NAMESPACE", "$(PRIVATE_NAMESPACE)je_") |
         # CPU_SPINWAIT and HAVE_CPU_SPINWAIT: Platform-specific spin wait instructions, depends on compiler
         select({
             "@platforms//cpu:x86_32": define_macro_with("HAVE_CPU_SPINWAIT", "1"),
