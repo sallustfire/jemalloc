@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
+#define JEMALLOC_NO_DEMANGLE
 #include <jemalloc/jemalloc.h>
 #include <errno.h>
 #include <getopt.h>
@@ -25,7 +27,7 @@ int test_stats_functionality(int verbose) {
     int ret;
 
     // Try to access stats.allocated - will fail if stats are disabled
-    ret = mallctl("stats.allocated", &allocated, &sz, NULL, 0);
+    ret = je_mallctl("stats.allocated", &allocated, &sz, NULL, 0);
 
     if (ret != 0) {
         fprintf(stderr, "Stats error: Failed to get stats.allocated: %s (error code: %d)\n",
@@ -42,28 +44,63 @@ int test_stats_functionality(int verbose) {
         printf("  Allocated: %zu bytes (%.2f MB)\n", allocated, (double)allocated / (1024 * 1024));
 
         // Get additional stats and print them when available
-        if (mallctl("stats.active", &active, &sz, NULL, 0) == 0) {
+        if (je_mallctl("stats.active", &active, &sz, NULL, 0) == 0) {
             printf("  Active: %zu bytes (%.2f MB)\n", active, (double)active / (1024 * 1024));
         }
 
-        if (mallctl("stats.resident", &resident, &sz, NULL, 0) == 0) {
+        if (je_mallctl("stats.resident", &resident, &sz, NULL, 0) == 0) {
             printf("  Resident: %zu bytes (%.2f MB)\n", resident, (double)resident / (1024 * 1024));
         }
 
-        if (mallctl("stats.metadata", &metadata, &sz, NULL, 0) == 0) {
+        if (je_mallctl("stats.metadata", &metadata, &sz, NULL, 0) == 0) {
             printf("  Metadata: %zu bytes (%.2f MB)\n", metadata, (double)metadata / (1024 * 1024));
         }
 
-        if (mallctl("stats.mapped", &mapped, &sz, NULL, 0) == 0) {
+        if (je_mallctl("stats.mapped", &mapped, &sz, NULL, 0) == 0) {
             printf("  Mapped: %zu bytes (%.2f MB)\n", mapped, (double)mapped / (1024 * 1024));
         }
 
-        if (mallctl("stats.retained", &retained, &sz, NULL, 0) == 0) {
+        if (je_mallctl("stats.retained", &retained, &sz, NULL, 0) == 0) {
             printf("  Retained: %zu bytes (%.2f MB)\n", retained, (double)retained / (1024 * 1024));
         }
     }
 
     return 0; // Stats are available
+}
+
+/*
+ * Under the platform's default prefix, plain malloc must reach jemalloc: through the replaced symbols when there is no
+ * prefix, and through the default malloc zone on macOS, where the prefix is je_. thread.allocated counts the bytes this
+ * thread allocates through jemalloc. The manual marks it [--enable-stats], but in this version thread events keep the
+ * counter and src/ctl.c does not gate it on stats, so the check also runs without stats.
+ * Returns 0 if malloc allocated from jemalloc, 1 if not
+ */
+int test_malloc_is_jemalloc(void) {
+    uint64_t before, after;
+    size_t sz = sizeof(uint64_t);
+
+    if (je_mallctl("thread.allocated", &before, &sz, NULL, 0) != 0) {
+        fprintf(stderr, "Error: je_mallctl 'thread.allocated' failed\n");
+        return 1;
+    }
+    // The volatile store keeps the compiler from eliding the malloc/free pair
+    void * volatile p = malloc(4096);
+    if (p == NULL) {
+        fprintf(stderr, "malloc(4096) failed\n");
+        return 1;
+    }
+    int ret = je_mallctl("thread.allocated", &after, &sz, NULL, 0);
+    free(p);
+    if (ret != 0) {
+        fprintf(stderr, "Error: je_mallctl 'thread.allocated' failed\n");
+        return 1;
+    }
+
+    if (after - before < 4096) {
+        fprintf(stderr, "malloc(4096) did not allocate from jemalloc\n");
+        return 1;
+    }
+    return 0;
 }
 
 int main(int argc, char** argv) {
@@ -102,7 +139,7 @@ int main(int argc, char** argv) {
     // Basic check to ensure jemalloc is loaded
     const char *version;
     size_t version_size = sizeof(version);
-    if (mallctl("version", (void*)&version, &version_size, NULL, 0) != 0) {
+    if (je_mallctl("version", (void*)&version, &version_size, NULL, 0) != 0) {
         fprintf(stderr, "Error: mallctl 'version' failed. Jemalloc not loaded?\n");
         return 1; // Always fail if jemalloc isn't loaded
     }
@@ -143,6 +180,11 @@ int main(int argc, char** argv) {
     } else {
         // Expecting stats to be unavailable
         exit_code = stats_unavailable ? 0 : 1;
+    }
+
+    // With or without stats, plain malloc must reach jemalloc
+    if (test_malloc_is_jemalloc()) {
+        exit_code = 1;
     }
 
     // Only print this if verbose mode is enabled

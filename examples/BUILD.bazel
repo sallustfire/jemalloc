@@ -1,10 +1,10 @@
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("@jemalloc//settings:config.bzl", "jemalloc")
 
-# test_api.c calls the API by its unprefixed names, which only a build without a prefix exports; configure defaults to
-# je_ on macOS and Windows.
-_UNPREFIXED = select({
-    "@platforms//os:macos": ["@platforms//:incompatible"],
+# test_api.c checks that plain malloc reaches jemalloc, which holds under the platform's default prefix: through the
+# replaced symbols, or on macOS through the zone. On Windows the default prefix is je_ and there is no zone to overlay,
+# so plain malloc stays with the C runtime.
+_MALLOC_REPLACED = select({
     "@platforms//os:windows": ["@platforms//:incompatible"],
     "//conditions:default": [],
 })
@@ -17,13 +17,13 @@ cc_test(
     malloc = "@jemalloc",
 )
 
-# Case 2: Test that the jemalloc API can be used
+# Case 2: Test that the jemalloc API can be used under any prefix
 cc_test(
     name = "test_2_api",
     size = "small",
     srcs = ["test_api.c"],
     malloc = "@jemalloc",
-    target_compatible_with = _UNPREFIXED,
+    target_compatible_with = _MALLOC_REPLACED,
 )
 
 # Case 3: Test convenience rule can modify the library build settings
@@ -50,7 +50,7 @@ cc_test(
     srcs = ["test_api.c"],
     args = ["--expect-stats-unavailable"],
     malloc = ":jemalloc_custom",
-    target_compatible_with = _UNPREFIXED,
+    target_compatible_with = _MALLOC_REPLACED,
 )
 
 # Case 5: On macOS, plain malloc reaches jemalloc through its zone
