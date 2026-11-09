@@ -22,7 +22,6 @@ def _jemalloc_transition_impl(settings, attr):
         "//settings/flags:enable_cxx": attr.cxx,
         "//settings/flags:enable_experimental_smallocx": attr.experimental_smallocx,
         "//settings/flags:enable_fill": attr.fill,
-        "//settings/flags:enable_lazy_lock": attr.lazy_lock,
         "//settings/flags:enable_log": attr.log,
         "//settings/flags:enable_stats": attr.stats,
         "//settings/flags:enable_uaf_detection": attr.uaf_detection,
@@ -38,6 +37,9 @@ def _jemalloc_transition_impl(settings, attr):
     # String flags
     if attr.jemalloc_prefix != _UNSET:
         result["//settings/flags:jemalloc_prefix"] = attr.jemalloc_prefix
+
+    if attr.lazy_lock != "":
+        result["//settings/flags:enable_lazy_lock"] = attr.lazy_lock
 
     if attr.zone_allocator != "":
         result["//settings/flags:enable_zone_allocator"] = attr.zone_allocator
@@ -95,7 +97,7 @@ jemalloc = rule(
             doc = "Prefix for the public API, as --with-jemalloc-prefix; \"\" for none, \"__auto__\" for configure's platform default.",
             default = _UNSET,
         ),
-        "lazy_lock": attr.string(values = ["True", "False", ""]),
+        "lazy_lock": attr.string(values = ["yes", "no", "__auto__", ""]),
         "lg_quantum": attr.int(default = -1),
         "log": attr.string(values = ["True", "False", ""]),
         "stats": attr.string(values = ["True", "False", ""]),

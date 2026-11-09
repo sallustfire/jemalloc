@@ -248,16 +248,9 @@ selects.config_setting_group(
 )
 
 config_setting(
-    name = "freebsd_lazy_lock",
-    constraint_values = ["@platforms//os:freebsd"],
-    flag_values = {"//settings/flags:enable_lazy_lock": "True"},
-    visibility = ["//visibility:private"],
-)
-
-config_setting(
     name = "windows_lazy_lock",
     constraint_values = ["@platforms//os:windows"],
-    flag_values = {"//settings/flags:enable_lazy_lock": "True"},
+    flag_values = {"//settings/flags:enable_lazy_lock": "yes"},
     visibility = ["//visibility:private"],
 )
 
@@ -632,11 +625,17 @@ autoconf(
         "//settings/flags:cxx": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_ENABLE_CXX", "")],
         "//conditions:default": [],
     }) + select({
-        # configure.ac defaults lazy locking on for FreeBSD and forces it off for the pecoff ABI.
-        "//settings/flags:lazy_lock": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_LAZY_LOCK", "")],
-        ":freebsd_lazy_lock": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_LAZY_LOCK", "")],
+        "//settings/flags:lazy_lock": [
+            checks.AC_TRY_COMPILE(
+                name = "lazy_lock_dlsym",
+                code = utils.AC_LANG_PROGRAM("", ""),
+                error = "Missing dlsym support: lazy-lock cannot be enabled.",
+                requires = ["ac_cv_func_dlsym || ac_cv_lib_dl_dlsym"],
+            ),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_LAZY_LOCK", ""),
+        ],
+        # configure.ac forces lazy locking off for the pecoff ABI.
         ":windows_lazy_lock": [],
-        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_LAZY_LOCK", "")],
         "//conditions:default": [],
     }) + select({
         cpu: [

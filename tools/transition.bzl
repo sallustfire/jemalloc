@@ -21,6 +21,7 @@ CPU = select({
 # Assume typical defaults for target platforms. A "<platform>-<cpu>" key takes precedence over a "<platform>" key, and
 # that over a "*-<cpu>" key.
 _PLATFORM_DEFAULTS = {
+    "//settings/flags:enable_lazy_lock": {"freebsd": "yes", "default": "no"},
     "//settings/flags:enable_zone_allocator": {"darwin": "yes", "default": "no"},
     # configure.ac's --with-jemalloc-prefix default: "je_" for the macho and pecoff ABIs, "" otherwise.
     "//settings/flags:jemalloc_prefix": {"darwin": "je_", "windows": "je_", "default": ""},

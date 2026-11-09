@@ -41,6 +41,7 @@ See the [examples/BUILD.bazel](examples/BUILD.bazel) file for examples of how to
  However, they are deprecated since glibc 2.34. The jemalloc source likely needs to be updated to reflect this.
 
 Platform configurations that have defaults that are applied via transition.
+- //settings/flags:enable_lazy_lock
 - //settings/flags:enable_zone_allocator
 - //settings/flags:jemalloc_prefix
 - //settings/platform:glibc_overrides_support
