@@ -6,7 +6,8 @@ load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc_autoconf//autoconf:autoconf.bzl", "autoconf")
 load("@rules_cc_autoconf//autoconf:autoconf_hdr.bzl", "autoconf_hdr")
-load("@rules_cc_autoconf//autoconf:checks.bzl", "checks")
+load("@rules_cc_autoconf//autoconf:checks.bzl", "checks", "utils")
+load("//tools:configure_host.bzl", "HOST_CC_DEPS", "HOST_CPPFLAGS")
 load("//tools:transition.bzl", "CPU", "PLATFORM")
 load(":private_namespace.bzl", "jemalloc_private_namespace", "private_namespace", "private_namespace_leak_test")
 load(":public_symbols.bzl", "public_symbols", "public_symbols_header")
@@ -311,31 +312,258 @@ autoconf(
             unquote = True,
         ),
     ],
+    cc_deps = HOST_CC_DEPS,
     checks = [
-        checks.AC_DEFINE_UNQUOTED("JEMALLOC_C11_ATOMICS", ""),
+        checks.AC_TRY_COMPILE(
+            name = "ac_cv_c_compiler_gnu",
+            code = utils.AC_LANG_PROGRAM(
+                "",
+                [
+                    "#ifndef __GNUC__",
+                    "       choke me",
+                    "#endif",
+                ],
+            ),
+        ),
+        checks.AC_TRY_COMPILE(
+            name = "je_cv_msvc",
+            code = utils.AC_LANG_PROGRAM(
+                "",
+                [
+                    "#ifndef _MSC_VER",
+                    "  int fail[-1];",
+                    "#endif",
+                ],
+            ),
+            requires = ["!ac_cv_c_compiler_gnu"],
+        ),
     ] + select({
-        compiler: [
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_GCC_ATOMIC_ATOMICS", ""),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_GCC_U8_ATOMIC_ATOMICS", ""),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_GCC_SYNC_ATOMICS", ""),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_GCC_U8_SYNC_ATOMICS", ""),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_BUILTIN_CLZ", ""),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_INTERNAL_UNREACHABLE", "__builtin_unreachable"),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_INTERNAL_FFSLL", "__builtin_ffsll"),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_INTERNAL_FFSL", "__builtin_ffsl"),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_INTERNAL_FFS", "__builtin_ffs"),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_INTERNAL_POPCOUNTL", "__builtin_popcountl"),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_INTERNAL_POPCOUNT", "__builtin_popcount"),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAS_RESTRICT", ""),
-        ]
-        for compiler in [
-            "@rules_cc//cc/compiler:clang",
-            "@rules_cc//cc/compiler:clang-cl",
-            "@rules_cc//cc/compiler:emscripten",
-            "@rules_cc//cc/compiler:gcc",
-            "@rules_cc//cc/compiler:mingw-gcc",
-        ]
-    } | {"//conditions:default": []}) + select({
+        # configure.ac's host table defines it for Android whatever the probe finds.
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_C11_ATOMICS", "")],
+        "//conditions:default": [
+            checks.AC_TRY_LINK(
+                name = "je_cv_c11_atomics",
+                code = utils.AC_LANG_PROGRAM(
+                    [
+                        "#include <stdint.h>",
+                        "#if (__STDC_VERSION__ >= 201112L) && !defined(__STDC_NO_ATOMICS__)",
+                        "#include <stdatomic.h>",
+                        "#else",
+                        "#error Atomics not available",
+                        "#endif",
+                    ],
+                    [
+                        "uint64_t *p = (uint64_t *)0;",
+                        "uint64_t x = 1;",
+                        "volatile atomic_uint_least64_t *a = (volatile atomic_uint_least64_t *)p;",
+                        "uint64_t r = atomic_fetch_add(a, x) + x;",
+                        "return r == 0;",
+                    ],
+                ),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_C11_ATOMICS",
+                condition = "je_cv_c11_atomics",
+            ),
+        ],
+    }) + [
+        checks.AC_TRY_LINK(
+            name = "je_cv_gcc_atomic_atomics",
+            code = utils.AC_LANG_PROGRAM(
+                "",
+                [
+                    "int x = 0;",
+                    "int val = 1;",
+                    "int y = __atomic_fetch_add(&x, val, __ATOMIC_RELAXED);",
+                    "int after_add = x;",
+                    "return after_add == 1;",
+                ],
+            ),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_GCC_ATOMIC_ATOMICS",
+            condition = "je_cv_gcc_atomic_atomics",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_gcc_u8_atomic_atomics",
+            code = utils.AC_LANG_PROGRAM(
+                "",
+                [
+                    "unsigned char x = 0;",
+                    "int val = 1;",
+                    "int y = __atomic_fetch_add(&x, val, __ATOMIC_RELAXED);",
+                    "int after_add = (int)x;",
+                    "return after_add == 1;",
+                ],
+            ),
+            requires = ["je_cv_gcc_atomic_atomics"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_GCC_U8_ATOMIC_ATOMICS",
+            condition = "je_cv_gcc_u8_atomic_atomics",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_gcc_sync_atomics",
+            code = utils.AC_LANG_PROGRAM(
+                "",
+                [
+                    "int x = 0;",
+                    "int before_add = __sync_fetch_and_add(&x, 1);",
+                    "int after_add = x;",
+                    "return (before_add == 0) && (after_add == 1);",
+                ],
+            ),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_GCC_SYNC_ATOMICS",
+            condition = "je_cv_gcc_sync_atomics",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_gcc_u8_sync_atomics",
+            code = utils.AC_LANG_PROGRAM(
+                "",
+                [
+                    "unsigned char x = 0;",
+                    "int before_add = __sync_fetch_and_add(&x, 1);",
+                    "int after_add = (int)x;",
+                    "return (before_add == 0) && (after_add == 1);",
+                ],
+            ),
+            requires = ["je_cv_gcc_sync_atomics"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_GCC_U8_SYNC_ATOMICS",
+            condition = "je_cv_gcc_u8_sync_atomics",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_builtin_clz",
+            code = utils.AC_LANG_PROGRAM(
+                "",
+                [
+                    "{",
+                    "        unsigned x = 0;",
+                    "        int y = __builtin_clz(x);",
+                    "}",
+                    "{",
+                    "        unsigned long x = 0;",
+                    "        int y = __builtin_clzl(x);",
+                    "}",
+                    "{",
+                    "        unsigned long long x = 0;",
+                    "        int y = __builtin_clzll(x);",
+                    "}",
+                ],
+            ),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_BUILTIN_CLZ",
+            condition = "je_cv_builtin_clz",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_gcc_builtin_unreachable",
+            code = utils.AC_LANG_PROGRAM(
+                [
+                    "void foo (void) {",
+                    "  __builtin_unreachable();",
+                    "}",
+                ],
+                [
+                    "{",
+                    "        foo();",
+                    "}",
+                ],
+            ),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_INTERNAL_UNREACHABLE",
+            condition = "je_cv_gcc_builtin_unreachable",
+            if_false = "abort",
+            if_true = "__builtin_unreachable",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_gcc_builtin_ffsl",
+            code = utils.AC_LANG_PROGRAM(
+                [
+                    "#include <stdio.h>",
+                    "#include <strings.h>",
+                    "#include <string.h>",
+                ],
+                [
+                    "{",
+                    "        int rv = __builtin_ffsl(0x08);",
+                    "        printf(\"%d\\n\", rv);",
+                    "}",
+                ],
+            ),
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_function_ffsl",
+            code = utils.AC_LANG_PROGRAM(
+                [
+                    "#include <stdio.h>",
+                    "#include <strings.h>",
+                    "#include <string.h>",
+                ],
+                [
+                    "{",
+                    "        int rv = ffsl(0x08);",
+                    "        printf(\"%d\\n\", rv);",
+                    "}",
+                ],
+            ),
+            requires = ["!je_cv_gcc_builtin_ffsl"],
+        ),
+        checks.AC_TRY_COMPILE(
+            name = "ffsl_available",
+            code = utils.AC_LANG_PROGRAM("", ""),
+            error = "Cannot build without ffsl(3) or __builtin_ffsl()",
+            requires = ["je_cv_gcc_builtin_ffsl || je_cv_function_ffsl"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_INTERNAL_FFSLL",
+            condition = "je_cv_gcc_builtin_ffsl",
+            if_false = "ffsll",
+            if_true = "__builtin_ffsll",
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_INTERNAL_FFSL",
+            condition = "je_cv_gcc_builtin_ffsl",
+            if_false = "ffsl",
+            if_true = "__builtin_ffsl",
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_INTERNAL_FFS",
+            condition = "je_cv_gcc_builtin_ffsl",
+            if_false = "ffs",
+            if_true = "__builtin_ffs",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_gcc_builtin_popcountl",
+            code = utils.AC_LANG_PROGRAM(
+                [
+                    "#include <stdio.h>",
+                    "#include <strings.h>",
+                    "#include <string.h>",
+                ],
+                [
+                    "{",
+                    "        int rv = __builtin_popcountl(0x08);",
+                    "        printf(\"%d\\n\", rv);",
+                    "}",
+                ],
+            ),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_INTERNAL_POPCOUNT",
+            condition = "je_cv_gcc_builtin_popcountl",
+            if_true = "__builtin_popcount",
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_INTERNAL_POPCOUNTL",
+            condition = "je_cv_gcc_builtin_popcountl",
+            if_true = "__builtin_popcountl",
+        ),
+    ] + select({
         "//settings/flags:no_jemalloc_prefix": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_IS_MALLOC", "")],
         "//conditions:default": [],
     }) + select({
@@ -393,23 +621,44 @@ autoconf(
         "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_LAZY_LOCK", "")],
         "//conditions:default": [],
     }) + select({
-        "@platforms//cpu:aarch32": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
-        "@platforms//cpu:aarch64": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
-        "@platforms//cpu:arm64_32": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
-        "@platforms//cpu:arm64e": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
-        "@platforms//cpu:armv6-m": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
-        "@platforms//cpu:armv7": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
-        "@platforms//cpu:armv7-m": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
-        "@platforms//cpu:armv7e-m": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
-        "@platforms//cpu:armv7e-mf": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
-        "@platforms//cpu:armv7k": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
-        "@platforms//cpu:armv8-m": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
-        "@platforms//cpu:cortex-r52": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
-        "@platforms//cpu:cortex-r82": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
-        "@platforms//cpu:x86_32": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
-        "@platforms//cpu:x86_64": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
-        "//conditions:default": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "0")],
-    }) + select({
+        cpu: [
+            checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1"),
+            checks.AC_TRY_LINK(
+                name = "je_cv_isb",
+                code = utils.AC_LANG_PROGRAM("", "__asm__ volatile(\"isb\"); return 0;"),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "CPU_SPINWAIT",
+                condition = "je_cv_isb",
+                if_false = "",
+                if_true = "__asm__ volatile(\"isb\")",
+            ),
+        ]
+        for cpu in [
+            "@platforms//cpu:aarch32",
+            "@platforms//cpu:aarch64",
+            "@platforms//cpu:arm64_32",
+            "@platforms//cpu:arm64e",
+            "@platforms//cpu:armv6-m",
+            "@platforms//cpu:armv7",
+            "@platforms//cpu:armv7-m",
+            "@platforms//cpu:armv7e-m",
+            "@platforms//cpu:armv7e-mf",
+            "@platforms//cpu:armv7k",
+            "@platforms//cpu:armv8-m",
+            "@platforms//cpu:cortex-r52",
+            "@platforms//cpu:cortex-r82",
+        ]
+    } | {
+        cpu: [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")]
+        for cpu in [
+            "@platforms//cpu:x86_32",
+            "@platforms//cpu:x86_64",
+        ]
+    } | {"//conditions:default": [
+        checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "0"),
+        checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", ""),
+    ]}) + select({
         "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_DONTNEED_ZEROS", "")],
         "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_DONTNEED_ZEROS", "")],
         "//conditions:default": [],
@@ -463,9 +712,33 @@ autoconf(
         "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_MUTEX_INIT_CB", "")],
         "//conditions:default": [],
     }) + select({
+        "@platforms//os:android": [],
+        # configure.ac forces TLS on where _malloc_thread_cleanup exists, which this header asserts for FreeBSD.
         "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS", "")],
-        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS", "")],
-        "//conditions:default": [],
+        "@platforms//os:ios": [],
+        "@platforms//os:macos": [],
+        "@platforms//os:openbsd": [],
+        "@platforms//os:qnx": [],
+        "@platforms//os:tvos": [],
+        "@platforms//os:watchos": [],
+        "@platforms//os:windows": [],
+        "//conditions:default": [
+            checks.AC_TRY_COMPILE(
+                name = "enable_tls",
+                code = utils.AC_LANG_PROGRAM(
+                    "    __thread int x;",
+                    [
+                        "    x = 42;",
+                        "",
+                        "    return 0;",
+                    ],
+                ),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_TLS",
+                condition = "enable_tls",
+            ),
+        ],
     }) + select({
         "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_DSS", "")],
         "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_DSS", "")],
@@ -610,19 +883,154 @@ autoconf(
         "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MALLOC_SIZE", "")],
         "//conditions:default": [],
     }) + [
-        checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_INT", "2"),
-        checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_LONG_LONG", "3"),
-        checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_INTMAX_T", "3"),
-    ] + select(
-        {
-            "@platforms//cpu:aarch32": [checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_LONG", "2")],
-            "@platforms//cpu:aarch64": [checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_LONG", "3")],
-            "@platforms//cpu:x86_32": [checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_LONG", "2")],
-            "@platforms//cpu:x86_64": [checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_LONG", "3")],
-            "@platforms//os:windows": [checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_LONG", "2")],
-        },
-        no_match_error = "Determined by ABI, support for less common target cpus not yet implemented",
-    ) + select({
+        # configure.ac's AC_C_BIGENDIAN tries <sys/param.h>, then <limits.h>. Where neither names the byte order it
+        # runs a program, or greps an object file when cross-compiling; the compiler's predefined macros stand in.
+        checks.AC_TRY_COMPILE(
+            name = "byte_order_in_sys_param",
+            code = utils.AC_LANG_PROGRAM(
+                [
+                    "#include <sys/types.h>",
+                    "#include <sys/param.h>",
+                ],
+                [
+                    "#if ! (defined BYTE_ORDER && defined BIG_ENDIAN \\",
+                    "       && defined LITTLE_ENDIAN && BYTE_ORDER && BIG_ENDIAN \\",
+                    "       && LITTLE_ENDIAN)",
+                    " bogus endian macros",
+                    "#endif",
+                ],
+            ),
+        ),
+        checks.AC_TRY_COMPILE(
+            name = "big_endian_in_sys_param",
+            code = utils.AC_LANG_PROGRAM(
+                [
+                    "#include <sys/types.h>",
+                    "#include <sys/param.h>",
+                ],
+                [
+                    "#if BYTE_ORDER != BIG_ENDIAN",
+                    " not big endian",
+                    "#endif",
+                ],
+            ),
+            requires = ["byte_order_in_sys_param"],
+        ),
+        checks.AC_TRY_COMPILE(
+            name = "byte_order_in_limits",
+            code = utils.AC_LANG_PROGRAM(
+                "#include <limits.h>",
+                [
+                    "#if ! (defined _LITTLE_ENDIAN || defined _BIG_ENDIAN)",
+                    " bogus endian macros",
+                    "#endif",
+                ],
+            ),
+            requires = ["!byte_order_in_sys_param"],
+        ),
+        checks.AC_TRY_COMPILE(
+            name = "big_endian_in_limits",
+            code = utils.AC_LANG_PROGRAM(
+                "#include <limits.h>",
+                [
+                    "#ifndef _BIG_ENDIAN",
+                    " not big endian",
+                    "#endif",
+                ],
+            ),
+            requires = ["byte_order_in_limits"],
+        ),
+        # Every MSVC target is little-endian.
+        checks.AC_TRY_COMPILE(
+            name = "byte_order_predefined",
+            code = utils.AC_LANG_PROGRAM(
+                "",
+                [
+                    "#if ! ((defined __BYTE_ORDER__ && defined __ORDER_BIG_ENDIAN__) || defined _MSC_VER)",
+                    " unknown endianness",
+                    "#endif",
+                ],
+            ),
+            requires = ["!byte_order_in_sys_param && !byte_order_in_limits"],
+        ),
+        checks.AC_TRY_COMPILE(
+            name = "byte_order_known",
+            code = utils.AC_LANG_PROGRAM("", ""),
+            error = "unknown endianness: neither <sys/param.h>, <limits.h> nor the compiler's predefined macros name the byte order",
+            requires = ["byte_order_in_sys_param || byte_order_in_limits || byte_order_predefined"],
+        ),
+        checks.AC_TRY_COMPILE(
+            name = "big_endian_predefined",
+            code = utils.AC_LANG_PROGRAM(
+                "",
+                [
+                    "#if ! (defined __BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)",
+                    " not big endian",
+                    "#endif",
+                ],
+            ),
+            requires = ["byte_order_predefined"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_BIG_ENDIAN",
+            condition = "big_endian_in_sys_param || big_endian_in_limits || big_endian_predefined",
+        ),
+        # AC_CHECK_SIZEOF bisects at compile time, so it is cross-safe; the define is the log of the size.
+        checks.AC_CHECK_SIZEOF("int"),
+        checks.AC_TRY_COMPILE(
+            name = "int_size_supported",
+            code = utils.AC_LANG_PROGRAM("", ""),
+            error = "Unsupported int size: sizeof(int) is neither 8 nor 4",
+            requires = ["ac_cv_sizeof_int==8 || ac_cv_sizeof_int==4"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "LG_SIZEOF_INT",
+            condition = "ac_cv_sizeof_int==8",
+            if_false = "2",
+            if_true = "3",
+        ),
+        checks.AC_CHECK_SIZEOF("long"),
+        checks.AC_TRY_COMPILE(
+            name = "long_size_supported",
+            code = utils.AC_LANG_PROGRAM("", ""),
+            error = "Unsupported long size: sizeof(long) is neither 8 nor 4",
+            requires = ["ac_cv_sizeof_long==8 || ac_cv_sizeof_long==4"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "LG_SIZEOF_LONG",
+            condition = "ac_cv_sizeof_long==8",
+            if_false = "2",
+            if_true = "3",
+        ),
+        checks.AC_CHECK_SIZEOF("long long"),
+        checks.AC_TRY_COMPILE(
+            name = "long_long_size_supported",
+            code = utils.AC_LANG_PROGRAM("", ""),
+            error = "Unsupported long long size: sizeof(long long) is neither 8 nor 4",
+            requires = ["ac_cv_sizeof_long_long==8 || ac_cv_sizeof_long_long==4"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "LG_SIZEOF_LONG_LONG",
+            condition = "ac_cv_sizeof_long_long==8",
+            if_false = "2",
+            if_true = "3",
+        ),
+        checks.AC_CHECK_SIZEOF("intmax_t"),
+        # configure.ac also maps 4 to 2, but C99 makes intmax_t at least as wide as long long (64 bits), and a define
+        # takes one of two values.
+        checks.AC_TRY_COMPILE(
+            name = "intmax_t_size_supported",
+            code = utils.AC_LANG_PROGRAM("", ""),
+            error = "Unsupported intmax_t size: sizeof(intmax_t) is neither 16 nor 8",
+            requires = ["ac_cv_sizeof_intmax_t==16 || ac_cv_sizeof_intmax_t==8"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "LG_SIZEOF_INTMAX_T",
+            condition = "ac_cv_sizeof_intmax_t==16",
+            if_false = "3",
+            if_true = "4",
+        ),
+    ] + select({
         "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_PTHREAD_MUTEX_ADAPTIVE_NP", "")],
         "//conditions:default": [],
     }) + select({
@@ -630,16 +1038,6 @@ autoconf(
         "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_VM_MAKE_TAG", "")],
         "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_VM_MAKE_TAG", "")],
         "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_VM_MAKE_TAG", "")],
-        "//conditions:default": [],
-    }) + select({
-        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS_MODEL", "__attribute__((tls_model(\"initial-exec\")))")],
-        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS_MODEL", "__attribute__((tls_model(\"initial-exec\")))")],
-        "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS_MODEL", "__attribute__((tls_model(\"initial-exec\")))")],
-        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS_MODEL", "__attribute__((tls_model(\"initial-exec\")))")],
-        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS_MODEL", "__attribute__((tls_model(\"initial-exec\")))")],
-        "@platforms//os:openbsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS_MODEL", "__attribute__((tls_model(\"initial-exec\")))")],
-        "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS_MODEL", "__attribute__((tls_model(\"initial-exec\")))")],
-        "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS_MODEL", "__attribute__((tls_model(\"initial-exec\")))")],
         "//conditions:default": [],
     }) + select({
         "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_USE_SYSCALL", "")],
@@ -652,7 +1050,139 @@ autoconf(
         "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_STRERROR_R_RETURNS_CHAR_WITH_GNU_SOURCE", "")],
         "//conditions:default": [],
     }),
+    copts = HOST_CPPFLAGS,
     tags = ["manual"],
+)
+
+# A define takes one of two values, so CPU_SPINWAIT reads je_cv_pause_msvc or je_cv_pause by compiler, and a check
+# fails the build if that choice disagrees with configure.ac's je_cv_msvc probe.
+autoconf(
+    name = "jemalloc_internal_defs_x86_spinwait_checks",
+    cc_deps = HOST_CC_DEPS,
+    checks = [
+        checks.AC_TRY_LINK(
+            name = "je_cv_pause_msvc",
+            code = utils.AC_LANG_PROGRAM("", "_mm_pause(); return 0;"),
+            requires = ["je_cv_msvc"],
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_pause",
+            code = utils.AC_LANG_PROGRAM("", "__asm__ volatile(\"pause\"); return 0;"),
+            requires = ["!je_cv_msvc"],
+        ),
+    ] + select({
+        compiler: [
+            checks.AC_TRY_COMPILE(
+                name = "msvc_compiler_consistent",
+                code = utils.AC_LANG_PROGRAM("", ""),
+                error = "The compiler does not define _MSC_VER, but rules_cc identifies it as an MSVC-compatible compiler",
+                requires = ["je_cv_msvc"],
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "CPU_SPINWAIT",
+                condition = "je_cv_pause_msvc",
+                if_false = "",
+                if_true = "_mm_pause()",
+            ),
+        ]
+        for compiler in [
+            "@rules_cc//cc/compiler:clang-cl",
+            "@rules_cc//cc/compiler:msvc-cl",
+        ]
+    } | {"//conditions:default": [
+        checks.AC_TRY_COMPILE(
+            name = "msvc_compiler_consistent",
+            code = utils.AC_LANG_PROGRAM("", ""),
+            error = "The compiler defines _MSC_VER, but rules_cc does not identify it as msvc-cl or clang-cl",
+            requires = ["!je_cv_msvc"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "CPU_SPINWAIT",
+            condition = "je_cv_pause",
+            if_false = "",
+            if_true = "__asm__ volatile(\"pause\")",
+        ),
+    ]}),
+    copts = HOST_CPPFLAGS,
+    tags = ["manual"],
+    deps = [":jemalloc_internal_defs_checks"],
+)
+
+# configure.ac adds -Werror only around these probes (JE_CFLAGS_SAVE/JE_CFLAGS_RESTORE), so a construct the compiler
+# merely warns about counts as unsupported. The flag is set once on this target rather than on each check. msvc-cl gets
+# no flag: cl ignores -Werror with a warning, so configure's probes run without it there.
+autoconf(
+    name = "jemalloc_internal_defs_warnings_as_errors_checks",
+    cc_deps = HOST_CC_DEPS,
+    checks = [
+        checks.AC_TRY_LINK(
+            name = "je_cv_tls_model",
+            code = utils.AC_LANG_PROGRAM(
+                "",
+                [
+                    "static __thread int",
+                    "               __attribute__((tls_model(\"initial-exec\"), unused)) foo;",
+                    "               foo = 0;",
+                ],
+            ),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_TLS_MODEL",
+            condition = "je_cv_tls_model",
+            if_false = "",
+            if_true = "__attribute__((tls_model(\"initial-exec\")))",
+        ),
+    ],
+    copts = select({
+        "@rules_cc//cc/compiler:msvc-cl": [],
+        "//conditions:default": ["-Werror"],
+    }) + HOST_CPPFLAGS,
+    tags = ["manual"],
+)
+
+autoconf(
+    name = "jemalloc_internal_defs_std_gnu11_checks",
+    cc_deps = HOST_CC_DEPS,
+    checks = [
+        checks.AC_TRY_COMPILE(
+            name = "je_cv_cflags_added_std_gnu11",
+            code = utils.AC_LANG_PROGRAM("", "return 0;"),
+            requires = ["ac_cv_c_compiler_gnu"],
+        ),
+    ],
+    copts = select({
+        "@rules_cc//cc/compiler:clang-cl": [],
+        "@rules_cc//cc/compiler:msvc-cl": [],
+        "//conditions:default": ["-std=gnu11"],
+    }) + HOST_CPPFLAGS,
+    tags = ["manual"],
+    deps = [":jemalloc_internal_defs_checks"],
+)
+
+autoconf(
+    name = "jemalloc_internal_defs_std_gnu99_checks",
+    cc_deps = HOST_CC_DEPS,
+    checks = [
+        checks.AC_TRY_COMPILE(
+            name = "je_cv_cflags_added_std_gnu99",
+            code = utils.AC_LANG_PROGRAM("", "return 0;"),
+            requires = [
+                "ac_cv_c_compiler_gnu",
+                "!je_cv_cflags_added_std_gnu11",
+            ],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAS_RESTRICT",
+            condition = "je_cv_cflags_added_std_gnu11 || je_cv_cflags_added_std_gnu99",
+        ),
+    ],
+    copts = select({
+        "@rules_cc//cc/compiler:clang-cl": [],
+        "@rules_cc//cc/compiler:msvc-cl": [],
+        "//conditions:default": ["-std=gnu99"],
+    }) + HOST_CPPFLAGS,
+    tags = ["manual"],
+    deps = [":jemalloc_internal_defs_std_gnu11_checks"],
 )
 
 autoconf(
@@ -685,65 +1215,25 @@ autoconf(
     tags = ["manual"],
 )
 
-autoconf(
-    name = "jemalloc_internal_defs_arm_spinwait",
-    checks = select({
-        "@rules_cc//cc/compiler:clang": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "__asm__ volatile(\"isb\")")],
-        "@rules_cc//cc/compiler:clang-cl": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "__asm__ volatile(\"isb\")")],
-        "@rules_cc//cc/compiler:gcc": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "__asm__ volatile(\"isb\")")],
-        "@rules_cc//cc/compiler:mingw-gcc": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "__asm__ volatile(\"isb\")")],
-        "//conditions:default": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "")],
-    }),
-    tags = ["manual"],
-)
-
-autoconf(
-    name = "jemalloc_internal_defs_x86_spinwait",
-    checks = select({
-        "@rules_cc//cc/compiler:clang": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "__asm__ volatile(\"pause\")")],
-        "@rules_cc//cc/compiler:clang-cl": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "_mm_pause()")],
-        "@rules_cc//cc/compiler:gcc": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "__asm__ volatile(\"pause\")")],
-        "@rules_cc//cc/compiler:mingw-gcc": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "__asm__ volatile(\"pause\")")],
-        "@rules_cc//cc/compiler:msvc-cl": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "_mm_pause()")],
-        "//conditions:default": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "")],
-    }),
-    tags = ["manual"],
-)
-
-autoconf(
-    name = "jemalloc_internal_defs_empty_spinwait",
-    checks = [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "")],
-    tags = ["manual"],
-)
-
 autoconf_hdr(
     name = "jemalloc_internal_defs",
     out = "jemalloc_internal_defs.h",
     tags = ["manual"],
     template = "jemalloc_internal_defs.h.in",
-    deps = [":jemalloc_internal_defs_checks"] + select({
+    deps = [
+        ":jemalloc_internal_defs_checks",
+        ":jemalloc_internal_defs_std_gnu99_checks",
+        ":jemalloc_internal_defs_warnings_as_errors_checks",
+    ] + select({
         "//settings/flags:no_jemalloc_prefix": [],
         "//conditions:default": [":jemalloc_internal_defs_prefix"],
     }) + select({
         "//settings/flags:no_lg_quantum": [],
         "//conditions:default": [":jemalloc_internal_defs_lg_quantum"],
     }) + select({
-        "@platforms//cpu:aarch32": [":jemalloc_internal_defs_arm_spinwait"],
-        "@platforms//cpu:aarch64": [":jemalloc_internal_defs_arm_spinwait"],
-        "@platforms//cpu:arm64_32": [":jemalloc_internal_defs_arm_spinwait"],
-        "@platforms//cpu:arm64e": [":jemalloc_internal_defs_arm_spinwait"],
-        "@platforms//cpu:armv6-m": [":jemalloc_internal_defs_arm_spinwait"],
-        "@platforms//cpu:armv7": [":jemalloc_internal_defs_arm_spinwait"],
-        "@platforms//cpu:armv7-m": [":jemalloc_internal_defs_arm_spinwait"],
-        "@platforms//cpu:armv7e-m": [":jemalloc_internal_defs_arm_spinwait"],
-        "@platforms//cpu:armv7e-mf": [":jemalloc_internal_defs_arm_spinwait"],
-        "@platforms//cpu:armv7k": [":jemalloc_internal_defs_arm_spinwait"],
-        "@platforms//cpu:armv8-m": [":jemalloc_internal_defs_arm_spinwait"],
-        "@platforms//cpu:cortex-r52": [":jemalloc_internal_defs_arm_spinwait"],
-        "@platforms//cpu:cortex-r82": [":jemalloc_internal_defs_arm_spinwait"],
-        "@platforms//cpu:x86_32": [":jemalloc_internal_defs_x86_spinwait"],
-        "@platforms//cpu:x86_64": [":jemalloc_internal_defs_x86_spinwait"],
-        "//conditions:default": [":jemalloc_internal_defs_empty_spinwait"],
+        "@platforms//cpu:x86_32": [":jemalloc_internal_defs_x86_spinwait_checks"],
+        "@platforms//cpu:x86_64": [":jemalloc_internal_defs_x86_spinwait_checks"],
+        "//conditions:default": [],
     }),
 )
 
