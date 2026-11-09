@@ -175,7 +175,7 @@ jobs:
       - name: Download upstream release
         shell: bash
         run: |
-          version="$(sed -n '/^ *version = "/{s/^ *version = "\([^"]*\)".*/\1/p;q}' MODULE.bazel)"
+          version="$(sed -n '/^ *version = "/{s/^ *version = "\([^"]*\)".*/\1/p;q;}' MODULE.bazel)"
           upstream="${version%%-bcr.*}"
           curl --fail --silent --show-error --location -o "${RUNNER_TEMP}/upstream.tar.bz2" \
             "https://github.com/jemalloc/jemalloc/releases/download/${upstream}/jemalloc-${upstream}.tar.bz2"
