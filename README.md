@@ -47,7 +47,6 @@ Platform configurations that have defaults that are applied via transition.
 - //settings/platform:lg_page
 - //settings/platform:memalign_support
 - //settings/platform:malloc_size_support
-- //settings/platform:usable_size_const
 - //settings/platform:valloc_support
 
 ## Fidelity with upstream

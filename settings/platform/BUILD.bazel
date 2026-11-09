@@ -51,19 +51,6 @@ config_setting(
     visibility = ["//visibility:public"],
 )
 
-# JEMALLOC_USABLE_SIZE_CONST: Whether malloc_usable_size can accepts const, glibc on linux apparently omits it
-string_flag(
-    name = "usable_size_const",
-    build_setting_default = "__auto__",
-    make_variable = "JEMALLOC_USABLE_SIZE_CONST",
-    values = [
-        "",
-        "const",
-        "__auto__",
-    ],
-    visibility = ["//visibility:public"],
-)
-
 string_flag(
     name = "memalign_support",
     build_setting_default = "__auto__",

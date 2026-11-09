@@ -28,7 +28,6 @@ _PLATFORM_DEFAULTS = {
     "//settings/platform:lg_page": {"darwin": "14", "default": "12"},
     "//settings/platform:memalign_support": {"linux": "yes", "default": "no"},
     "//settings/platform:malloc_size_support": {"darwin": "yes", "default": "no"},
-    "//settings/platform:usable_size_const": {"linux": "", "default": "const"},
     "//settings/platform:valloc_support": {"darwin": "yes", "linux": "yes", "default": "no"},
 }
 
