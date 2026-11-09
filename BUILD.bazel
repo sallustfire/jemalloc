@@ -18,6 +18,11 @@ license(
 
 exports_files(["VERSION"])
 
+exports_files(
+    ["configure.ac"],
+    visibility = ["//tools/fidelity:__pkg__"],
+)
+
 alias(
     name = "jemalloc",
     actual = ":jemalloc_with_defaults",

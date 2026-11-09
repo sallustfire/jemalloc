@@ -1,11 +1,8 @@
 load("@bazel_lib//lib:expand_template.bzl", "expand_template")
 load("@bazel_skylib//lib:selects.bzl", "selects")
-load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
-load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//tools:autoconf.bzl", "configure_header", "define_macro", "define_macro_if", "define_macro_if_any", "define_macro_if_with", "define_macro_with", "undefine_macro")
-load("//tools:transition.bzl", "PLATFORM", "transition_default_constraints")
 load("//tools:version.bzl", "VERSION")
 load(":private_namespace.bzl", "private_namespace")
 load(":public_symbols.bzl", "public_symbols")
@@ -579,52 +576,6 @@ public_symbols(
     symbols = PUBLIC_SYMBOLS,
     tags = ["manual"],
     visibility = ["//:__subpackages__"],
-)
-
-# The expected output is what configure.ac's public_symbols.txt command writes for this map, whose entries cover a
-# name that is not a public symbol, a space and a trailing comma as separators, an extra field and an empty value. The
-# prefix is set through the flag, which the transition resolves into the rule's only source for it.
-public_symbols(
-    name = "public_symbols_mangling",
-    testonly = True,
-    out = "public_symbols_mangling.txt",
-    mangling_map = "calloc:my_calloc,not_public:np_impl, malloc:my_malloc:extra,free:,",
-    symbols = [
-        "malloc",
-        "free",
-        "calloc",
-        "realloc",
-    ],
-    tags = ["manual"],
-)
-
-write_file(
-    name = "public_symbols_mangling_expected",
-    testonly = True,
-    out = "public_symbols_mangling_expected.txt",
-    content = [
-        "calloc:my_calloc",
-        "not_public:np_impl",
-        "malloc:my_malloc",
-        "free:",
-        "realloc:pre_realloc",
-        "",
-    ],
-    newline = "unix",
-)
-
-transition_default_constraints(
-    name = "public_symbols_mangling_pre",
-    testonly = True,
-    src = ":public_symbols_mangling",
-    platform = PLATFORM,
-    settings = {"//settings/flags:jemalloc_prefix": "pre_"},
-)
-
-diff_test(
-    name = "public_symbols_mangling_test",
-    file1 = ":public_symbols_mangling_pre",
-    file2 = ":public_symbols_mangling_expected",
 )
 
 WRAP_SYMBOLS = select({

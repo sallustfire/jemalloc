@@ -1,5 +1,6 @@
 load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("//include/jemalloc/internal:public_symbols.bzl", "public_symbols")
 load("//tools:version.bzl", "UPSTREAM_VERSION")
 load(":fidelity.bzl", "fidelity_test")
 
@@ -34,4 +35,37 @@ fidelity_test(
     generated = "//include/jemalloc",
     script = "//include/jemalloc:jemalloc.sh",
     script_args = [""],
+)
+
+_MANGLING_MAP = "malloc:my malloc,free:,  unknown:u_x,calloc:a:b,"
+
+_MANGLING_SYMBOLS = [
+    "calloc",
+    "free",
+    "malloc",
+    "mallocx",
+]
+
+public_symbols(
+    name = "public_symbols_mangling",
+    testonly = True,
+    out = "public_symbols_mangling.txt",
+    mangling_map = _MANGLING_MAP,
+    symbols = _MANGLING_SYMBOLS,
+    tags = ["manual"],
+)
+
+fidelity_test(
+    name = "public_symbols_mangling_test",
+    srcs = ["//:configure.ac"],
+    generated = ":public_symbols_mangling",
+    script = ":configure_commands.sh",
+    script_args = [
+        "configure.ac",
+        "include/jemalloc/internal/public_symbols.txt",
+        "mangling_map=" + _MANGLING_MAP,
+        "public_syms=" + " ".join(_MANGLING_SYMBOLS),
+        "JEMALLOC_PREFIX=:je_",
+    ],
+    settings = {"//settings/flags:jemalloc_prefix": ":je_"},
 )
