@@ -80,7 +80,7 @@ public_symbols_header(
     script = "jemalloc_mangle.sh",
     symbol_prefix = "jet_",
     tags = ["manual"],
-    visibility = ["//visibility:public"],
+    visibility = ["//tools/fidelity:__pkg__"],
 )
 
 expand_template(

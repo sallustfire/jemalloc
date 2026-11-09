@@ -583,5 +583,5 @@ public_symbols_header(
     public_symbols = ":public_symbols",
     script = "public_unnamespace.sh",
     tags = ["manual"],
-    visibility = ["//visibility:public"],
+    visibility = ["//tools/fidelity:__pkg__"],
 )
