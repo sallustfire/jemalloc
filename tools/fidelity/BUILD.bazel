@@ -1,7 +1,9 @@
 load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
+load("@bazel_skylib//rules:native_binary.bzl", "native_test")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("//include/jemalloc/internal:public_symbols.bzl", "public_symbols")
-load("//tools:version.bzl", "UPSTREAM_VERSION")
+load("//include/jemalloc/internal:symbols.bzl", "ALL_PUBLIC_SYMBOLS", "ALL_WRAP_SYMBOLS")
+load("//tools:version.bzl", "UPSTREAM_VERSION", "VERSION")
 load(":fidelity.bzl", "fidelity_test")
 
 write_file(
@@ -20,6 +22,26 @@ diff_test(
     name = "version_test",
     file1 = ":upstream_version",
     file2 = "//:VERSION",
+)
+
+native_test(
+    name = "configure_symbols_test",
+    size = "small",
+    src = "@gawk",
+    args = [
+        "-f",
+        "$(rootpath :configure_symbols.awk)",
+        "-vgid=" + VERSION.gid,
+        "-vpublic=" + ",".join(ALL_PUBLIC_SYMBOLS),
+        "-vwrap=" + ",".join(ALL_WRAP_SYMBOLS),
+        # configure.ac adds these only alongside JEMALLOC_OVERRIDE___POSIX_MEMALIGN and JEMALLOC_GLIBC_*_HOOK, which the fork undefines
+        "-vunwrapped=__posix_memalign,__free_hook,__malloc_hook,__realloc_hook,__memalign_hook",
+        "$(rootpath //:configure.ac)",
+    ],
+    data = [
+        ":configure_symbols.awk",
+        "//:configure.ac",
+    ],
 )
 
 fidelity_test(

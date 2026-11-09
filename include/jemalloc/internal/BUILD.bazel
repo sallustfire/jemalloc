@@ -3,9 +3,9 @@ load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//tools:autoconf.bzl", "configure_header", "define_macro", "define_macro_if", "define_macro_if_any", "define_macro_if_with", "define_macro_with", "undefine_macro")
-load("//tools:version.bzl", "VERSION")
 load(":private_namespace.bzl", "private_namespace")
 load(":public_symbols.bzl", "public_symbols")
+load(":symbols.bzl", "PUBLIC_SYMBOLS", "WRAP_SYMBOLS")
 
 cc_library(
     name = "internal",
@@ -527,49 +527,6 @@ configure_header(
     ],
 )
 
-PUBLIC_SYMBOLS = [
-    "aligned_alloc",
-    "calloc",
-    "dallocx",
-    "free",
-    "mallctl",
-    "mallctlbymib",
-    "mallctlnametomib",
-    "malloc",
-    "malloc_conf",
-    "malloc_conf_2_conf_harder",
-    "malloc_message",
-    "malloc_stats_print",
-    "malloc_usable_size",
-    "mallocx",
-    "smallocx_%s" % VERSION.gid,
-    "nallocx",
-    "posix_memalign",
-    "rallocx",
-    "realloc",
-    "sallocx",
-    "sdallocx",
-    "xallocx",
-] + select(
-    {
-        "//settings/platform:has_memalign": ["memalign"],
-        "//settings/platform:no_memalign": [],
-    },
-    no_match_error = "Availability of memalign must explicitly be declared via //settings/platform:memalign_support",
-) + select(
-    {
-        "//settings/platform:has_valloc": ["valloc"],
-        "//settings/platform:no_valloc": [],
-    },
-    no_match_error = "Availability of valloc must explicitly be declared via //settings/platform:valloc_support",
-) + select(
-    {
-        "//settings/platform:has_malloc_size": ["malloc_size"],
-        "//settings/platform:no_malloc_size": [],
-    },
-    no_match_error = "Availability of malloc_size must explicitly be declared via //settings/platform:malloc_size_support",
-)
-
 public_symbols(
     name = "public_symbols",
     out = "public_symbols.txt",
@@ -577,28 +534,6 @@ public_symbols(
     tags = ["manual"],
     visibility = ["//:__subpackages__"],
 )
-
-WRAP_SYMBOLS = select({
-    "@platforms//os:windows": ["tls_callback"],
-    "@platforms//os:freebsd": [
-        "pthread_create",
-        "_malloc_thread_cleanup",
-        "_malloc_tsd_cleanup_register",
-        "_malloc_prefork",
-        "_malloc_postfork",
-    ],
-    "//conditions:default": ["pthread_create"],
-}) + select({
-    ":override_glibc_allocator": [
-        "__libc_calloc",
-        "__libc_free",
-        "__libc_malloc",
-        "__libc_memalign",
-        "__libc_realloc",
-        "__libc_valloc",
-    ],
-    "//conditions:default": [],
-})
 
 private_namespace(
     name = "private_namespace",
