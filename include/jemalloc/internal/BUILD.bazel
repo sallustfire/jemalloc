@@ -6,7 +6,6 @@ load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//tools:autoconf.bzl", "configure_header", "define_macro", "define_macro_if", "define_macro_if_any", "define_macro_if_with", "define_macro_with", "undefine_macro")
 load("//tools:transition.bzl", "PLATFORM")
-load("//tools:version.bzl", "VERSION")
 load(":private_namespace.bzl", "private_namespace", "private_namespace_leak_test")
 load(":public_symbols.bzl", "public_symbols", "public_symbols_header")
 load(":symbols.bzl", "PUBLIC_SYMBOLS", "SYM_PREFIX", "WRAP_SYMBOLS")
@@ -23,10 +22,11 @@ license(
     text = "LICENSE.murmurhash3",
 )
 
+# hash.h adapts MurmurHash3 and states no upstream version.
 package_metadata(
     name = "murmurhash3_metadata",
     attributes = [":murmurhash3_license"],
-    purl = "pkg:generic/jemalloc/murmurhash3@" + VERSION.release,
+    purl = "pkg:github/aappleby/smhasher#src/MurmurHash3.cpp",
 )
 
 exports_files(

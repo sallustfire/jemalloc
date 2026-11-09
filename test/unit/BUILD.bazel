@@ -5,7 +5,6 @@ load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
 load("//tools:test.bzl", "join_conf", "test_name")
 load("//tools:transition.bzl", "PLATFORM", "transition_default_constraints")
-load("//tools:version.bzl", "VERSION")
 
 license(
     name = "smhasher_license",
@@ -13,10 +12,11 @@ license(
     text = "LICENSE.smhasher",
 )
 
+# hash.c adapts SMHasher's VerificationTest and states no upstream version.
 package_metadata(
     name = "smhasher_metadata",
     attributes = [":smhasher_license"],
-    purl = "pkg:generic/jemalloc/smhasher@" + VERSION.release,
+    purl = "pkg:github/aappleby/smhasher#src/KeysetTest.cpp",
 )
 
 filegroup(
