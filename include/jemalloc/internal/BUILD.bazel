@@ -1683,6 +1683,7 @@ autoconf_hdr(
     out = "jemalloc_internal_defs.h",
     tags = ["manual"],
     template = "jemalloc_internal_defs.h.in",
+    visibility = ["//tools/fidelity:__pkg__"],
     deps = [
         ":jemalloc_internal_defs_checks",
         ":jemalloc_internal_defs_lg_vaddr",

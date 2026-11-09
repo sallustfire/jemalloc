@@ -258,14 +258,25 @@ private_namespace_fidelity_test(
 )
 
 filegroup(
+    name = "private_namespace_export_syms",
+    srcs = ["//include/jemalloc/internal:private_namespace"],
+    output_group = "export_syms",
+    tags = ["manual"],
+)
+
+# The generated headers, with public_symbols.txt and export_syms, the symbol lists configure writes
+filegroup(
     name = "configured_headers",
     srcs = [
+        ":private_namespace_export_syms",
         "//include/jemalloc",
         "//include/jemalloc:jemalloc_mangle",
         "//include/jemalloc:jemalloc_mangle_jet",
         "//include/jemalloc:jemalloc_rename",
+        "//include/jemalloc/internal:jemalloc_internal_defs",
         "//include/jemalloc/internal:private_namespace",
         "//include/jemalloc/internal:public_namespace",
+        "//include/jemalloc/internal:public_symbols",
         "//include/jemalloc/internal:public_unnamespace",
     ],
     tags = ["manual"],

@@ -131,28 +131,56 @@ jobs:
 
   upstream-oracle:
     name: Upstream oracle (${{ matrix.name }})
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: default
+            os: ubuntu-24.04
           - name: prefix je_
+            os: ubuntu-24.04
+            configure_args: --with-jemalloc-prefix=je_
+            bazel_args: --//settings/flags:jemalloc_prefix=je_
+          - name: macOS default
+            os: macos-15
+          - name: Alpine default
+            os: ubuntu-24.04
+            container: alpine:3.22
+          - name: Alpine prefix je_
+            os: ubuntu-24.04
+            container: alpine:3.22
             configure_args: --with-jemalloc-prefix=je_
             bazel_args: --//settings/flags:jemalloc_prefix=je_
     steps:
+      # Bazel's release binaries and their embedded JDK need glibc, so on musl the launcher runs under gcompat and
+      # the server on Alpine's JDK.
+      - name: Install Alpine packages
+        if: matrix.container != ''
+        run: |
+          apk add --no-cache bash build-base bzip2 coreutils curl diffutils gcompat git libstdc++ openjdk21-jdk tar
+          curl --fail --silent --show-error --location -o /usr/local/bin/bazel \
+            https://github.com/bazelbuild/bazelisk/releases/download/v1.27.0/bazelisk-linux-amd64
+          # The digest GitHub publishes for the v1.27.0 release asset bazelisk-linux-amd64.
+          echo "e1508323f347ad1465a887bc5d2bfb91cffc232d11e8e997b623227c6b32fb76  /usr/local/bin/bazel" | sha256sum -c -
+          chmod +x /usr/local/bin/bazel
+          echo "startup --server_javabase=/usr/lib/jvm/java-21-openjdk" > /etc/bazel.bazelrc
       - uses: actions/checkout@v4
       - uses: bazel-contrib/setup-bazel@0.14.0
+        if: matrix.container == ''
         with:
           bazelisk-cache: true
           repository-cache: true
       - name: Download upstream release
+        shell: bash
         run: |
           version="$(sed -n '/^ *version = "/{s/^ *version = "\([^"]*\)".*/\1/p;q}' MODULE.bazel)"
           upstream="${version%%-bcr.*}"
           curl --fail --silent --show-error --location -o "${RUNNER_TEMP}/upstream.tar.bz2" \
             "https://github.com/jemalloc/jemalloc/releases/download/${upstream}/jemalloc-${upstream}.tar.bz2"
       - name: Compare generated headers
+        shell: bash
         env:
           USE_BAZEL_VERSION: 8.x
           CONFIGURE_ARGS: ${{ matrix.configure_args }}

@@ -77,7 +77,7 @@ The upstream scripts are kept, not replaced. Each generated header has a `fideli
 same inputs and with the same settings, and fails if the outputs differ. The scripts run with hermetic gawk, grep, sed
 and coreutils, which are dev dependencies: they are fetched for this repository's tests and never for consumers. The
 `upstream-oracle` CI job goes further, building the upstream release with configure and make and comparing every
-script-generated header with the Bazel build's.
+script-generated header, and the public and wrapped symbol lists, with the Bazel build's.
 
 When upgrading jemalloc, a failing fidelity test means an upstream script changed and its Bazel counterpart must
 follow.
