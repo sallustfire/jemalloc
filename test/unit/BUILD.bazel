@@ -1,6 +1,6 @@
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
-load("//tools:cc.bzl", "COPTS")
+load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
 load("//tools:test.bzl", "join_conf", "test_name")
 load("//tools:transition.bzl", "PLATFORM", "transition_default_constraints")
 
@@ -242,6 +242,8 @@ transition_default_constraints(
     name = test_name(test),
     srcs = [test["src"]],
     copts = COPTS,
+    conlyopts = CONLYOPTS,
+    cxxopts = CXXOPTS,
     env = select({
         "//settings/flags:prof": {"JE_TEST_MALLOC_CONF": join_conf(
             test.get("conf", ""),
@@ -258,6 +260,8 @@ cc_test(
     name = "arena_reset_prof",
     srcs = ["arena_reset_prof.c"],
     copts = COPTS,
+    conlyopts = CONLYOPTS,
+    cxxopts = CXXOPTS,
     env = {"JE_TEST_MALLOC_CONF": "prof:true,lg_prof_sample:0"},
     linkstatic = True,
     local_defines = ["JEMALLOC_UNIT_TEST"],
@@ -275,6 +279,8 @@ cc_test(
     name = "batch_alloc_prof",
     srcs = ["batch_alloc_prof.c"],
     copts = COPTS,
+    conlyopts = CONLYOPTS,
+    cxxopts = CXXOPTS,
     env = {"JE_TEST_MALLOC_CONF": "prof:true,lg_prof_sample:14"},
     linkstatic = True,
     local_defines = ["JEMALLOC_UNIT_TEST"],

@@ -1,6 +1,6 @@
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_license//rules:license.bzl", "license")
-load("//tools:cc.bzl", "COPTS")
+load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
 load("//tools:transition.bzl", "PLATFORM", "transition_default_constraints")
 
 ####
@@ -118,6 +118,8 @@ cc_library(
         ],
         "//conditions:default": [],
     }) + COPTS,
+    conlyopts = CONLYOPTS,
+    cxxopts = CXXOPTS,
     includes = ["include"],
     linkopts = select({
         "@platforms//os:android": ["-ldl"],
@@ -163,6 +165,8 @@ cc_library(
     ],
     hdrs = ["//include/jemalloc"],
     copts = ["-Iinclude/jemalloc/internal"] + COPTS,
+    conlyopts = CONLYOPTS,
+    cxxopts = CXXOPTS,
     includes = ["include"],
     linkopts = select({
         "@platforms//os:linux": [
