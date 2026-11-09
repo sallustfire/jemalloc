@@ -60,7 +60,7 @@ def _platform_constraints_transition_impl(settings, attr):
 
     return result
 
-_platform_constraints_transition = transition(
+platform_constraints_transition = transition(
     implementation = _platform_constraints_transition_impl,
     inputs = _SETTINGS + [_CPREFIX],
     outputs = _SETTINGS + [_PREFIX_RESOLVED, _CPREFIX],
@@ -77,7 +77,7 @@ transition_default_constraints = rule(
           "intelligent defaults can be set for the majority of cases.",
     implementation = _transition_default_constraints_impl,
     attrs = {
-        "src": attr.label(cfg = _platform_constraints_transition),
+        "src": attr.label(cfg = platform_constraints_transition),
         "platform": attr.string(
             doc = "Hack to inject platform constraints into the transition to apply unset defaults",
             mandatory = True,

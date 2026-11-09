@@ -4,6 +4,11 @@ load("//tools:autoconf.bzl", "configure_header", "define_macro_if", "define_macr
 load("//tools:version.bzl", "VERSION")
 load(":jemalloc_hdr.bzl", "jemalloc_hdr")
 
+exports_files(
+    ["jemalloc.sh"],
+    visibility = ["//tools/fidelity:__pkg__"],
+)
+
 configure_header(
     name = "jemalloc_defs",
     out = "jemalloc_defs.h",
@@ -33,6 +38,7 @@ configure_header(
     tags = ["manual"],
     template = "jemalloc_defs.h.in",
     toolchains = ["//settings/platform:usable_size_const"],
+    visibility = ["//tools/fidelity:__pkg__"],
 )
 
 expand_template(
@@ -47,7 +53,10 @@ expand_template(
         "@jemalloc_version_gid@": VERSION.gid,
     },
     template = "jemalloc_macros.h.in",
-    visibility = ["//test:__subpackages__"],
+    visibility = [
+        "//test:__subpackages__",
+        "//tools/fidelity:__pkg__",
+    ],
 )
 
 sh_binary(
@@ -91,6 +100,7 @@ expand_template(
         "@install_suffix@": "",
     },
     template = "jemalloc_protos.h.in",
+    visibility = ["//tools/fidelity:__pkg__"],
 )
 
 expand_template(
@@ -127,6 +137,7 @@ expand_template(
     out = "jemalloc_typedefs.h",
     substitutions = {},
     template = "jemalloc_typedefs.h.in",
+    visibility = ["//tools/fidelity:__pkg__"],
 )
 
 jemalloc_hdr(

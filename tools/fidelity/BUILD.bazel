@@ -1,0 +1,37 @@
+load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("//tools:version.bzl", "UPSTREAM_VERSION")
+load(":fidelity.bzl", "fidelity_test")
+
+write_file(
+    name = "upstream_version",
+    testonly = True,
+    out = "upstream_version.txt",
+    # The trailing "" ends the file with a newline, as the VERSION file does.
+    content = [
+        UPSTREAM_VERSION,
+        "",
+    ],
+    newline = "unix",
+)
+
+diff_test(
+    name = "version_test",
+    file1 = ":upstream_version",
+    file2 = "//:VERSION",
+)
+
+fidelity_test(
+    name = "jemalloc_test",
+    srcs = [
+        "//include/jemalloc:jemalloc_defs",
+        "//include/jemalloc:jemalloc_macros",
+        "//include/jemalloc:jemalloc_mangle",
+        "//include/jemalloc:jemalloc_protos",
+        "//include/jemalloc:jemalloc_rename",
+        "//include/jemalloc:jemalloc_typedefs",
+    ],
+    generated = "//include/jemalloc",
+    script = "//include/jemalloc:jemalloc.sh",
+    script_args = [""],
+)
