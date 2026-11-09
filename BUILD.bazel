@@ -1,5 +1,7 @@
+load("@package_metadata//licenses/rules:license.bzl", "license")
+load("@package_metadata//purl:purl.bzl", "purl")
+load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
-load("@rules_license//rules:license.bzl", "license")
 load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
 load("//tools:transition.bzl", "PLATFORM", "transition_default_constraints")
 
@@ -8,12 +10,21 @@ load("//tools:transition.bzl", "PLATFORM", "transition_default_constraints")
 # See https://github.com/sallustfire/jemalloc/tree/bcr-5.3.0?tab=readme-ov-file#bazel-build-of-jemalloc
 ####
 
-package(default_applicable_licenses = [":license"])
-
 license(
     name = "license",
-    license_kinds = ["@rules_license//licenses/spdx:BSD-2-Clause"],
-    license_text = "COPYING",
+    kind = "@package_metadata//licenses/spdx:BSD-2-Clause",
+    text = "COPYING",
+    visibility = ["//visibility:public"],
+)
+
+package_metadata(
+    name = "package_metadata",
+    attributes = [":license"],
+    purl = purl.bazel(
+        module_name(),
+        module_version(),
+    ),
+    visibility = ["//visibility:public"],
 )
 
 exports_files(["VERSION"])
@@ -100,8 +111,6 @@ cc_library(
            }) +
            select({
                "//settings/compiler:msvc_compatible": [
-                   "include/msvc_compat/C99/stdbool.h",
-                   "include/msvc_compat/C99/stdint.h",
                    "include/msvc_compat/strings.h",
                    "include/msvc_compat/windows_extra.h",
                ],
@@ -111,14 +120,11 @@ cc_library(
         "//conditions:default": [],
     }),
     hdrs = ["//include/jemalloc"],
+    conlyopts = CONLYOPTS,
     copts = ["-Iinclude/jemalloc/internal"] + select({
-        "//settings/compiler:msvc_compatible": [
-            "-Iinclude/msvc_compat",
-            "-Iinclude/msvc_compat/C99",
-        ],
+        "//settings/compiler:msvc_compatible": ["-Iinclude/msvc_compat"],
         "//conditions:default": [],
     }) + COPTS,
-    conlyopts = CONLYOPTS,
     cxxopts = CXXOPTS,
     includes = ["include"],
     linkopts = select({
@@ -164,8 +170,8 @@ cc_library(
         "src/ticker.c",
     ],
     hdrs = ["//include/jemalloc"],
-    copts = ["-Iinclude/jemalloc/internal"] + COPTS,
     conlyopts = CONLYOPTS,
+    copts = ["-Iinclude/jemalloc/internal"] + COPTS,
     cxxopts = CXXOPTS,
     includes = ["include"],
     linkopts = select({

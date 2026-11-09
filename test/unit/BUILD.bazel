@@ -1,8 +1,38 @@
+load("@package_metadata//licenses/rules:license.bzl", "license")
+load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
 load("//tools:test.bzl", "join_conf", "test_name")
 load("//tools:transition.bzl", "PLATFORM", "transition_default_constraints")
+
+license(
+    name = "smhasher_license",
+    kind = "@package_metadata//licenses/spdx:MIT",
+    text = "LICENSE.smhasher",
+)
+
+# hash.c adapts SMHasher's VerificationTest and states no upstream version.
+package_metadata(
+    name = "smhasher_metadata",
+    attributes = [":smhasher_license"],
+    purl = "pkg:github/aappleby/smhasher#src/KeysetTest.cpp",
+)
+
+filegroup(
+    name = "smhasher_test_sources",
+    srcs = ["hash.c"],
+    applicable_licenses = [":smhasher_metadata"],
+)
+
+filegroup(
+    name = "sfmt_test_sources",
+    srcs = ["SFMT.c"],
+    applicable_licenses = [
+        "//:package_metadata",
+        "//test:sfmt_metadata",
+    ],
+)
 
 UNIT_TESTS = [
     {"src": "a0.c"},
@@ -43,7 +73,10 @@ UNIT_TESTS = [
         "conf": "san_guard_large:1,san_guard_small:1",
     },
     {"src": "san_bump.c"},
-    {"src": "hash.c"},
+    {
+        "name": "hash",
+        "src": ":smhasher_test_sources",
+    },
     {"src": "hook.c"},
     {"src": "hpa.c"},
     {
@@ -158,7 +191,10 @@ UNIT_TESTS = [
     {"src": "sc.c"},
     {"src": "sec.c"},
     {"src": "seq.c"},
-    {"src": "SFMT.c"},
+    {
+        "name": "sfmt",
+        "src": ":sfmt_test_sources",
+    },
     {
         "src": "size_check.c",
         "prof_conf": "prof:false",
@@ -241,8 +277,8 @@ transition_default_constraints(
 [cc_test(
     name = test_name(test),
     srcs = [test["src"]],
-    copts = COPTS,
     conlyopts = CONLYOPTS,
+    copts = COPTS,
     cxxopts = CXXOPTS,
     env = select({
         "//settings/flags:prof": {"JE_TEST_MALLOC_CONF": join_conf(
@@ -259,8 +295,8 @@ transition_default_constraints(
 cc_test(
     name = "arena_reset_prof",
     srcs = ["arena_reset_prof.c"],
-    copts = COPTS,
     conlyopts = CONLYOPTS,
+    copts = COPTS,
     cxxopts = CXXOPTS,
     env = {"JE_TEST_MALLOC_CONF": "prof:true,lg_prof_sample:0"},
     linkstatic = True,
@@ -278,8 +314,8 @@ cc_test(
 cc_test(
     name = "batch_alloc_prof",
     srcs = ["batch_alloc_prof.c"],
-    copts = COPTS,
     conlyopts = CONLYOPTS,
+    copts = COPTS,
     cxxopts = CXXOPTS,
     env = {"JE_TEST_MALLOC_CONF": "prof:true,lg_prof_sample:14"},
     linkstatic = True,

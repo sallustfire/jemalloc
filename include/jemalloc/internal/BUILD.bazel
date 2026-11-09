@@ -1,11 +1,33 @@
 load("@bazel_lib//lib:expand_template.bzl", "expand_template")
 load("@bazel_skylib//lib:selects.bzl", "selects")
+load("@package_metadata//licenses/rules:license.bzl", "license")
+load("@package_metadata//licenses/rules:license_kind.bzl", "license_kind")
+load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//tools:autoconf.bzl", "configure_header", "define_macro", "define_macro_if", "define_macro_if_any", "define_macro_if_with", "define_macro_with", "undefine_macro")
 load("//tools:transition.bzl", "PLATFORM")
 load(":private_namespace.bzl", "private_namespace", "private_namespace_leak_test")
 load(":public_symbols.bzl", "public_symbols", "public_symbols_header")
 load(":symbols.bzl", "PUBLIC_SYMBOLS", "SYM_PREFIX", "WRAP_SYMBOLS")
+
+license_kind(
+    name = "public_domain",
+    full_name = "Public Domain",
+    identifier = "LicenseRef-scancode-public-domain",
+)
+
+license(
+    name = "murmurhash3_license",
+    kind = ":public_domain",
+    text = "LICENSE.murmurhash3",
+)
+
+# hash.h adapts MurmurHash3 and states no upstream version.
+package_metadata(
+    name = "murmurhash3_metadata",
+    attributes = [":murmurhash3_license"],
+    purl = "pkg:github/aappleby/smhasher#src/MurmurHash3.cpp",
+)
 
 exports_files(
     [
@@ -15,6 +37,15 @@ exports_files(
         "public_unnamespace.sh",
     ],
     visibility = ["//tools/fidelity:__pkg__"],
+)
+
+filegroup(
+    name = "murmurhash3_headers",
+    srcs = ["hash.h"],
+    applicable_licenses = [
+        ":murmurhash3_metadata",
+        "//:package_metadata",
+    ],
 )
 
 cc_library(
@@ -63,7 +94,6 @@ cc_library(
         "extent_mmap.h",
         "fb.h",
         "fxp.h",
-        "hash.h",
         "hook.h",
         "hpa.h",
         "hpa_hooks.h",
@@ -139,6 +169,7 @@ cc_library(
         "typed_list.h",
         "util.h",
         "witness.h",
+        ":murmurhash3_headers",
     ] + [
         ":jemalloc_internal_defs",
         ":jemalloc_preamble",

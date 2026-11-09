@@ -57,6 +57,8 @@
     "https://bcr.bazel.build/modules/libunwind/1.8.3/source.json": "8bba6459bed0b337c50f554292d724e2736edf906379556fa56a8a57d5a5299d",
     "https://bcr.bazel.build/modules/nlohmann_json/3.12.0.bcr.1/MODULE.bazel": "a1c8bb07b5b91d971727c635f449d05623ac9608f6fe4f5f04254ea12f08e349",
     "https://bcr.bazel.build/modules/nlohmann_json/3.12.0.bcr.1/source.json": "93f82a5ae985eb935c539bfee95e04767187818189241ac956f3ccadbdb8fb02",
+    "https://bcr.bazel.build/modules/package_metadata/0.0.5/MODULE.bazel": "ef4f9439e3270fdd6b9fd4dbc3d2f29d13888e44c529a1b243f7a31dfbc2e8e4",
+    "https://bcr.bazel.build/modules/package_metadata/0.0.5/source.json": "2326db2f6592578177751c3e1f74786b79382cd6008834c9d01ec865b9126a85",
     "https://bcr.bazel.build/modules/pcre2/10.48/MODULE.bazel": "d2f6e42fe272f7de4c60c49b05e89ea1758ad0f04bbac859cf5c416dd6692ac3",
     "https://bcr.bazel.build/modules/pcre2/10.48/source.json": "271f79ac301aaaaf1c3310537f9cba202e6d8d5a2217924af8e2dc6f3971a5a7",
     "https://bcr.bazel.build/modules/platforms/0.0.10/MODULE.bazel": "8cb8efaf200bdeb2150d93e162c40f388529a25852b332cec879373771e48ed5",
