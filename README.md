@@ -17,21 +17,20 @@ See the [examples/BUILD.bazel](examples/BUILD.bazel) file for examples of how to
 
 - **//settings/flags:jemalloc_prefix (--with-jemalloc-prefix):** As in the make build, this defaults to "je_" on macOS
  and Windows and to no prefix elsewhere. On macOS jemalloc replaces malloc by overlaying the default malloc zone rather
- than by exporting malloc, free and so on; see //settings/flags:enable_zone_allocator below. A
- prefix renames the public API, malloc_conf, /etc/malloc.conf and MALLOC_CONF as INSTALL.md's --with-jemalloc-prefix
- describes. To call the API by its je_* names (je_mallctl, je_mallocx, ...) under any prefix, define
- JEMALLOC_NO_DEMANGLE before including jemalloc/jemalloc.h. Set the flag, or jemalloc()'s jemalloc_prefix, to choose a
- prefix explicitly. The flag defaults to "__auto__", which only jemalloc's own transition resolves, so a select() on the
- flag outside it sees "__auto__", and the flag provides no $(JEMALLOC_PREFIX). Set the prefix explicitly where a
- consumer needs to know it.
+ than by exporting malloc, free and so on; see //settings/flags:enable_zone_allocator below. A prefix renames the
+ public API, malloc_conf, /etc/malloc.conf and MALLOC_CONF as INSTALL.md's --with-jemalloc-prefix describes. To call
+ the API by its je_* names (je_mallctl, je_mallocx, ...) under any prefix, define JEMALLOC_NO_DEMANGLE before including
+ jemalloc/jemalloc.h. Set the flag, or jemalloc()'s jemalloc_prefix, to choose a prefix explicitly. The flag defaults
+ to "__auto__", which only jemalloc's own transition resolves, so a select() on the flag outside it sees "__auto__",
+ and the flag provides no $(JEMALLOC_PREFIX). Set the prefix explicitly where a consumer needs to know it.
 - **//settings/flags:enable_zone_allocator (--disable-zone-allocator):** As in the make build, this is on for Darwin
  and off elsewhere, and turning it on for any other platform fails the build. With it on, jemalloc registers a malloc
- zone from a constructor in src/zone.c, so plain malloc reaches jemalloc in every binary that links @jemalloc, statically
- or not; this includes binaries that call jemalloc only through a prefixed API. Turn it off to keep jemalloc private to
- that API. Unlike the make build's static libjemalloc.a, this build links src/zone.c whole (alwayslink), but only in
- links Bazel performs: an archive exported to another build system would need -force_load. An application that defines its
- own global operator new and delete must define every overload it calls, or jemalloc's are linked as well and the
- duplicates fail the link.
+ zone from a constructor in src/zone.c, so plain malloc reaches jemalloc in every binary that links @jemalloc,
+ statically or not; this includes binaries that call jemalloc only through a prefixed API. Turn it off to keep jemalloc
+ private to that API. Unlike the make build's static libjemalloc.a, this build links src/zone.c whole (alwayslink), but
+ only in links Bazel performs: an archive exported to another build system would need -force_load. An application that
+ defines its own global operator new and delete must define every overload it calls, or jemalloc's are linked as well
+ and the duplicates fail the link.
 - **Library targets:** @jemalloc//:jemalloc is the target to depend on, through deps or the malloc attribute; it
  provides CcInfo and builds no file of its own. Inside, the archives are lib/libjemalloc_core.a and, with the zone
  allocator, lib/libjemalloc_zone.lo; their names are not part of the interface.
