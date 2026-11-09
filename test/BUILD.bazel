@@ -1,6 +1,50 @@
 load("@bazel_lib//lib:expand_template.bzl", "expand_template")
+load("@package_metadata//licenses/rules:license.bzl", "license")
+load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
+
+license(
+    name = "sfmt_license",
+    kind = "@package_metadata//licenses/spdx:BSD-3-Clause",
+    text = "LICENSE.sfmt",
+)
+
+# jemalloc's copy derives from SFMT 1.3.3 ("This file derives from SFMT 1.3.3", src/SFMT.c), adapted to a re-entrant
+# API.
+package_metadata(
+    name = "sfmt_metadata",
+    attributes = [":sfmt_license"],
+    purl = "pkg:generic/sfmt@1.3.3",
+    visibility = ["//test/unit:__pkg__"],
+)
+
+filegroup(
+    name = "sfmt_sources",
+    srcs = ["src/SFMT.c"],
+    applicable_licenses = [":sfmt_metadata"],
+)
+
+filegroup(
+    name = "sfmt_headers",
+    srcs = [
+        "include/test/SFMT.h",
+        "include/test/SFMT-alti.h",
+        "include/test/SFMT-params.h",
+        "include/test/SFMT-params11213.h",
+        "include/test/SFMT-params1279.h",
+        "include/test/SFMT-params132049.h",
+        "include/test/SFMT-params19937.h",
+        "include/test/SFMT-params216091.h",
+        "include/test/SFMT-params2281.h",
+        "include/test/SFMT-params4253.h",
+        "include/test/SFMT-params44497.h",
+        "include/test/SFMT-params607.h",
+        "include/test/SFMT-params86243.h",
+        "include/test/SFMT-sse2.h",
+    ],
+    applicable_licenses = [":sfmt_metadata"],
+)
 
 expand_template(
     name = "jemalloc_test",
@@ -32,7 +76,6 @@ cc_library(
     name = "testlib",
     testonly = True,
     srcs = [
-        "src/SFMT.c",
         "src/btalloc.c",
         "src/btalloc_0.c",
         "src/btalloc_1.c",
@@ -42,22 +85,9 @@ cc_library(
         "src/test.c",
         "src/thd.c",
         "src/timer.c",
+        ":sfmt_sources",
     ],
     hdrs = [
-        "include/test/SFMT.h",
-        "include/test/SFMT-alti.h",
-        "include/test/SFMT-params.h",
-        "include/test/SFMT-params11213.h",
-        "include/test/SFMT-params1279.h",
-        "include/test/SFMT-params132049.h",
-        "include/test/SFMT-params19937.h",
-        "include/test/SFMT-params216091.h",
-        "include/test/SFMT-params2281.h",
-        "include/test/SFMT-params4253.h",
-        "include/test/SFMT-params44497.h",
-        "include/test/SFMT-params607.h",
-        "include/test/SFMT-params86243.h",
-        "include/test/SFMT-sse2.h",
         "include/test/arena_util.h",
         "include/test/bench.h",
         "include/test/bgthd.h",
@@ -74,6 +104,7 @@ cc_library(
         "include/test/test.h",
         "include/test/thd.h",
         "include/test/timer.h",
+        ":sfmt_headers",
         "//include/jemalloc:jemalloc_macros",
     ],
     copts = COPTS,
