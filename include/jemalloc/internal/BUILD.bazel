@@ -262,18 +262,36 @@ config_setting(
 )
 
 config_setting(
-    name = "linux_aarch32",
+    name = "android_x86_32",
     constraint_values = [
-        "@platforms//cpu:aarch32",
+        "@platforms//cpu:x86_32",
+        "@platforms//os:android",
+    ],
+    visibility = ["//visibility:private"],
+)
+
+config_setting(
+    name = "android_x86_64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:android",
+    ],
+    visibility = ["//visibility:private"],
+)
+
+config_setting(
+    name = "linux_x86_32",
+    constraint_values = [
+        "@platforms//cpu:x86_32",
         "@platforms//os:linux",
     ],
     visibility = ["//visibility:private"],
 )
 
 config_setting(
-    name = "linux_armv7",
+    name = "linux_x86_64",
     constraint_values = [
-        "@platforms//cpu:armv7",
+        "@platforms//cpu:x86_64",
         "@platforms//os:linux",
     ],
     visibility = ["//visibility:private"],
@@ -761,11 +779,23 @@ autoconf(
                 condition = "enable_tls",
             ),
         ],
-    }) + select({
-        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_DSS", "")],
-        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_DSS", "")],
-        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_DSS", "")],
-        "//conditions:default": [],
+    }) + [
+        checks.AC_CHECK_FUNC(
+            "sbrk",
+            code = utils.AC_LANG_FUNC_LINK_TRY("sbrk"),
+        ),
+    ] + select({
+        # configure.ac's host table sets sbrk_deprecated for these.
+        "@platforms//os:ios": [],
+        "@platforms//os:macos": [],
+        "@platforms//os:tvos": [],
+        "@platforms//os:watchos": [],
+        "//conditions:default": [
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_DSS",
+                condition = "ac_cv_func_sbrk",
+            ),
+        ],
     }) + select({
         ":override_glibc_allocator": [
             checks.AC_DEFINE_UNQUOTED("JEMALLOC_OVERRIDE___LIBC_CALLOC", ""),
@@ -964,52 +994,159 @@ autoconf(
             "JEMALLOC_HAVE_CLOCK_REALTIME",
             condition = "je_cv_clock_realtime",
         ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_madvise",
+            code = utils.AC_LANG_PROGRAM(
+                "#include <sys/mman.h>",
+                "\tmadvise((void *)0, 0, 0);",
+            ),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_MADVISE",
+            condition = "je_cv_madvise",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_madv_free",
+            code = utils.AC_LANG_PROGRAM(
+                "#include <sys/mman.h>",
+                "\tmadvise((void *)0, 0, MADV_FREE);",
+            ),
+            requires = ["je_cv_madvise"],
+        ),
     ] + select({
-        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE", "")],
-        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE", "")],
-        "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE", "")],
-        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE", "")],
-        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE", "")],
-        "@platforms//os:openbsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE", "")],
-        "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE", "")],
-        "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE", "")],
-        "//conditions:default": [],
-    }) + select({
-        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_FREE", "")],
-        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_FREE", "")],
-        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_FREE", "")],
-        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_FREE", "")],
-        "@platforms//os:openbsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_FREE", "")],
-        "//conditions:default": [],
-    }) + select({
-        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_DONTNEED", "")],
-        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_DONTNEED", "")],
-        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_DONTNEED", "")],
-        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_DONTNEED", "")],
-        "//conditions:default": [],
-    }) + select({
-        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_MADVISE_DONTDUMP", "")],
-        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_MADVISE_DONTDUMP", "")],
-        "//conditions:default": [],
-    }) + select({
-        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_MADVISE_NOCORE", "")],
-        "//conditions:default": [],
-    }) + select({
-        ":linux_aarch32": [],
-        ":linux_armv7": [],
-        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE_HUGE", "")],
-        "//conditions:default": [],
-    }) + select({
-        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MPROTECT", "")],
-        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MPROTECT", "")],
-        "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MPROTECT", "")],
-        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MPROTECT", "")],
-        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MPROTECT", "")],
-        "@platforms//os:openbsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MPROTECT", "")],
-        "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MPROTECT", "")],
-        "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MPROTECT", "")],
-        "//conditions:default": [],
-    }) + select({
+        # configure.ac's fallback matches the host *-*-linux*, which includes Android.
+        setting: [
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_PURGE_MADVISE_FREE",
+                condition = "je_cv_madv_free || je_cv_madvise",
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_DEFINE_MADVISE_FREE",
+                condition = "je_cv_madvise && !je_cv_madv_free",
+            ),
+        ]
+        for setting in [
+            ":android_x86_32",
+            ":android_x86_64",
+            ":linux_x86_32",
+            ":linux_x86_64",
+        ]
+    } | {"//conditions:default": [
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_PURGE_MADVISE_FREE",
+            condition = "je_cv_madv_free",
+        ),
+    ]}) + [
+        checks.AC_TRY_LINK(
+            name = "je_cv_madv_dontneed",
+            code = utils.AC_LANG_PROGRAM(
+                "#include <sys/mman.h>",
+                "\tmadvise((void *)0, 0, MADV_DONTNEED);",
+            ),
+            requires = ["je_cv_madvise"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_PURGE_MADVISE_DONTNEED",
+            condition = "je_cv_madv_dontneed",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_madv_dontdump",
+            code = utils.AC_LANG_PROGRAM(
+                "#include <sys/mman.h>",
+                [
+                    "\tmadvise((void *)0, 0, MADV_DONTDUMP);",
+                    "\tmadvise((void *)0, 0, MADV_DODUMP);",
+                ],
+            ),
+            requires = ["je_cv_madvise"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_MADVISE_DONTDUMP",
+            condition = "je_cv_madv_dontdump",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_thp",
+            code = utils.AC_LANG_PROGRAM(
+                "#include <sys/mman.h>",
+                [
+                    "\tmadvise((void *)0, 0, MADV_HUGEPAGE);",
+                    "\tmadvise((void *)0, 0, MADV_NOHUGEPAGE);",
+                ],
+            ),
+            requires = ["je_cv_madvise"],
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_madv_nocore",
+            code = utils.AC_LANG_PROGRAM(
+                "#include <sys/mman.h>",
+                [
+                    "\tmadvise((void *)0, 0, MADV_NOCORE);",
+                    "\tmadvise((void *)0, 0, MADV_CORE);",
+                ],
+            ),
+            requires = ["je_cv_madvise"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_MADVISE_NOCORE",
+            condition = "je_cv_madv_nocore",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_posix_madvise",
+            code = utils.AC_LANG_PROGRAM(
+                "  #include <sys/mman.h>",
+                "    posix_madvise((void *)0, 0, 0);",
+            ),
+            requires = ["!je_cv_madvise"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_POSIX_MADVISE",
+            condition = "je_cv_posix_madvise",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_posix_madv_dontneed",
+            code = utils.AC_LANG_PROGRAM(
+                "  #include <sys/mman.h>",
+                "    posix_madvise((void *)0, 0, POSIX_MADV_DONTNEED);",
+            ),
+            requires = ["je_cv_posix_madvise"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_PURGE_POSIX_MADVISE_DONTNEED",
+            condition = "je_cv_posix_madv_dontneed",
+        ),
+    ] + select({
+        # configure.ac skips it for the host_cpu arm*, which names only 32-bit ARM because config.sub turns arm64 into
+        # aarch64.
+        cpu: []
+        for cpu in [
+            "@platforms//cpu:aarch32",
+            "@platforms//cpu:armv6-m",
+            "@platforms//cpu:armv7",
+            "@platforms//cpu:armv7-m",
+            "@platforms//cpu:armv7e-m",
+            "@platforms//cpu:armv7e-mf",
+            "@platforms//cpu:armv7k",
+            "@platforms//cpu:armv8-m",
+            "@platforms//cpu:cortex-r52",
+        ]
+    } | {"//conditions:default": [
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_MADVISE_HUGE",
+            condition = "je_cv_thp",
+        ),
+    ]}) + [
+        checks.AC_TRY_LINK(
+            name = "je_cv_mprotect",
+            code = utils.AC_LANG_PROGRAM(
+                "#include <sys/mman.h>",
+                "\tmprotect((void *)0, 0, PROT_NONE);",
+            ),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_MPROTECT",
+            condition = "je_cv_mprotect",
+        ),
+    ] + select({
         "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MALLOC_SIZE", "")],
         "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MALLOC_SIZE", "")],
         "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MALLOC_SIZE", "")],
@@ -1179,13 +1316,25 @@ autoconf(
             "JEMALLOC_HAVE_PTHREAD_MUTEX_ADAPTIVE_NP",
             condition = "je_cv_pthread_mutex_adaptive_np",
         ),
-    ] + select({
-        "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_VM_MAKE_TAG", "")],
-        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_VM_MAKE_TAG", "")],
-        "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_VM_MAKE_TAG", "")],
-        "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_VM_MAKE_TAG", "")],
-        "//conditions:default": [],
-    }),
+        checks.AC_TRY_LINK(
+            name = "je_cv_vm_make_tag",
+            code = utils.AC_LANG_PROGRAM(
+                [
+                    "#include <sys/mman.h>",
+                    "\t       #include <mach/vm_statistics.h>",
+                ],
+                [
+                    "void *p;",
+                    "\t       p = mmap(0, 16, PROT_READ, MAP_ANON|MAP_PRIVATE, VM_MAKE_TAG(1), 0);",
+                    "\t       munmap(p, 16);",
+                ],
+            ),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_VM_MAKE_TAG",
+            condition = "je_cv_vm_make_tag",
+        ),
+    ],
     copts = HOST_CPPFLAGS,
     tags = ["manual"],
 )
