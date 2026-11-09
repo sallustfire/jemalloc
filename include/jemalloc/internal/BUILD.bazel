@@ -1,11 +1,18 @@
 load("@bazel_lib//lib:expand_template.bzl", "expand_template")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
-load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//tools:autoconf.bzl", "configure_header", "define_macro", "define_macro_if", "define_macro_if_any", "define_macro_if_with", "define_macro_with", "undefine_macro")
 load(":private_namespace.bzl", "private_namespace")
-load(":public_symbols.bzl", "public_symbols")
+load(":public_symbols.bzl", "public_symbols", "public_symbols_header")
 load(":symbols.bzl", "PUBLIC_SYMBOLS", "WRAP_SYMBOLS")
+
+exports_files(
+    [
+        "public_namespace.sh",
+        "public_unnamespace.sh",
+    ],
+    visibility = ["//tools/fidelity:__pkg__"],
+)
 
 cc_library(
     name = "internal",
@@ -555,38 +562,20 @@ private_namespace(
     wrap_symbols = WRAP_SYMBOLS,
 )
 
-sh_binary(
-    name = "public_namespace_sh",
-    srcs = ["public_namespace.sh"],
-)
-
-genrule(
+public_symbols_header(
     name = "public_namespace",
-    srcs = [
-        ":public_symbols",
-    ],
-    outs = ["public_namespace.h"],
-    cmd = "$(execpath :public_namespace_sh) $(execpath :public_symbols) > $@",
-    cmd_bat = "$(execpath :public_namespace_sh) $(execpath :public_symbols) > $@",
+    out = "public_namespace.h",
+    public_symbols = ":public_symbols",
+    script = "public_namespace.sh",
     tags = ["manual"],
-    tools = [":public_namespace_sh"],
     visibility = ["//visibility:public"],
 )
 
-sh_binary(
-    name = "public_unnamespace_sh",
-    srcs = ["public_unnamespace.sh"],
-)
-
-genrule(
+public_symbols_header(
     name = "public_unnamespace",
-    srcs = [
-        ":public_symbols",
-    ],
-    outs = ["public_unnamespace.h"],
-    cmd = "$(execpath :public_unnamespace_sh) $(execpath :public_symbols) > $@",
-    cmd_bat = "$(execpath :public_unnamespace_sh) $(execpath :public_symbols) > $@",
+    out = "public_unnamespace.h",
+    public_symbols = ":public_symbols",
+    script = "public_unnamespace.sh",
     tags = ["manual"],
-    tools = [":public_unnamespace_sh"],
     visibility = ["//visibility:public"],
 )

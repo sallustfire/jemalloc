@@ -1,11 +1,15 @@
 load("@bazel_skylib//rules:expand_template.bzl", "expand_template")
-load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+load("//include/jemalloc/internal:public_symbols.bzl", "public_symbols_header")
 load("//tools:autoconf.bzl", "configure_header", "define_macro_if", "define_macro_with")
 load("//tools:version.bzl", "VERSION")
 load(":jemalloc_hdr.bzl", "jemalloc_hdr")
 
 exports_files(
-    ["jemalloc.sh"],
+    [
+        "jemalloc.sh",
+        "jemalloc_mangle.sh",
+        "jemalloc_rename.sh",
+    ],
     visibility = ["//tools/fidelity:__pkg__"],
 )
 
@@ -59,36 +63,23 @@ expand_template(
     ],
 )
 
-sh_binary(
-    name = "jemalloc_mangle_sh",
-    srcs = ["jemalloc_mangle.sh"],
-)
-
-# Note this scripts are not hermetic.
-genrule(
+public_symbols_header(
     name = "jemalloc_mangle",
-    srcs = [
-        "//include/jemalloc/internal:public_symbols",
-    ],
-    outs = ["jemalloc_mangle.h"],
-    cmd = "$(execpath :jemalloc_mangle_sh) $(execpath //include/jemalloc/internal:public_symbols) je_ > $@",
-    cmd_bat = "$(execpath :jemalloc_mangle_sh) $(execpath //include/jemalloc/internal:public_symbols) je_ > $@",
+    out = "jemalloc_mangle.h",
+    public_symbols = "//include/jemalloc/internal:public_symbols",
+    script = "jemalloc_mangle.sh",
+    symbol_prefix = "je_",
     tags = ["manual"],
-    tools = [":jemalloc_mangle_sh"],
     visibility = ["//visibility:public"],
 )
 
-# Note this scripts are not hermetic.
-genrule(
+public_symbols_header(
     name = "jemalloc_mangle_jet",
-    srcs = [
-        "//include/jemalloc/internal:public_symbols",
-    ],
-    outs = ["jemalloc_mangle_jet.h"],
-    cmd = "$(execpath :jemalloc_mangle_sh) $(execpath //include/jemalloc/internal:public_symbols) jet_ > $@",
-    cmd_bat = "$(execpath :jemalloc_mangle_sh) $(execpath //include/jemalloc/internal:public_symbols) jet_ > $@",
+    out = "jemalloc_mangle_jet.h",
+    public_symbols = "//include/jemalloc/internal:public_symbols",
+    script = "jemalloc_mangle.sh",
+    symbol_prefix = "jet_",
     tags = ["manual"],
-    tools = [":jemalloc_mangle_sh"],
     visibility = ["//visibility:public"],
 )
 
@@ -113,22 +104,12 @@ expand_template(
     template = "jemalloc_protos.h.in",
 )
 
-sh_binary(
-    name = "jemalloc_rename_sh",
-    srcs = ["jemalloc_rename.sh"],
-)
-
-# Invoke jemalloc_rename.sh to generate jemalloc_rename.h
-genrule(
+public_symbols_header(
     name = "jemalloc_rename",
-    srcs = [
-        "//include/jemalloc/internal:public_symbols",
-    ],
-    outs = ["jemalloc_rename.h"],
-    cmd = "$(execpath :jemalloc_rename_sh) $(execpath //include/jemalloc/internal:public_symbols) > $@",
-    cmd_bat = "$(execpath :jemalloc_rename_sh) $(execpath //include/jemalloc/internal:public_symbols) > $@",
+    out = "jemalloc_rename.h",
+    public_symbols = "//include/jemalloc/internal:public_symbols",
+    script = "jemalloc_rename.sh",
     tags = ["manual"],
-    tools = [":jemalloc_rename_sh"],
     visibility = ["//visibility:public"],
 )
 
