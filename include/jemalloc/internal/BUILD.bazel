@@ -144,10 +144,11 @@ cc_library(
         ":public_namespace",
     ] + select({
         "//settings:no_private_namespace": [],
-        "//conditions:default": [
-            ":private_namespace",
-            ":private_namespace_jet",
-        ],
+        "//conditions:default": [":private_namespace"],
+    }) + select({
+        # jemalloc_preamble.h includes private_namespace_jet.h only under JEMALLOC_JET
+        ":jet_private_namespace": [":private_namespace_jet"],
+        "//conditions:default": [],
     }),
     tags = ["manual"],
     visibility = ["//:__subpackages__"],
@@ -163,6 +164,14 @@ expand_template(
     },
     template = "jemalloc_preamble.h.in",
     toolchains = ["//settings/flags:private_namespace"],
+)
+
+selects.config_setting_group(
+    name = "jet_private_namespace",
+    match_all = [
+        "//settings:jet",
+        "//settings:with_private_namespace",
+    ],
 )
 
 # jemalloc is built to be the default allocator

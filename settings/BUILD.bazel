@@ -25,6 +25,11 @@ config_setting(
     flag_values = {":enable_no_private_namespace": "True"},
 )
 
+config_setting(
+    name = "with_private_namespace",
+    flag_values = {":enable_no_private_namespace": "False"},
+)
+
 # Control defines for compilation under different testing scenarios
 string_setting(
     name = "with_test",
