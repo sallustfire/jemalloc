@@ -1,5 +1,5 @@
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
-load("//tools:cc.bzl", "COPTS")
+load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
 load("//tools:test.bzl", "join_conf", "test_name")
 load("//tools:transition.bzl", "PLATFORM", "transition_default_constraints")
 
@@ -125,6 +125,8 @@ transition_default_constraints(
     name = test_name(test),
     srcs = [test["src"]],
     copts = COPTS,
+    conlyopts = CONLYOPTS,
+    cxxopts = CXXOPTS,
     env = {"JE_TEST_MALLOC_CONF": test.get("conf", "")},
     flaky = test.get("flaky", False),
     local_defines = ["JEMALLOC_INTEGRATION_TEST"],
@@ -211,6 +213,8 @@ transition_default_constraints(
     name = test_name(test),
     srcs = [test["src"]],
     copts = COPTS,
+    conlyopts = CONLYOPTS,
+    cxxopts = CXXOPTS,
     env = {"JE_TEST_MALLOC_CONF": test.get("conf", "")},
     local_defines = ["JEMALLOC_INTEGRATION_CPP_TEST"],
     # Makefile.in empties TESTS_INTEGRATION_CPP unless @enable_cxx@ (on by default; --disable-cxx turns it off).

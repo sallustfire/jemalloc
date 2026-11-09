@@ -22,6 +22,21 @@ _COPTS_MSVC_COMPATIBLE = [
     "/FS",
 ]
 
+# The language standards jemalloc's sources are written in, configure.ac's
+# preferred -std=gnu11 and -std=c++17. They are a property of these sources, so
+# they are declared here rather than left to the toolchain's default. MSVC has
+# no GNU C dialect, so C compiles there keep cl's default, as upstream's msvc/
+# projects do.
+CONLYOPTS = select({
+    "//settings/compiler:msvc_compatible": [],
+    "//conditions:default": ["-std=gnu11"],
+})
+
+CXXOPTS = select({
+    "//settings/compiler:msvc_compatible": ["/std:c++17"],
+    "//conditions:default": ["-std=c++17"],
+})
+
 # Platform and compiler COPTS consistent with configure/make
 COPTS = ["-D_REENTRANT"] + select({
     "@rules_cc//cc/compiler:clang": _COPTS_GCC_COMPATIBLE + ["-Wshorten-64-to-32"],
