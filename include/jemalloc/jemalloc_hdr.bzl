@@ -33,7 +33,7 @@ jemalloc_hdr = rule(
         "_generator": attr.label(
             cfg = "exec",
             executable = True,
-            default = Label("//include/jemalloc:jemalloc_hdr_gen"),
+            default = Label("//tools/generators:jemalloc_hdr_gen"),
         ),
     },
 )

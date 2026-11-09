@@ -40,6 +40,23 @@ Platform configurations that have defaults that are applied via transition.
 - //settings/platform:usable_size_const
 - //settings/platform:valloc_support
 
+## Fidelity with upstream
+
+The upstream build generates several headers with shell, awk and sed scripts, run by configure and make on the host.
+Here Bazel generates them from Starlark rules and a small C++ tool, so a module that depends on `@jemalloc` needs only
+its C and C++ toolchain: no host shell, awk or sed. private_namespace.h comes from running the toolchain's `nm`, which
+the tool can only do on POSIX hosts for now (see Windows under Known Issues).
+
+The upstream scripts are kept, not replaced. Each generated header has a `fidelity_test` in
+[tools/fidelity](tools/fidelity) that runs the unmodified upstream script, as configure.ac invokes it, on the
+same inputs and with the same settings, and fails if the outputs differ. The scripts run with hermetic gawk, grep, sed
+and coreutils, which are dev dependencies: they are fetched for this repository's tests and never for consumers. The
+`upstream-oracle` CI job goes further, building the upstream release with configure and make and comparing every
+script-generated header with the Bazel build's.
+
+When upgrading jemalloc, a failing fidelity test means an upstream script changed and its Starlark counterpart must
+follow.
+
 ## Validated Platforms
 
 - Ubuntu 20.04 & 22.04
@@ -49,7 +66,7 @@ Platform configurations that have defaults that are applied via transition.
 ## Known Issues
 
 - **Windows:** An effort to was made to translate upstream MSVC configuration, but it has not been validated and will 
-    likely fail.
+    likely fail. Generating private_namespace.h also fails there: the tool that runs `nm` is not implemented on Windows.
 - **FreeBSD:** An effort was made to translate existing autoconf feature detection to Bazel config settings, but no 
     attempt has been made to build on FreeBSD.
 - **Centos 7:** Fails due to the lack of defining `JEMALLOC_MADV_FREE`. Though, the original build does not set it when 

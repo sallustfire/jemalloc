@@ -10,12 +10,17 @@ load("//tools:transition.bzl", "PLATFORM", "transition_default_constraints")
 
 package(default_applicable_licenses = [":license"])
 
-exports_files(["VERSION"])
-
 license(
     name = "license",
     license_kinds = ["@rules_license//licenses/spdx:BSD-2-Clause"],
     license_text = "COPYING",
+)
+
+exports_files(["VERSION"])
+
+exports_files(
+    ["configure.ac"],
+    visibility = ["//tools/fidelity:__pkg__"],
 )
 
 alias(

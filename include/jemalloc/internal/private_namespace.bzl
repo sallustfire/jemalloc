@@ -1,66 +1,58 @@
+"""Rules that generate private_namespace.h from the library's symbols and check the library against it."""
+
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolchain")
+load("//tools:transition.bzl", "platform_constraints_transition")
 
 def _private_namespace_impl(ctx):
     cc_toolchain = find_cc_toolchain(ctx)
-    output = ctx.actions.declare_file(ctx.attr.out)
-
-    # Extract private symbols
-    args = ctx.actions.args()
-
     prefix = ctx.attr.prefix if ctx.attr.prefix else ctx.attr._prefix[BuildSettingInfo].value
-    for sym in ctx.attr.public_symbols:
-        args.add(prefix + sym)
+    public = [prefix + symbol for symbol in ctx.attr.public_symbols]
 
-    # Wrap symbols without prefix
-    args.add_all(ctx.attr.wrap_symbols)
+    output = ctx.actions.declare_file(ctx.attr.out)
+    if bool(ctx.attr.input) == bool(ctx.file.listing):
+        fail("set exactly one of input and listing")
+    nm_stderr = ctx.actions.declare_file(ctx.label.name + ".nm.stderr")
+    sym_prefix = ctx.attr.sym_prefix
+    if ctx.file.listing:
+        listing = ctx.file.listing
+        ctx.actions.write(output = nm_stderr, content = "")
+        listing_source = listing.short_path
+        unfound_reason = "public_symbols, prefix or sym_prefix does not match it"
+    else:
+        listing_source = "`{}`".format(cc_toolchain.nm_executable)
+        unfound_reason = "it read no symbol table (for example from LTO bitcode it cannot parse)"
+        archives = [file for file in ctx.files.input if file.path.endswith(".a")]
+        if not archives:
+            fail("{} provides no static archive (.a) to list, got {}".format(ctx.attr.input[0].label, ctx.files.input))
+        listing = ctx.actions.declare_file(ctx.label.name + ".nm")
+        ctx.actions.run(
+            executable = ctx.executable._generator,
+            arguments = ["nm", cc_toolchain.nm_executable, listing.path, nm_stderr.path] + [archive.path for archive in archives],
+            inputs = depset(archives, transitive = [cc_toolchain.all_files]),
+            outputs = [listing, nm_stderr],
+            mnemonic = "PrivateNamespaceNM",
+        )
 
-    # Write out awk script
-    constraint = ctx.attr._constraint_macos[platform_common.ConstraintValueInfo]
-    sym_prefix = "_" if ctx.target_platform_has_constraint(constraint) else ""
-    output_awk = ctx.actions.declare_file("{name}.awk".format(name = ctx.attr.name))
-    ctx.actions.run_shell(
-        inputs = [],
-        outputs = [output_awk],
+    args = ctx.actions.args()
+    args.add_all(["header", output.path, listing, nm_stderr, sym_prefix, listing_source, unfound_reason])
+    args.add_all(public, format_each = "--public=%s")
+    args.add_all(ctx.attr.wrap_symbols, format_each = "--wrap=%s")
+    ctx.actions.run(
+        executable = ctx.executable._generator,
         arguments = [args],
-        command = "{script} \"{sym_prefix}\" $@ > {output}".format(
-            script = ctx.file._private_symbols_sh.path,
-            output = output_awk.path,
-            sym_prefix = sym_prefix,
-        ),
-        mnemonic = "PrivateSymbols",
-        tools = [ctx.file._private_symbols_sh],
-    )
-
-    inputs = [src for src in ctx.files.input if src.path.endswith(".a")]
-    output_symbols = ctx.actions.declare_file("symbols{jet}.sym".format(jet = "_jet" if ctx.attr.enable_jet else ""))
-
-    ctx.actions.run_shell(
-        inputs = depset(inputs, transitive = [cc_toolchain.all_files]),
-        outputs = [output_symbols],
-        command = "{nm} -a {inputs} | awk -f {script} > {output}".format(
-            nm = cc_toolchain.nm_executable,
-            inputs = " ".join([input.path for input in inputs]),
-            script = output_awk.path,
-            output = output_symbols.path,
-        ),
-        tools = [output_awk],
-        mnemonic = "PrivateNamespaceNM",
-    )
-
-    ctx.actions.run_shell(
-        inputs = [output_symbols],
+        inputs = [listing, nm_stderr],
         outputs = [output],
-        command = "{script} {symbols} > {output}".format(
-            script = ctx.file._private_namespace_sh.path,
-            symbols = output_symbols.path,
-            output = output.path,
-        ),
         mnemonic = "PrivateNamespace",
-        tools = [ctx.file._private_namespace_sh],
     )
 
-    return [DefaultInfo(files = depset([output]))]
+    export_syms = ctx.actions.declare_file(ctx.label.name + ".export_syms")
+    ctx.actions.write(output = export_syms, content = "".join([symbol + "\n" for symbol in public + ctx.attr.wrap_symbols]))
+
+    return [
+        DefaultInfo(files = depset([output])),
+        OutputGroupInfo(upstream_inputs = depset([listing, export_syms])),
+    ]
 
 def _transition_impl(_settings, attr):
     return {
@@ -77,8 +69,8 @@ transition_config_settings = transition(
 )
 
 private_namespace = rule(
-    doc = "Generate the private namespace header from compiled object files. This combines the private_symbols.awk " +
-          "generation with the header generation to bridge the requriements between the exec and target platforms.",
+    doc = "Generate the private namespace header from the `nm -a` listing of `input`, as upstream's private_symbols.awk " +
+          "and private_namespace.sh do. Output group `upstream_inputs` holds that listing and configure's export_syms.",
     implementation = _private_namespace_impl,
     attrs = {
         "prefix": attr.string(doc = "Explicit prefix for public symbols, overrides value selected by build setting."),
@@ -91,9 +83,18 @@ private_namespace = rule(
             cfg = transition_config_settings,
         ),
         "enable_jet": attr.bool(default = False),
+        "listing": attr.label(
+            doc = "An `nm -a` or `dumpbin /SYMBOLS` listing to use in place of listing `input`.",
+            allow_single_file = True,
+        ),
         "out": attr.string(
             doc = "Name of the generated file",
             mandatory = True,
+        ),
+        "sym_prefix": attr.string(
+            doc = "configure's SYM_PREFIX: \"_\" for Mach-O targets, or whatever a `listing`'s format fixes.",
+            mandatory = True,
+            values = ["", "_"],
         ),
         "wrap_symbols": attr.string_list(
             doc = "List of symbols to wrap without prefix",
@@ -101,16 +102,80 @@ private_namespace = rule(
         ),
         "_prefix": attr.label(default = "//settings/flags:jemalloc_prefix_resolved"),
         "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
-        "_constraint_macos": attr.label(default = "@platforms//os:macos", cfg = "target"),
-        "_private_namespace_sh": attr.label(
-            default = "//include/jemalloc/internal:private_namespace.sh",
-            allow_single_file = True,
+        "_generator": attr.label(
+            default = Label("//tools/generators:private_namespace_gen"),
             cfg = "exec",
+            executable = True,
         ),
-        "_private_symbols_sh": attr.label(
-            default = "//include/jemalloc/internal:private_symbols.sh",
-            allow_single_file = True,
+    },
+    toolchains = use_cc_toolchain(True),
+)
+
+def _rlocationpath(ctx, file):
+    return file.short_path[3:] if file.short_path.startswith("../") else ctx.workspace_name + "/" + file.short_path
+
+def _private_namespace_leak_test_impl(ctx):
+    cc_toolchain = find_cc_toolchain(ctx)
+    archives = [file for file in ctx.files.library if file.path.endswith(".a")]
+    if not archives:
+        fail("expected a static archive from {}, got {}".format(ctx.attr.library.label, ctx.files.library))
+    namespace = ctx.attr.namespace[0]
+    export_syms = [file for file in namespace[OutputGroupInfo].upstream_inputs.to_list() if file.path.endswith(".export_syms")][0]
+    header = namespace[DefaultInfo].files.to_list()[0]
+
+    listing = ctx.actions.declare_file(ctx.label.name + ".nm")
+    nm_stderr = ctx.actions.declare_file(ctx.label.name + ".nm.stderr")
+    ctx.actions.run(
+        executable = ctx.executable._generator,
+        arguments = ["nm", cc_toolchain.nm_executable, listing.path, nm_stderr.path] + [archive.path for archive in archives],
+        inputs = depset(archives, transitive = [cc_toolchain.all_files]),
+        outputs = [listing, nm_stderr],
+        mnemonic = "PrivateNamespaceLeakNM",
+    )
+
+    executable = ctx.actions.declare_file(ctx.label.name)
+    ctx.actions.symlink(output = executable, target_file = ctx.executable._checker, is_executable = True)
+
+    return [
+        DefaultInfo(
+            executable = executable,
+            runfiles = ctx.runfiles(files = [listing, nm_stderr, export_syms, header]).merge(ctx.attr._checker[DefaultInfo].default_runfiles),
+        ),
+        RunEnvironmentInfo(environment = {
+            "PRIVATE_NAMESPACE_LEAK_STDERR": _rlocationpath(ctx, nm_stderr),
+            "PRIVATE_NAMESPACE_LEAK_EXPORTS": _rlocationpath(ctx, export_syms),
+            "PRIVATE_NAMESPACE_LEAK_HEADER": _rlocationpath(ctx, header),
+            "PRIVATE_NAMESPACE_LEAK_LISTING": _rlocationpath(ctx, listing),
+            "PRIVATE_NAMESPACE_LEAK_PREFIX": ctx.attr._private_namespace[BuildSettingInfo].value + "je_",
+            "PRIVATE_NAMESPACE_LEAK_SYM_PREFIX": ctx.attr.sym_prefix,
+        }),
+    ]
+
+private_namespace_leak_test = rule(
+    doc = "Checks that `library` defines no symbol outside the public API, the wrapped symbols and the private namespace.",
+    implementation = _private_namespace_leak_test_impl,
+    test = True,
+    attrs = {
+        "library": attr.label(doc = "The library consumers link.", mandatory = True),
+        "namespace": attr.label(
+            doc = "The private_namespace target that names the exported and private symbols.",
+            mandatory = True,
+            cfg = platform_constraints_transition,
+        ),
+        "platform": attr.string(doc = "Read by the transition; see transition_default_constraints.", mandatory = True),
+        "settings": attr.label_keyed_string_dict(doc = "Read by the transition; see transition_default_constraints."),
+        "sym_prefix": attr.string(doc = "configure's SYM_PREFIX for the target platform.", mandatory = True, values = ["", "_"]),
+        "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
+        "_private_namespace": attr.label(default = "//settings/flags:private_namespace"),
+        "_checker": attr.label(
+            default = Label("//tools/generators:private_namespace_leak_check"),
+            cfg = "target",
+            executable = True,
+        ),
+        "_generator": attr.label(
+            default = Label("//tools/generators:private_namespace_gen"),
             cfg = "exec",
+            executable = True,
         ),
     },
     toolchains = use_cc_toolchain(True),

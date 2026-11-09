@@ -1,0 +1,194 @@
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+cc_binary(
+    name = "jemalloc_hdr_gen",
+    srcs = ["jemalloc_hdr_gen.cc"],
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
+    visibility = ["//include/jemalloc:__pkg__"],
+)
+
+cc_library(
+    name = "private_namespace_listing",
+    srcs = ["private_namespace_listing.cc"],
+    hdrs = ["private_namespace_listing.h"],
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
+)
+
+cc_binary(
+    name = "private_namespace_gen",
+    srcs = ["private_namespace_gen.cc"],
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
+    visibility = ["//include/jemalloc/internal:__pkg__"],
+    deps = [":private_namespace_listing"],
+)
+
+cc_binary(
+    name = "private_namespace_leak_check",
+    testonly = True,
+    srcs = ["private_namespace_leak_check.cc"],
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
+    visibility = ["//include/jemalloc/internal:__pkg__"],
+    deps = [
+        ":private_namespace_listing",
+        "@rules_cc//cc/runfiles",
+    ],
+)
+
+# expect_failure and fake_nm use POSIX process APIs, as private_namespace_gen's nm mode does.
+_POSIX = select({
+    "@platforms//os:windows": ["@platforms//:incompatible"],
+    "//conditions:default": [],
+})
+
+cc_binary(
+    name = "fake_nm",
+    testonly = True,
+    srcs = ["fake_nm.cc"],
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
+    target_compatible_with = _POSIX,
+)
+
+_LEAK_ENV = {
+    "PRIVATE_NAMESPACE_LEAK_EXPORTS": "$(rlocationpath :private_namespace_leak_fixture.export_syms)",
+    "PRIVATE_NAMESPACE_LEAK_HEADER": "$(rlocationpath :private_namespace_leak_fixture.h)",
+    "PRIVATE_NAMESPACE_LEAK_PREFIX": "je_",
+    "PRIVATE_NAMESPACE_LEAK_STDERR": "/dev/null",
+    "PRIVATE_NAMESPACE_LEAK_SYM_PREFIX": "",
+}
+
+_LEAK_DATA = [
+    ":private_namespace_leak_fixture.export_syms",
+    ":private_namespace_leak_fixture.h",
+]
+
+cc_test(
+    name = "private_namespace_leak_check_clean_test",
+    size = "small",
+    srcs = ["private_namespace_leak_check.cc"],
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
+    data = _LEAK_DATA + [":private_namespace_leak_fixture.nm"],
+    env = _LEAK_ENV | {"PRIVATE_NAMESPACE_LEAK_LISTING": "$(rlocationpath :private_namespace_leak_fixture.nm)"},
+    deps = [
+        ":private_namespace_listing",
+        "@rules_cc//cc/runfiles",
+    ],
+)
+
+_HEADER_ARGS = [
+    "header",
+    "@TEST_TMPDIR@/private_namespace.h",
+]
+
+# Each case runs a generator tool on a fixture that must make it fail, naming the problem.
+_FAILURE_CASES = [
+    {
+        "name": "private_namespace_gen_unreadable_member_test",
+        "expected": "could not read every archive member",
+        "command": ":private_namespace_gen",
+        "args": _HEADER_ARGS + [
+            "$(rootpath :private_namespace_leak_fixture.nm)",
+            "$(rootpath :private_namespace_gen_unreadable_member.stderr)",
+            "''",
+            "fixture",
+            "fixture",
+            "--public=malloc",
+        ],
+        "data": [
+            ":private_namespace_leak_fixture.nm",
+            ":private_namespace_gen_unreadable_member.stderr",
+        ],
+        "env": {},
+    },
+    {
+        "name": "private_namespace_gen_slim_lto_test",
+        "expected": "GCC slim-LTO objects",
+        "command": ":private_namespace_gen",
+        "args": _HEADER_ARGS + [
+            "$(rootpath :private_namespace_gen_slim_lto.nm)",
+            "/dev/null",
+            "''",
+            "fixture",
+            "fixture",
+            "--public=malloc",
+        ],
+        "data": [":private_namespace_gen_slim_lto.nm"],
+        "env": {},
+    },
+    {
+        "name": "private_namespace_gen_no_public_symbol_test",
+        "expected": "defines none of the public symbols",
+        "command": ":private_namespace_gen",
+        "args": _HEADER_ARGS + [
+            "$(rootpath :private_namespace_leak_fixture.nm)",
+            "/dev/null",
+            "''",
+            "fixture",
+            "fixture",
+            "--public=absent_symbol",
+        ],
+        "data": [":private_namespace_leak_fixture.nm"],
+        "env": {},
+    },
+    {
+        "name": "private_namespace_gen_nm_fails_test",
+        "expected": "fake_nm: cannot read archive member",
+        "command": ":private_namespace_gen",
+        "args": [
+            "nm",
+            "$(rootpath :fake_nm)",
+            "@TEST_TMPDIR@/listing.nm",
+            "@TEST_TMPDIR@/nm.stderr",
+            "libjemalloc.a",
+        ],
+        "data": [":fake_nm"],
+        "env": {},
+    },
+    {
+        "name": "private_namespace_leak_check_leak_test",
+        "expected": "leaked_function",
+        "command": ":private_namespace_leak_check",
+        "args": [],
+        "data": _LEAK_DATA + [":private_namespace_leak_fixture_leaky.nm"],
+        "env": _LEAK_ENV | {"PRIVATE_NAMESPACE_LEAK_LISTING": "$(rlocationpath :private_namespace_leak_fixture_leaky.nm)"},
+    },
+]
+
+[
+    cc_test(
+        name = case["name"],
+        size = "small",
+        srcs = ["expect_failure.cc"],
+        args = [
+            "'{}'".format(case["expected"]),
+            "$(rootpath {})".format(case["command"]),
+        ] + case["args"],
+        cxxopts = select({
+            "//settings/compiler:msvc_compatible": ["/std:c++14"],
+            "//conditions:default": ["-std=c++14"],
+        }),
+        data = [case["command"]] + case["data"],
+        env = case["env"],
+        target_compatible_with = _POSIX,
+    )
+    for case in _FAILURE_CASES
+]
