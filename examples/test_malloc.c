@@ -16,8 +16,9 @@
 
 /*
  * On macOS plain malloc reaches jemalloc only through jemalloc_zone, so that zone must own the pointer. The pointer's
- * zone cannot show this: since OS X 10.12 malloc_zone_from_ptr() and malloc_default_zone() report a virtual default
- * zone (see src/zone.c's zone_default_get()). jemalloc_zone's size() returns 0 for a pointer it does not own.
+ * zone cannot show this: on macOS 15.1, malloc_zone_from_ptr() was observed to report the virtual default zone for
+ * pointers the first registered zone owns, the zone malloc_default_zone() has returned since OS X 10.12 (see
+ * src/zone.c's zone_default_get()). jemalloc_zone's size() returns 0 for a pointer it does not own.
  */
 static int owned_by_jemalloc_zone(const void *p) {
     vm_address_t *zones = NULL;

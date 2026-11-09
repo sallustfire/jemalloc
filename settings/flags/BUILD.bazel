@@ -119,18 +119,17 @@ config_setting(
     flag_values = {":enable_xmalloc": "True"},
 )
 
-# --with-jemalloc-prefix. __auto__ takes configure's default for the target platform. C reserves identifiers that begin
-# with two underscores, so no real prefix is __auto__. Only transitions use this flag: jemalloc() in
-# //settings:config.bzl may set it, and //tools:transition.bzl resolves it into :jemalloc_prefix_resolved. Everything
-# else reads the resolved prefix, so __auto__ never reaches a symbol name.
+# --with-jemalloc-prefix. __auto__ takes configure's default for the target platform, which //tools:transition.bzl
+# resolves into :jemalloc_prefix_resolved. C reserves identifiers that begin with two underscores (C11 7.1.3), so no
+# real prefix is __auto__.
 string_flag(
     name = "jemalloc_prefix",
     build_setting_default = "__auto__",
     visibility = ["//visibility:public"],
 )
 
-# JEMALLOC_PREFIX, as //tools:transition.bzl resolves it from :jemalloc_prefix. It is not a flag, so only a transition
-# sets it, and that transition never writes __auto__.
+# JEMALLOC_PREFIX: :jemalloc_prefix with __auto__ resolved to the platform default by //tools:transition.bzl. It is not
+# a flag, so a user cannot set it to __auto__.
 string_setting(
     name = "jemalloc_prefix_resolved",
     build_setting_default = "",
