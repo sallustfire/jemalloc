@@ -29,11 +29,14 @@ _SETTINGS = _BOOL_SETTINGS + ["//settings:with_test"] + list(_PLATFORM_DEFAULTS)
 
 _SETTING_LABELS = [Label(setting) for setting in _SETTINGS]
 
+_PREFIX_RESOLVED = "//settings/flags:jemalloc_prefix_resolved"
+
 _CPREFIX = "//settings/flags:jemalloc_cprefix"
 
 def _platform_constraints_transition_impl(settings, attr):
     # Only _SETTINGS are taken from settings. Any other key is either not an output of this transition or, like
-    # jemalloc_cprefix, derived from jemalloc_prefix below, so its value would be dropped without a word.
+    # jemalloc_prefix_resolved and jemalloc_cprefix, derived from jemalloc_prefix below, so its value would be dropped
+    # without a word.
     for label in attr.settings:
         if label not in _SETTING_LABELS:
             fail("transition_default_constraints cannot take {} from settings; it takes only {}".format(label, ", ".join(_SETTINGS)))
@@ -50,15 +53,17 @@ def _platform_constraints_transition_impl(settings, attr):
             value = _PLATFORM_DEFAULTS[setting].get(attr.platform, _PLATFORM_DEFAULTS[setting]["default"])
         result[setting] = value
 
+    result[_PREFIX_RESOLVED] = result["//settings/flags:jemalloc_prefix"]
+
     # Equivalent of JEMALLOC_CPREFIX=`echo ${JEMALLOC_PREFIX} | tr "a-z" "A-Z"`
-    result[_CPREFIX] = result["//settings/flags:jemalloc_prefix"].upper()
+    result[_CPREFIX] = result[_PREFIX_RESOLVED].upper()
 
     return result
 
 _platform_constraints_transition = transition(
     implementation = _platform_constraints_transition_impl,
     inputs = _SETTINGS + [_CPREFIX],
-    outputs = _SETTINGS + [_CPREFIX],
+    outputs = _SETTINGS + [_PREFIX_RESOLVED, _CPREFIX],
 )
 
 def _transition_default_constraints_impl(ctx):
@@ -86,7 +91,8 @@ transition_default_constraints = rule(
         ),
         "settings": attr.label_keyed_string_dict(
             doc = "Settings to transition to, over both their configured values and the platform defaults. Only the " +
-                  "settings it resolves are accepted; jemalloc_cprefix is derived from jemalloc_prefix.",
+                  "settings it resolves are accepted; jemalloc_prefix_resolved and jemalloc_cprefix are derived from " +
+                  "jemalloc_prefix.",
             default = {},
         ),
         "_allowlist_function_transition": attr.label(

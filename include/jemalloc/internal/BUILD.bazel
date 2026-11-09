@@ -519,7 +519,7 @@ configure_header(
     tags = ["manual"],
     template = "jemalloc_internal_defs.h.in",
     toolchains = [
-        "//settings/flags:jemalloc_prefix",
+        "//settings/flags:jemalloc_prefix_resolved",
         "//settings/flags:jemalloc_cprefix",
         "//settings/flags:lg_quantum",
         "//settings/flags:malloc_conf",
@@ -583,7 +583,7 @@ public_symbols(
 
 # The expected output is what configure.ac's public_symbols.txt command writes for this map, whose entries cover a
 # name that is not a public symbol, a space and a trailing comma as separators, an extra field and an empty value. The
-# prefix is set through the flag, the rule's only source for it.
+# prefix is set through the flag, which the transition resolves into the rule's only source for it.
 public_symbols(
     name = "public_symbols_mangling",
     testonly = True,

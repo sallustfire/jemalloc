@@ -9,8 +9,6 @@ def _private_namespace_impl(ctx):
     args = ctx.actions.args()
 
     prefix = ctx.attr.prefix if ctx.attr.prefix else ctx.attr._prefix[BuildSettingInfo].value
-    if prefix == "__auto__":
-        fail("//settings/flags:jemalloc_prefix is __auto__, which only the platform transition resolves; build through //:jemalloc")
     for sym in ctx.attr.public_symbols:
         args.add(prefix + sym)
 
@@ -101,7 +99,7 @@ private_namespace = rule(
             doc = "List of symbols to wrap without prefix",
             default = [],
         ),
-        "_prefix": attr.label(default = "//settings/flags:jemalloc_prefix"),
+        "_prefix": attr.label(default = "//settings/flags:jemalloc_prefix_resolved"),
         "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
         "_constraint_macos": attr.label(default = "@platforms//os:macos", cfg = "target"),
         "_private_namespace_sh": attr.label(

@@ -5,8 +5,6 @@ load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 def _public_symbols_impl(ctx):
     output = ctx.actions.declare_file(ctx.attr.out)
     prefix = ctx.attr._prefix[BuildSettingInfo].value
-    if prefix == "__auto__":
-        fail("//settings/flags:jemalloc_prefix is __auto__, which only the platform transition resolves; build through //:jemalloc")
 
     # configure.ac splits entries with `echo ${mangling_map} |tr ',' ' '` and writes each as $1:$2 of
     # `echo ${nm} |tr ':' ' ' |awk`, so whitespace also separates entries, empty fields are skipped, and an entry whose
@@ -43,6 +41,6 @@ public_symbols = rule(
             doc = "Name of the generated file",
             mandatory = True,
         ),
-        "_prefix": attr.label(default = "//settings/flags:jemalloc_prefix"),
+        "_prefix": attr.label(default = "//settings/flags:jemalloc_prefix_resolved"),
     },
 )

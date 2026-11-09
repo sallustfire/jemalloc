@@ -20,7 +20,9 @@ See the [examples/BUILD.bazel](examples/BUILD.bazel) file for examples of how to
  than by exporting malloc, free and so on. A prefix renames the public API, malloc_conf, /etc/malloc.conf and
  MALLOC_CONF as INSTALL.md's --with-jemalloc-prefix describes. To call the API by its je_* names (je_mallctl,
  je_mallocx, ...) under any prefix, define JEMALLOC_NO_DEMANGLE before including jemalloc/jemalloc.h. Set the flag, or
- jemalloc()'s jemalloc_prefix, to choose a prefix explicitly.
+ jemalloc()'s jemalloc_prefix, to choose a prefix explicitly. The flag defaults to "__auto__", which only jemalloc's own
+ transition resolves, so a select() on the flag outside it sees "__auto__", and the flag provides no $(JEMALLOC_PREFIX).
+ Set the prefix explicitly where a consumer needs to know it.
 - **//settings/platform:lg_vaddr:** Defaults to the hard-coded cross compilation value of 57 from the configure script.
  If targeting a 32-bit platform, this should be explicitly set.
 - **glibc:** Assumes a modern version. If jemalloc is compiled to be the default allocator on linux, it assumes glibc
