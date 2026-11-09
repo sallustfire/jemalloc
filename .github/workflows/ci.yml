@@ -30,6 +30,11 @@ jobs:
             bazel_config: "--config=bazel9"
           - os: ubuntu-24.04
             bazel_version: "7.4.0"
+          # The sed dev dependency compiles its SELinux calls where the host has libselinux headers (ubuntu-22.04
+          # does) but never links -lselinux: rules_cc_autoconf's gnulib port probes selinux/selinux.h whatever
+          # with_selinux says. Remove once a rules_cc_autoconf release gates that probe as gnulib does.
+          - os: ubuntu-22.04
+            host_linkopts: "--host_linkopt=-lselinux"
     steps:
       - uses: actions/checkout@v4
       - uses: bazel-contrib/setup-bazel@0.14.0
@@ -39,11 +44,11 @@ jobs:
       - name: Build
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
-        run: bazel build //... ${{ matrix.bazel_config }}
+        run: bazel build //... ${{ matrix.bazel_config }} ${{ matrix.host_linkopts }}
       - name: Test
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
-        run: bazel test //... ${{ matrix.bazel_config }}
+        run: bazel test //... ${{ matrix.bazel_config }} ${{ matrix.host_linkopts }}
 
   prof-libunwind:
     name: Prof libunwind (${{ matrix.os }}, Bazel ${{ matrix.bazel_version }})
@@ -58,6 +63,9 @@ jobs:
             bazel_config: "--config=bazel8"
           - bazel_version: "9.x"
             bazel_config: "--config=bazel9"
+          # As in the build job: sed's SELinux link on ubuntu-22.04.
+          - os: ubuntu-22.04
+            host_linkopts: "--host_linkopt=-lselinux"
     steps:
       - uses: actions/checkout@v4
       - uses: bazel-contrib/setup-bazel@0.14.0
@@ -67,11 +75,11 @@ jobs:
       - name: Build
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
-        run: bazel build //... --config=prof-libunwind ${{ matrix.bazel_config }}
+        run: bazel build //... --config=prof-libunwind ${{ matrix.bazel_config }} ${{ matrix.host_linkopts }}
       - name: Test
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
-        run: bazel test //... --config=prof-libunwind ${{ matrix.bazel_config }}
+        run: bazel test //... --config=prof-libunwind ${{ matrix.bazel_config }} ${{ matrix.host_linkopts }}
 
   prof-libgcc:
     name: Prof libgcc (${{ matrix.os }}, Bazel ${{ matrix.bazel_version }})
