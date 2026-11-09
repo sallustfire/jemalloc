@@ -53,6 +53,12 @@ def _platform_constraints_transition_impl(settings, attr):
             value = _PLATFORM_DEFAULTS[setting].get(attr.platform, _PLATFORM_DEFAULTS[setting]["default"])
         result[setting] = value
 
+    # configure.ac: AC_MSG_ERROR([--enable-zone-allocator is only supported on Darwin]). Without it, zone.c stops at
+    # its own #error once compiled.
+    if result["//settings/flags:enable_zone_allocator"] == "yes" and attr.platform != "darwin":
+        fail("//settings/flags:enable_zone_allocator=yes is only supported on Darwin, as configure's " +
+             "--enable-zone-allocator; the target platform is {}".format(attr.platform))
+
     result[_PREFIX_RESOLVED] = result["//settings/flags:jemalloc_prefix"]
 
     # Equivalent of JEMALLOC_CPREFIX=`echo ${JEMALLOC_PREFIX} | tr "a-z" "A-Z"`

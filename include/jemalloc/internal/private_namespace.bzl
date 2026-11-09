@@ -2,7 +2,29 @@
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolchain")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 load("//tools:transition.bzl", "platform_constraints_transition")
+
+# This repository, as the owner of the library's own linker inputs, so that a dependency's archive (libunwind) is not
+# read as jemalloc's.
+_REPO = Label("//:BUILD.bazel").repo_name
+
+def _static_archives(target):
+    """The static archives target links, from its CcInfo: every archive the library is made of, whatever its extension.
+
+    An alwayslink archive is named .lo, so matching on ".a" silently drops it. The archives come dependencies first, the
+    reverse of link order, so the core precedes the zone and its symbols are listed in upstream's order (zone.o last in
+    C_SYM_OBJS), which keeps private_namespace.h byte-identical to a single-archive build.
+    """
+    archives = []
+    for linker_input in reversed(target[CcInfo].linking_context.linker_inputs.to_list()):
+        if linker_input.owner.repo_name != _REPO:
+            continue
+        for library in linker_input.libraries:
+            for archive in [library.static_library, library.pic_static_library]:
+                if archive != None and archive not in archives:
+                    archives.append(archive)
+    return archives
 
 def _private_namespace_impl(ctx):
     cc_toolchain = find_cc_toolchain(ctx)
@@ -22,9 +44,9 @@ def _private_namespace_impl(ctx):
     else:
         listing_source = "`{}`".format(cc_toolchain.nm_executable)
         unfound_reason = "it read no symbol table (for example from LTO bitcode it cannot parse)"
-        archives = [file for file in ctx.files.input if file.path.endswith(".a")]
+        archives = _static_archives(ctx.attr.input[0])
         if not archives:
-            fail("{} provides no static archive (.a) to list, got {}".format(ctx.attr.input[0].label, ctx.files.input))
+            fail("{} provides no static archive to list, got {}".format(ctx.attr.input[0].label, ctx.files.input))
         listing = ctx.actions.declare_file(ctx.label.name + ".nm")
         ctx.actions.run(
             executable = ctx.executable._generator,
@@ -116,7 +138,7 @@ def _rlocationpath(ctx, file):
 
 def _private_namespace_leak_test_impl(ctx):
     cc_toolchain = find_cc_toolchain(ctx)
-    archives = [file for file in ctx.files.library if file.path.endswith(".a")]
+    archives = _static_archives(ctx.attr.library)
     if not archives:
         fail("expected a static archive from {}, got {}".format(ctx.attr.library.label, ctx.files.library))
     namespace = ctx.attr.namespace[0]
