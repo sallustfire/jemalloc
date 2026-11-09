@@ -1,5 +1,4 @@
 load("@bazel_skylib//rules:expand_template.bzl", "expand_template")
-load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//tools:autoconf.bzl", "configure_header", "define_macro_if", "define_macro_with")
 load("//tools:version.bzl", "VERSION")
@@ -128,16 +127,6 @@ expand_template(
     out = "jemalloc_typedefs.h",
     substitutions = {},
     template = "jemalloc_typedefs.h.in",
-)
-
-cc_binary(
-    name = "jemalloc_hdr_gen",
-    srcs = ["jemalloc_hdr_gen.cc"],
-    cxxopts = select({
-        "@rules_cc//cc/compiler:msvc-cl": ["/std:c++11"],
-        "//conditions:default": ["-std=c++11"],
-    }),
-    visibility = ["//visibility:private"],
 )
 
 jemalloc_hdr(
