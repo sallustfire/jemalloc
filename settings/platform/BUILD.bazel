@@ -1,4 +1,3 @@
-load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "int_flag", "string_flag")
 
 ### Bazel-ification of platform feature detection performed by ./configure ###
@@ -30,18 +29,4 @@ string_flag(
     build_setting_default = "__auto__",
     make_variable = "LG_VADDR",
     visibility = ["//visibility:public"],
-)
-
-### Convenience settings groups ###
-
-# Darwin systems
-selects.config_setting_group(
-    name = "darwin",
-    match_any = [
-        "@platforms//os:ios",
-        "@platforms//os:macos",
-        "@platforms//os:tvos",
-        "@platforms//os:watchos",
-    ],
-    visibility = ["//:__subpackages__"],
 )

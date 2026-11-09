@@ -2,14 +2,22 @@
 
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
+# configure.ac's host table arm for *-*-darwin* and *-*-ios*: "darwin" for every Apple OS.
 PLATFORM = select({
     "@platforms//os:android": "android",
     "@platforms//os:freebsd": "freebsd",
     "@platforms//os:linux": "linux",
     "@platforms//os:windows": "windows",
-    "//settings/platform:darwin": "darwin",
-    "//conditions:default": "unknown",
-})
+} | {
+    os: "darwin"
+    for os in [
+        "@platforms//os:ios",
+        "@platforms//os:macos",
+        "@platforms//os:tvos",
+        "@platforms//os:visionos",
+        "@platforms//os:watchos",
+    ]
+} | {"//conditions:default": "unknown"})
 
 # The CPU class the platform defaults read. aarch64 and x86_64 have defaults of their own; any other CPU is classed by
 # its pointer width, and a CPU whose width @platforms leaves ambiguous (ppc) or that is not listed is "unknown".

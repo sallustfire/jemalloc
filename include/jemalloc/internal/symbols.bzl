@@ -77,8 +77,15 @@ ALL_PUBLIC_SYMBOLS = PUBLIC_SYMBOLS + list(OPTIONAL_PUBLIC_SYMBOLS)
 
 ALL_WRAP_SYMBOLS = [symbol for symbols in _WRAP_OS.values() for symbol in symbols] + list(OPTIONAL_WRAP_SYMBOLS)
 
-# configure.ac's SYM_PREFIX
+# configure.ac's SYM_PREFIX: "_" for every Apple OS (its *-*-darwin* and *-*-ios* hosts), as Mach-O symbol names
+# carry a leading underscore.
 SYM_PREFIX = select({
-    "//settings/platform:darwin": "_",
-    "//conditions:default": "",
-})
+    os: "_"
+    for os in [
+        "@platforms//os:ios",
+        "@platforms//os:macos",
+        "@platforms//os:tvos",
+        "@platforms//os:visionos",
+        "@platforms//os:watchos",
+    ]
+} | {"//conditions:default": ""})
