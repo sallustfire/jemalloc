@@ -4,8 +4,8 @@ cc_binary(
     name = "jemalloc_hdr_gen",
     srcs = ["jemalloc_hdr_gen.cc"],
     cxxopts = select({
-        "@rules_cc//cc/compiler:msvc-cl": ["/std:c++11"],
-        "//conditions:default": ["-std=c++11"],
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
     }),
     visibility = ["//include/jemalloc:__pkg__"],
 )
