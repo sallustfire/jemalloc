@@ -3,7 +3,7 @@ load("@bazel_skylib//rules:native_binary.bzl", "native_test")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("//include/jemalloc/internal:private_namespace.bzl", "private_namespace")
 load("//include/jemalloc/internal:public_symbols.bzl", "public_symbols", "public_symbols_header", "symbol_list")
-load("//include/jemalloc/internal:symbols.bzl", "ALL_PUBLIC_SYMBOLS", "ALL_WRAP_SYMBOLS", "SYM_PREFIX")
+load("//include/jemalloc/internal:symbols.bzl", "ALL_PUBLIC_SYMBOLS", "ALL_WRAP_SYMBOLS", "OPTIONAL_PUBLIC_SYMBOLS", "OPTIONAL_WRAP_SYMBOLS", "SYM_PREFIX")
 load("//tools:transition.bzl", "CPU", "PLATFORM", "transition_default_constraints")
 load("//tools:version.bzl", "UPSTREAM_VERSION", "VERSION")
 load(":fidelity.bzl", "fidelity_test", "private_namespace_fidelity_test")
@@ -26,6 +26,11 @@ diff_test(
     file2 = "//:VERSION",
 )
 
+# Each optional symbol's macro, as SYMBOL=MACRO entries
+_PUBLIC_MACROS = ",".join([symbol + "=" + coupling[1] for symbol, coupling in OPTIONAL_PUBLIC_SYMBOLS.items()])
+
+_WRAP_MACROS = ",".join([symbol + "=" + coupling[1] for symbol, coupling in OPTIONAL_WRAP_SYMBOLS.items()])
+
 native_test(
     name = "configure_symbols_test",
     size = "small",
@@ -36,6 +41,8 @@ native_test(
         "-vgid=" + VERSION.gid,
         "-vpublic=" + ",".join(ALL_PUBLIC_SYMBOLS),
         "-vwrap=" + ",".join(ALL_WRAP_SYMBOLS),
+        "-vpublic_macros=" + _PUBLIC_MACROS,
+        "-vwrap_macros=" + _WRAP_MACROS,
         "$(rootpath //:configure.ac)",
     ],
     data = [
