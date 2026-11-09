@@ -11,6 +11,7 @@ def _parse_version(version):
 
     return struct(
         full = version,
+        release = release,
         major = major,
         minor = minor,
         bugfix = bugfix,
@@ -18,5 +19,6 @@ def _parse_version(version):
         gid = gid.removeprefix("g"),
     )
 
-# UPSTREAM_VERSION's components: full (the whole string), major, minor, bugfix, nrev and gid (without the "g").
+# UPSTREAM_VERSION's components: full (the whole string), release (`<major>.<minor>.<bugfix>`), major, minor, bugfix,
+# nrev and gid (without the "g").
 VERSION = _parse_version(UPSTREAM_VERSION)
