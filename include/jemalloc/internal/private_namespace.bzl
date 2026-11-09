@@ -1,4 +1,5 @@
-"""Rules that generate private_namespace.h from the library's symbols and check the library against it."""
+"""Rules that generate private_namespace.h from the library's symbols, check the library against it, and resolve
+JEMALLOC_PRIVATE_NAMESPACE."""
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolchain")
@@ -28,6 +29,23 @@ def _static_archives(target):
 
 def _linker_input_owners(target):
     return [str(linker_input.owner) for linker_input in target[CcInfo].linking_context.linker_inputs.to_list()]
+
+def _jemalloc_private_namespace_impl(ctx):
+    # Equivalent of JEMALLOC_PRIVATE_NAMESPACE="${with_private_namespace}je_"
+    value = ctx.attr._private_namespace[BuildSettingInfo].value + "je_"
+    return [
+        BuildSettingInfo(value = value),
+        platform_common.TemplateVariableInfo({"JEMALLOC_PRIVATE_NAMESPACE": value}),
+    ]
+
+jemalloc_private_namespace = rule(
+    doc = "JEMALLOC_PRIVATE_NAMESPACE, the private_namespace flag followed by \"je_\", as a BuildSettingInfo for " +
+          "rules_cc_autoconf's AC_BUILD_SETTING and as the $(JEMALLOC_PRIVATE_NAMESPACE) make variable.",
+    implementation = _jemalloc_private_namespace_impl,
+    attrs = {
+        "_private_namespace": attr.label(default = "//settings/flags:private_namespace"),
+    },
+)
 
 def _private_namespace_impl(ctx):
     cc_toolchain = find_cc_toolchain(ctx)

@@ -4,9 +4,11 @@ load("@package_metadata//licenses/rules:license.bzl", "license")
 load("@package_metadata//licenses/rules:license_kind.bzl", "license_kind")
 load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
-load("//tools:autoconf.bzl", "configure_header", "define_macro", "define_macro_if", "define_macro_if_any", "define_macro_if_with", "define_macro_with", "undefine_macro")
+load("@rules_cc_autoconf//autoconf:autoconf.bzl", "autoconf")
+load("@rules_cc_autoconf//autoconf:autoconf_hdr.bzl", "autoconf_hdr")
+load("@rules_cc_autoconf//autoconf:checks.bzl", "checks")
 load("//tools:transition.bzl", "CPU", "PLATFORM")
-load(":private_namespace.bzl", "private_namespace", "private_namespace_leak_test")
+load(":private_namespace.bzl", "jemalloc_private_namespace", "private_namespace", "private_namespace_leak_test")
 load(":public_symbols.bzl", "public_symbols", "public_symbols_header")
 load(":symbols.bzl", "PUBLIC_SYMBOLS", "SYM_PREFIX", "WRAP_SYMBOLS")
 
@@ -192,10 +194,14 @@ expand_template(
     stamp = 0,
     substitutions = {
         "@install_suffix@": "",
-        "@private_namespace@": "$(PRIVATE_NAMESPACE)je_",
+        "@private_namespace@": "$(JEMALLOC_PRIVATE_NAMESPACE)",
     },
     template = "jemalloc_preamble.h.in",
-    toolchains = ["//settings/flags:private_namespace"],
+    toolchains = [":jemalloc_private_namespace"],
+)
+
+jemalloc_private_namespace(
+    name = "jemalloc_private_namespace",
 )
 
 selects.config_setting_group(
@@ -212,38 +218,6 @@ selects.config_setting_group(
     match_all = [
         "//settings/platform:has_glibc_overrides",
         "//settings/flags:no_jemalloc_prefix",
-    ],
-)
-
-selects.config_setting_group(
-    name = "aarch_clang-cl",
-    match_all = [
-        "//settings/platform:aarch",
-        "@rules_cc//cc/compiler:clang-cl",
-    ],
-)
-
-selects.config_setting_group(
-    name = "aarch_gcc",
-    match_all = [
-        "//settings/platform:aarch",
-        "//settings/compiler:gcc_native",
-    ],
-)
-
-selects.config_setting_group(
-    name = "x86_gcc",
-    match_all = [
-        "//settings/platform:x86",
-        "//settings/compiler:gcc_native",
-    ],
-)
-
-selects.config_setting_group(
-    name = "x86_msvc",
-    match_all = [
-        "//settings/platform:x86",
-        "//settings/compiler:msvc_compatible",
     ],
 )
 
@@ -272,309 +246,505 @@ selects.config_setting_group(
     ],
 )
 
-configure_header(
+config_setting(
+    name = "freebsd_lazy_lock",
+    constraint_values = ["@platforms//os:freebsd"],
+    flag_values = {"//settings/flags:enable_lazy_lock": "True"},
+    visibility = ["//visibility:private"],
+)
+
+config_setting(
+    name = "windows_lazy_lock",
+    constraint_values = ["@platforms//os:windows"],
+    flag_values = {"//settings/flags:enable_lazy_lock": "True"},
+    visibility = ["//visibility:private"],
+)
+
+config_setting(
+    name = "linux_aarch32",
+    constraint_values = [
+        "@platforms//cpu:aarch32",
+        "@platforms//os:linux",
+    ],
+    visibility = ["//visibility:private"],
+)
+
+config_setting(
+    name = "linux_armv7",
+    constraint_values = [
+        "@platforms//cpu:armv7",
+        "@platforms//os:linux",
+    ],
+    visibility = ["//visibility:private"],
+)
+
+autoconf(
+    name = "jemalloc_internal_defs_checks",
+    build_settings = [
+        checks.AC_BUILD_SETTING(
+            name = "JEMALLOC_PRIVATE_NAMESPACE",
+            define = "JEMALLOC_PRIVATE_NAMESPACE",
+            target = ":jemalloc_private_namespace",
+            unquote = True,
+        ),
+        checks.AC_BUILD_SETTING(
+            name = "config_malloc_conf",
+            define = "JEMALLOC_CONFIG_MALLOC_CONF",
+            target = "//settings/flags:malloc_conf",
+        ),
+        checks.AC_BUILD_SETTING(
+            name = "LG_VADDR",
+            define = "LG_VADDR",
+            target = "//settings/platform:lg_vaddr",
+            unquote = True,
+        ),
+        checks.AC_BUILD_SETTING(
+            name = "LG_PAGE",
+            define = "LG_PAGE",
+            target = "//settings/platform:lg_page",
+            unquote = True,
+        ),
+        checks.AC_BUILD_SETTING(
+            name = "je_cv_lg_hugepage",
+            define = "LG_HUGEPAGE",
+            target = "//settings/platform:lg_hugepage",
+            unquote = True,
+        ),
+    ],
+    checks = [
+        checks.AC_DEFINE_UNQUOTED("JEMALLOC_C11_ATOMICS", ""),
+    ] + select({
+        compiler: [
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_GCC_ATOMIC_ATOMICS", ""),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_GCC_U8_ATOMIC_ATOMICS", ""),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_GCC_SYNC_ATOMICS", ""),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_GCC_U8_SYNC_ATOMICS", ""),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_BUILTIN_CLZ", ""),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_INTERNAL_UNREACHABLE", "__builtin_unreachable"),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_INTERNAL_FFSLL", "__builtin_ffsll"),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_INTERNAL_FFSL", "__builtin_ffsl"),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_INTERNAL_FFS", "__builtin_ffs"),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_INTERNAL_POPCOUNTL", "__builtin_popcountl"),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_INTERNAL_POPCOUNT", "__builtin_popcount"),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAS_RESTRICT", ""),
+        ]
+        for compiler in [
+            "@rules_cc//cc/compiler:clang",
+            "@rules_cc//cc/compiler:clang-cl",
+            "@rules_cc//cc/compiler:emscripten",
+            "@rules_cc//cc/compiler:gcc",
+            "@rules_cc//cc/compiler:mingw-gcc",
+        ]
+    } | {"//conditions:default": []}) + select({
+        "//settings/flags:no_jemalloc_prefix": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_IS_MALLOC", "")],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:export": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_EXPORT", "")],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:debug": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_DEBUG", "")],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:stats": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_STATS", "")],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:experimental_smallocx_api": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_EXPERIMENTAL_SMALLOCX_API", "")],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:prof_gcc": [
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_GCC", ""),
+        ],
+        "//settings/flags:prof_libgcc": [
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_LIBGCC", ""),
+        ],
+        "//settings/flags:prof_libunwind": [
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_LIBUNWIND", ""),
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:fill": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_FILL", "")],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:xmalloc": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_XMALLOC", "")],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:cache_oblivious": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_CACHE_OBLIVIOUS", "")],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:log": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_LOG", "")],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:uaf_detection": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_UAF_DETECTION", "")],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:zone_allocator": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_ZONE", "")],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:cxx": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_ENABLE_CXX", "")],
+        "//conditions:default": [],
+    }) + select({
+        # configure.ac defaults lazy locking on for FreeBSD and forces it off for the pecoff ABI.
+        "//settings/flags:lazy_lock": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_LAZY_LOCK", "")],
+        ":freebsd_lazy_lock": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_LAZY_LOCK", "")],
+        ":windows_lazy_lock": [],
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_LAZY_LOCK", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//cpu:aarch32": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
+        "@platforms//cpu:aarch64": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
+        "@platforms//cpu:arm64_32": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
+        "@platforms//cpu:arm64e": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
+        "@platforms//cpu:armv6-m": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
+        "@platforms//cpu:armv7": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
+        "@platforms//cpu:armv7-m": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
+        "@platforms//cpu:armv7e-m": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
+        "@platforms//cpu:armv7e-mf": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
+        "@platforms//cpu:armv7k": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
+        "@platforms//cpu:armv8-m": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
+        "@platforms//cpu:cortex-r52": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
+        "@platforms//cpu:cortex-r82": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
+        "@platforms//cpu:x86_32": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
+        "@platforms//cpu:x86_64": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "1")],
+        "//conditions:default": [checks.AC_DEFINE_UNQUOTED("HAVE_CPU_SPINWAIT", "0")],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_DONTNEED_ZEROS", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_DONTNEED_ZEROS", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAS_ALLOCA_H", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAS_ALLOCA_H", "")],
+        "@platforms//os:qnx": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAS_ALLOCA_H", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROC_SYS_VM_OVERCOMMIT_MEMORY", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROC_SYS_VM_OVERCOMMIT_MEMORY", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_SYSCTL_VM_OVERCOMMIT", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_THREADED_INIT", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_THREADED_INIT", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:windows": [],
+        "//conditions:default": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_MAPS_COALESCE", "")],
+    }) + select({
+        ":jemalloc_retain": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_RETAIN", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_ZERO_REALLOC_DEFAULT_FREE", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_ZERO_REALLOC_DEFAULT_FREE", "")],
+        "@platforms//os:windows": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_ZERO_REALLOC_DEFAULT_FREE", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:windows": [],
+        "//conditions:default": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_PTHREAD", "")],
+    }) + select({
+        "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_OS_UNFAIR_LOCK", "")],
+        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_OS_UNFAIR_LOCK", "")],
+        "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_OS_UNFAIR_LOCK", "")],
+        "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_OS_UNFAIR_LOCK", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:ios": [],
+        "@platforms//os:macos": [],
+        "@platforms//os:tvos": [],
+        "@platforms//os:watchos": [],
+        "@platforms//os:windows": [],
+        "//conditions:default": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_BACKGROUND_THREAD", "")],
+    }) + select({
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_MALLOC_THREAD_CLEANUP", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_MUTEX_INIT_CB", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_DSS", "")],
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_DSS", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_DSS", "")],
+        "//conditions:default": [],
+    }) + select({
+        ":override_glibc_allocator": [
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_OVERRIDE___LIBC_CALLOC", ""),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_OVERRIDE___LIBC_FREE", ""),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_OVERRIDE___LIBC_MALLOC", ""),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_OVERRIDE___LIBC_MEMALIGN", ""),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_OVERRIDE___LIBC_REALLOC", ""),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_OVERRIDE___LIBC_VALLOC", ""),
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_SECURE_GETENV", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_SECURE_GETENV", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_SCHED_GETCPU", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_SCHED_GETCPU", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_SCHED_SETAFFINITY", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_SCHED_SETAFFINITY", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_ISSETUGID", "")],
+        "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_ISSETUGID", "")],
+        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_ISSETUGID", "")],
+        "@platforms//os:openbsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_ISSETUGID", "")],
+        "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_ISSETUGID", "")],
+        "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_ISSETUGID", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_DLSYM", "")],
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_DLSYM", "")],
+        "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_DLSYM", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_DLSYM", "")],
+        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_DLSYM", "")],
+        "@platforms//os:openbsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_DLSYM", "")],
+        "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_DLSYM", "")],
+        "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_DLSYM", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_PTHREAD_ATFORK", "")],
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_PTHREAD_ATFORK", "")],
+        "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_PTHREAD_ATFORK", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_PTHREAD_ATFORK", "")],
+        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_PTHREAD_ATFORK", "")],
+        "@platforms//os:openbsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_PTHREAD_ATFORK", "")],
+        "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_PTHREAD_ATFORK", "")],
+        "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_PTHREAD_ATFORK", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_PTHREAD_SETNAME_NP", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_PTHREAD_SETNAME_NP", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_PTHREAD_GETNAME_NP", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_PTHREAD_GETNAME_NP", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_PTHREAD_GET_NAME_NP", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_CLOCK_MONOTONIC_COARSE", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_CLOCK_MONOTONIC_COARSE", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_CLOCK_MONOTONIC", "")],
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_CLOCK_MONOTONIC", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_CLOCK_MONOTONIC", "")],
+        "@platforms//os:openbsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_CLOCK_MONOTONIC", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MACH_ABSOLUTE_TIME", "")],
+        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MACH_ABSOLUTE_TIME", "")],
+        "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MACH_ABSOLUTE_TIME", "")],
+        "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MACH_ABSOLUTE_TIME", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_CLOCK_REALTIME", "")],
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_CLOCK_REALTIME", "")],
+        "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_CLOCK_REALTIME", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_CLOCK_REALTIME", "")],
+        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_CLOCK_REALTIME", "")],
+        "@platforms//os:openbsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_CLOCK_REALTIME", "")],
+        "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_CLOCK_REALTIME", "")],
+        "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_CLOCK_REALTIME", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE", "")],
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE", "")],
+        "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE", "")],
+        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE", "")],
+        "@platforms//os:openbsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE", "")],
+        "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE", "")],
+        "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_FREE", "")],
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_FREE", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_FREE", "")],
+        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_FREE", "")],
+        "@platforms//os:openbsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_FREE", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_DONTNEED", "")],
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_DONTNEED", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_DONTNEED", "")],
+        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PURGE_MADVISE_DONTNEED", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_MADVISE_DONTDUMP", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_MADVISE_DONTDUMP", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_MADVISE_NOCORE", "")],
+        "//conditions:default": [],
+    }) + select({
+        ":linux_aarch32": [],
+        ":linux_armv7": [],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MADVISE_HUGE", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MPROTECT", "")],
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MPROTECT", "")],
+        "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MPROTECT", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MPROTECT", "")],
+        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MPROTECT", "")],
+        "@platforms//os:openbsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MPROTECT", "")],
+        "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MPROTECT", "")],
+        "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MPROTECT", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MALLOC_SIZE", "")],
+        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MALLOC_SIZE", "")],
+        "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MALLOC_SIZE", "")],
+        "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MALLOC_SIZE", "")],
+        "//conditions:default": [],
+    }) + [
+        checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_INT", "2"),
+        checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_LONG_LONG", "3"),
+        checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_INTMAX_T", "3"),
+    ] + select(
+        {
+            "@platforms//cpu:aarch32": [checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_LONG", "2")],
+            "@platforms//cpu:aarch64": [checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_LONG", "3")],
+            "@platforms//cpu:x86_32": [checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_LONG", "2")],
+            "@platforms//cpu:x86_64": [checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_LONG", "3")],
+            "@platforms//os:windows": [checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_LONG", "2")],
+        },
+        no_match_error = "Determined by ABI, support for less common target cpus not yet implemented",
+    ) + select({
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_PTHREAD_MUTEX_ADAPTIVE_NP", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_VM_MAKE_TAG", "")],
+        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_VM_MAKE_TAG", "")],
+        "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_VM_MAKE_TAG", "")],
+        "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_VM_MAKE_TAG", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS_MODEL", "__attribute__((tls_model(\"initial-exec\")))")],
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS_MODEL", "__attribute__((tls_model(\"initial-exec\")))")],
+        "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS_MODEL", "__attribute__((tls_model(\"initial-exec\")))")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS_MODEL", "__attribute__((tls_model(\"initial-exec\")))")],
+        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS_MODEL", "__attribute__((tls_model(\"initial-exec\")))")],
+        "@platforms//os:openbsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS_MODEL", "__attribute__((tls_model(\"initial-exec\")))")],
+        "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS_MODEL", "__attribute__((tls_model(\"initial-exec\")))")],
+        "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS_MODEL", "__attribute__((tls_model(\"initial-exec\")))")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_USE_SYSCALL", "")],
+        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_USE_SYSCALL", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_USE_SYSCALL", "")],
+        "@platforms//os:openbsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_USE_SYSCALL", "")],
+        "//conditions:default": [],
+    }) + select({
+        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_STRERROR_R_RETURNS_CHAR_WITH_GNU_SOURCE", "")],
+        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_STRERROR_R_RETURNS_CHAR_WITH_GNU_SOURCE", "")],
+        "//conditions:default": [],
+    }),
+    tags = ["manual"],
+)
+
+autoconf(
+    name = "jemalloc_internal_defs_prefix",
+    build_settings = [
+        checks.AC_BUILD_SETTING(
+            name = "JEMALLOC_PREFIX",
+            define = "JEMALLOC_PREFIX",
+            target = "//settings/flags:jemalloc_prefix_resolved",
+        ),
+        checks.AC_BUILD_SETTING(
+            name = "JEMALLOC_CPREFIX",
+            define = "JEMALLOC_CPREFIX",
+            target = "//settings/flags:jemalloc_cprefix",
+        ),
+    ],
+    tags = ["manual"],
+)
+
+autoconf(
+    name = "jemalloc_internal_defs_lg_quantum",
+    build_settings = [
+        checks.AC_BUILD_SETTING(
+            name = "with_lg_quantum",
+            define = "LG_QUANTUM",
+            target = "//settings/flags:lg_quantum",
+            unquote = True,
+        ),
+    ],
+    tags = ["manual"],
+)
+
+autoconf(
+    name = "jemalloc_internal_defs_arm_spinwait",
+    checks = select({
+        "@rules_cc//cc/compiler:clang": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "__asm__ volatile(\"isb\")")],
+        "@rules_cc//cc/compiler:clang-cl": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "__asm__ volatile(\"isb\")")],
+        "@rules_cc//cc/compiler:gcc": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "__asm__ volatile(\"isb\")")],
+        "@rules_cc//cc/compiler:mingw-gcc": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "__asm__ volatile(\"isb\")")],
+        "//conditions:default": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "")],
+    }),
+    tags = ["manual"],
+)
+
+autoconf(
+    name = "jemalloc_internal_defs_x86_spinwait",
+    checks = select({
+        "@rules_cc//cc/compiler:clang": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "__asm__ volatile(\"pause\")")],
+        "@rules_cc//cc/compiler:clang-cl": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "_mm_pause()")],
+        "@rules_cc//cc/compiler:gcc": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "__asm__ volatile(\"pause\")")],
+        "@rules_cc//cc/compiler:mingw-gcc": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "__asm__ volatile(\"pause\")")],
+        "@rules_cc//cc/compiler:msvc-cl": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "_mm_pause()")],
+        "//conditions:default": [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "")],
+    }),
+    tags = ["manual"],
+)
+
+autoconf(
+    name = "jemalloc_internal_defs_empty_spinwait",
+    checks = [checks.AC_DEFINE_UNQUOTED("CPU_SPINWAIT", "")],
+    tags = ["manual"],
+)
+
+autoconf_hdr(
     name = "jemalloc_internal_defs",
     out = "jemalloc_internal_defs.h",
-    stamp = 0,
-    substitutions =
-        select({
-            "//settings/flags:no_jemalloc_prefix": undefine_macro("JEMALLOC_PREFIX") |
-                                                   undefine_macro("JEMALLOC_CPREFIX"),
-            "//conditions:default": define_macro_with("JEMALLOC_PREFIX", "\"$(JEMALLOC_PREFIX)\"") |
-                                    define_macro_with("JEMALLOC_CPREFIX", "\"$(JEMALLOC_CPREFIX)\""),
-        }) |
-        # JEMALLOC_OVERRIDE___LIBC_*: Only relevant when JEMALLOC_PREFIX is empty and overriding libc
-        define_macro_if("JEMALLOC_OVERRIDE___LIBC_CALLOC", ":override_glibc_allocator") |
-        define_macro_if("JEMALLOC_OVERRIDE___LIBC_FREE", ":override_glibc_allocator") |
-        define_macro_if("JEMALLOC_OVERRIDE___LIBC_MALLOC", ":override_glibc_allocator") |
-        define_macro_if("JEMALLOC_OVERRIDE___LIBC_MEMALIGN", ":override_glibc_allocator") |
-        define_macro_if("JEMALLOC_OVERRIDE___LIBC_REALLOC", ":override_glibc_allocator") |
-        define_macro_if("JEMALLOC_OVERRIDE___LIBC_VALLOC", ":override_glibc_allocator") |
-        # Internal symbol that no longer appears to exist or be public on modern linux + glibc
-        undefine_macro("JEMALLOC_OVERRIDE___POSIX_MEMALIGN") |
-        # JEMALLOC_PRIVATE_NAMESPACE: Configurable flag, prepended to "je_" as in autoconf
-        define_macro_with("JEMALLOC_PRIVATE_NAMESPACE", "$(PRIVATE_NAMESPACE)je_") |
-        # CPU_SPINWAIT and HAVE_CPU_SPINWAIT: Platform-specific spin wait instructions, depends on compiler
-        select({
-            "@platforms//cpu:x86_32": define_macro_with("HAVE_CPU_SPINWAIT", "1"),
-            "@platforms//cpu:x86_64": define_macro_with("HAVE_CPU_SPINWAIT", "1"),
-            "@platforms//cpu:aarch32": define_macro_with("HAVE_CPU_SPINWAIT", "1"),
-            "@platforms//cpu:aarch64": define_macro_with("HAVE_CPU_SPINWAIT", "1"),
-            "//conditions:default": define_macro_with("HAVE_CPU_SPINWAIT", "0"),
-        }) |
-        select({
-            # configure.ac doesn't test aarch for msvc mm_pause
-            ":aarch_clang-cl": define_macro_with("CPU_SPINWAIT", "__asm__ volatile(\"isb\")"),
-            ":aarch_gcc": define_macro_with("CPU_SPINWAIT", "__asm__ volatile(\"isb\")"),
-            ":x86_gcc": define_macro_with("CPU_SPINWAIT", "__asm__ volatile(\"pause\")"),
-            ":x86_msvc": define_macro_with("CPU_SPINWAIT", "_mm_pause()"),
-            "//conditions:default": define_macro_with("CPU_SPINWAIT", ""),
-        }) |
-        # LG_VADDR: Virtual address bits
-        define_macro_with("LG_VADDR", "$(LG_VADDR)") |
-        # JEMALLOC_C11_ATOMICS: Assume available on modern compilers (C11 standard)
-        define_macro("JEMALLOC_C11_ATOMICS") |
-        # JEMALLOC_GCC_ATOMIC_ATOMICS and U8 variant: Assume GCC-style atomics on non-MSVC
-        define_macro_if("JEMALLOC_GCC_ATOMIC_ATOMICS", "//settings/compiler:gcc_compatible") |
-        define_macro_if("JEMALLOC_GCC_U8_ATOMIC_ATOMICS", "//settings/compiler:gcc_compatible") |
-        # JEMALLOC_GCC_SYNC_ATOMICS and U8 variant: Older GCC atomics, assume supported
-        define_macro_if("JEMALLOC_GCC_SYNC_ATOMICS", "//settings/compiler:gcc_compatible") |
-        define_macro_if("JEMALLOC_GCC_U8_SYNC_ATOMICS", "//settings/compiler:gcc_compatible") |
-        # JEMALLOC_HAVE_BUILTIN_CLZ: Assume available on modern GCC/Clang
-        define_macro_if("JEMALLOC_HAVE_BUILTIN_CLZ", "//settings/compiler:gcc_compatible") |
-        # JEMALLOC_OS_UNFAIR_LOCK: Darwin-specific
-        define_macro_if("JEMALLOC_OS_UNFAIR_LOCK", "//settings/platform:darwin") |
-        # JEMALLOC_USE_SYSCALL: Assume syscall(2) is usable on POSIX systems except for modern MacOS
-        define_macro_if_any(
-            "JEMALLOC_USE_SYSCALL",
-            [
-                "@platforms//os:android",
-                "@platforms//os:freebsd",
-                "@platforms//os:linux",
-                "@platforms//os:openbsd",
-            ],
-        ) |
-        # JEMALLOC_HAVE_SECURE_GETENV: GNU-specific, available on Linux/Android
-        define_macro_if("JEMALLOC_HAVE_SECURE_GETENV", "//settings/platform:gnu") |
-        # JEMALLOC_HAVE_ISSETUGID: BSD-specific, assume on macOS
-        define_macro_if("JEMALLOC_HAVE_ISSETUGID", "//settings/platform:bsd") |
-        # Pthread features: POSIX systems
-        define_macro_if("JEMALLOC_HAVE_PTHREAD_ATFORK", "//settings/platform:posix") |
-        # MacOS takes a different setname signature
-        define_macro_if("JEMALLOC_HAVE_PTHREAD_SETNAME_NP", "//settings/platform:gnu") |
-        define_macro_if("JEMALLOC_HAVE_PTHREAD_GETNAME_NP", "//settings/platform:gnu") |
-        define_macro_if("JEMALLOC_HAVE_PTHREAD_GET_NAME_NP", "@platforms//os:freebsd") |
-        # Clock features: POSIX systems
-        define_macro_if("JEMALLOC_HAVE_CLOCK_MONOTONIC_COARSE", "//settings/platform:gnu") |
-        # Despite POSIX compliance modern macs appear to not support this
-        define_macro_if_any(
-            "JEMALLOC_HAVE_CLOCK_MONOTONIC",
-            [
-                "@platforms//os:android",
-                "@platforms//os:freebsd",
-                "@platforms//os:linux",
-                "@platforms//os:openbsd",
-            ],
-        ) |
-        define_macro_if("JEMALLOC_HAVE_MACH_ABSOLUTE_TIME", "//settings/platform:darwin") |
-        define_macro_if("JEMALLOC_HAVE_CLOCK_REALTIME", "//settings/platform:posix") |
-        # JEMALLOC_MUTEX_INIT_CB: FreeBSD-specific
-        define_macro_if("JEMALLOC_MUTEX_INIT_CB", "@platforms//os:freebsd") |
-        # JEMALLOC_MALLOC_THREAD_CLEANUP: BSD specific
-        define_macro_if("JEMALLOC_MALLOC_THREAD_CLEANUP", "@platforms//os:freebsd") |
-        # JEMALLOC_THREADED_INIT: GNU systems
-        define_macro_if("JEMALLOC_THREADED_INIT", "//settings/platform:gnu") |
-        # JEMALLOC_TLS_MODEL: Assume initial-exec TLS on modern systems
-        define_macro_if_with("JEMALLOC_TLS_MODEL", "//settings/platform:posix", "__attribute__((tls_model(\"initial-exec\")))") |
-        # JEMALLOC_DEBUG: Configurable flag
-        define_macro_if("JEMALLOC_DEBUG", "//settings/flags:debug") |
-        # JEMALLOC_STATS: Configurable flag
-        define_macro_if("JEMALLOC_STATS", "//settings/flags:stats") |
-        # JEMALLOC_EXPERIMENTAL_SMALLOCX_API: Configurable flag
-        define_macro_if("JEMALLOC_EXPERIMENTAL_SMALLOCX_API", "//settings/flags:experimental_smallocx_api") |
-        # JEMALLOC_PROF_LIBGCC: Configurable flag
-        define_macro_if("JEMALLOC_PROF_LIBGCC", "//settings/flags:prof_libgcc") |
-        # JEMALLOC_PROF_GCC: Configurable flag
-        define_macro_if("JEMALLOC_PROF_GCC", "//settings/flags:prof_gcc") |
-        # JEMALLOC_PROF_LIBUNWIND: Configurable flag
-        define_macro_if("JEMALLOC_PROF_LIBUNWIND", "//settings/flags:prof_libunwind") |
-        # JEMALLOC_PROF: Configurable flag
-        define_macro_if("JEMALLOC_PROF", "//settings/flags:prof") |
-        # JEMALLOC_DSS: sbrk(2) deprecated on macOS, disable
-        define_macro_if_any(
-            "JEMALLOC_DSS",
-            [
-                "@platforms//os:android",
-                "@platforms//os:freebsd",
-                "@platforms//os:linux",
-            ],
-        ) |
-        # JEMALLOC_FILL: Configurable flag
-        define_macro_if("JEMALLOC_FILL", "//settings/flags:fill") |
-        # JEMALLOC_UTRACE and LABEL: Disabled by default
-        undefine_macro("JEMALLOC_UTRACE_LABEL") |
-        undefine_macro("JEMALLOC_UTRACE") |
-        # JEMALLOC_XMALLOC: Configurable flag
-        define_macro_if("JEMALLOC_XMALLOC", "//settings/flags:xmalloc") |
-        # JEMALLOC_LAZY_LOCK: Configurable flag
-        # TODO: This is forced for freeBSD
-        define_macro_if("JEMALLOC_LAZY_LOCK", "//settings/flags:lazy_lock") |
-        # LG_QUANTUM: Only set with configure flag, disabled by default
-        select({
-            "//settings/flags:no_lg_quantum": undefine_macro("LG_QUANTUM"),
-            "//conditions:default": define_macro_with("LG_QUANTUM", "$(LG_QUANTUM)"),
-        }) |
-        # LG_PAGE: Configured explicitly
-        define_macro_with("LG_PAGE", "$(LG_PAGE)") |
-        # CONFIG_LG_SLAB_MAXREGS: Optional tuning, leave undefined unless specified
-        undefine_macro("CONFIG_LG_SLAB_MAXREGS") |
-        # LG_HUGEPAGE: Configured explicitly
-        define_macro_with("LG_HUGEPAGE", "$(LG_HUGEPAGE)") |
-        # JEMALLOC_MAPS_COALESCE: Hardcoded via configure.ac host check
-        select({
-            "@platforms//os:windows": undefine_macro("JEMALLOC_MAPS_COALESCE"),
-            "//conditions:default": define_macro("JEMALLOC_MAPS_COALESCE"),
-        }) |
-        # JEMALLOC_RETAIN: Specific 64-bit systems
-        define_macro_if("JEMALLOC_RETAIN", ":jemalloc_retain") |
-        # JEMALLOC_TLS: One of the more complicated settings, explicitly disabled on darwin and windows,
-        # forced on FreeBSD, detected on the others
-        define_macro_if_any(
-            "JEMALLOC_TLS",
-            [
-                "@platforms//os:android",
-                "@platforms//os:freebsd",
-                "@platforms//os:linux",
-            ],
-        ) |
-        # JEMALLOC_INTERNAL_UNREACHABLE: Assume __builtin_unreachable on modern compilers, autoconf doesn't handle MSVC failure
-        define_macro_if_with("JEMALLOC_INTERNAL_UNREACHABLE", "//settings/compiler:gcc_compatible", "__builtin_unreachable") |
-        # JEMALLOC_INTERNAL_FFS*: Assume builtins on modern compilers
-        define_macro_if_with("JEMALLOC_INTERNAL_FFSLL", "//settings/compiler:gcc_compatible", "__builtin_ffsll") |
-        define_macro_if_with("JEMALLOC_INTERNAL_FFSL", "//settings/compiler:gcc_compatible", "__builtin_ffsl") |
-        define_macro_if_with("JEMALLOC_INTERNAL_FFS", "//settings/compiler:gcc_compatible", "__builtin_ffs") |
-        # JEMALLOC_INTERNAL_POPCOUNT*: Assume builtins on modern compilers
-        define_macro_if_with("JEMALLOC_INTERNAL_POPCOUNTL", "//settings/compiler:gcc_compatible", "__builtin_popcountl") |
-        define_macro_if_with("JEMALLOC_INTERNAL_POPCOUNT", "//settings/compiler:gcc_compatible", "__builtin_popcount") |
-        # JEMALLOC_CACHE_OBLIVIOUS: Configurable flag
-        define_macro_if("JEMALLOC_CACHE_OBLIVIOUS", "//settings/flags:cache_oblivious") |
-        # JEMALLOC_LOG: Configurable flag
-        define_macro_if("JEMALLOC_LOG", "//settings/flags:log") |
-        # JEMALLOC_READLINKAT: Assume off by default
-        undefine_macro("JEMALLOC_READLINKAT") |
-        # JEMALLOC_ZONE: Darwin-specific, configurable
-        define_macro_if("JEMALLOC_ZONE", "//settings/flags:zone_allocator") |
-        # Overcommit methods: Platform-specific
-        define_macro_if("JEMALLOC_SYSCTL_VM_OVERCOMMIT", "@platforms//os:freebsd") |
-        define_macro_if("JEMALLOC_PROC_SYS_VM_OVERCOMMIT_MEMORY", "//settings/platform:gnu") |
-        # JEMALLOC_HAVE_MADVISE_HUGE: Assume THP support on modern Linux
-        define_macro_if("JEMALLOC_HAVE_MADVISE_HUGE", "@platforms//os:linux") |
-        # JEMALLOC_HAVE_MADVISE: Assume available on modern POSIX systems
-        define_macro_if("JEMALLOC_HAVE_MADVISE", "//settings/platform:posix") |
-        # Purge methods: Platform-specific
-        define_macro_if_any(
-            "JEMALLOC_PURGE_MADVISE_FREE",
-            [
-                "@platforms//os:android",
-                "@platforms//os:freebsd",
-                "@platforms//os:linux",
-                "@platforms//os:macos",
-                "@platforms//os:openbsd",
-            ],
-        ) |
-        define_macro_if("JEMALLOC_PURGE_MADVISE_DONTNEED_ZEROS", "//settings/platform:gnu") |
-        define_macro_if_any(
-            "JEMALLOC_PURGE_MADVISE_DONTNEED",
-            [
-                "@platforms//os:android",
-                "@platforms//os:freebsd",
-                "@platforms//os:linux",
-                "@platforms//os:macos",
-            ],
-        ) |
-        # JEMALLOC_DEFINE_MADVISE_FREE: Only for older x86 Linux without MADV_FREE, assume not needed
-        undefine_macro("JEMALLOC_DEFINE_MADVISE_FREE") |
-        # JEMALLOC_MADVISE_DONTDUMP: Assume on Linux
-        define_macro_if("JEMALLOC_MADVISE_DONTDUMP", "//settings/platform:gnu") |
-        # JEMALLOC_MADVISE_NOCORE
-        define_macro_if("JEMALLOC_MADVISE_NOCORE", "@platforms//os:freebsd") |
-        # JEMALLOC_HAVE_MPROTECT: Assume on modern POSIX systems
-        define_macro_if("JEMALLOC_HAVE_MPROTECT", "//settings/platform:posix") |
-        # JEMALLOC_THP: Missing from configure detection
-        undefine_macro("JEMALLOC_THP") |
-        # JEMALLOC_HAVE_POSIX_MADVISE: Undefined in configure.ac if madvise is available, only possible on some BSD
-        # variants or embedded systems
-        undefine_macro("JEMALLOC_HAVE_POSIX_MADVISE") |
-        # JEMALLOC_PURGE_POSIX_MADVISE_DONTNEED_ZEROS: Unconfigurable but present in template
-        undefine_macro("JEMALLOC_PURGE_POSIX_MADVISE_DONTNEED_ZEROS") |
-        # JEMALLOC_PURGE_POSIX_MADVISE_DONTNEED: Obscure fallback, assume unneeded
-        undefine_macro("JEMALLOC_PURGE_POSIX_MADVISE_DONTNEED") |
-        # JEMALLOC_HAVE_MEMCNTL: Solaris-specific, assume off
-        undefine_macro("JEMALLOC_HAVE_MEMCNTL") |
-        # JEMALLOC_HAVE_MALLOC_SIZE: Darwin-specific
-        define_macro_if("JEMALLOC_HAVE_MALLOC_SIZE", "//settings/platform:darwin") |
-        # JEMALLOC_HAS_ALLOCA_H: Hardcoded via configure.ac host check
-        define_macro_if("JEMALLOC_HAS_ALLOCA_H", "//settings/platform:gnu") |
-        # JEMALLOC_HAS_RESTRICT: Assume C99-compliant compilers
-        define_macro_if("JEMALLOC_HAS_RESTRICT", "//settings/compiler:gcc_compatible") |
-        # JEMALLOC_BIG_ENDIAN: Assume little-endian for modern systems
-        undefine_macro("JEMALLOC_BIG_ENDIAN") |
-        # Size definitions: Function of ABI but can assume defaults
-        define_macro_with("LG_SIZEOF_INTMAX_T", "3") |
-        define_macro_with("LG_SIZEOF_INT", "2") |
-        define_macro_with("LG_SIZEOF_LONG_LONG", "3") |
-        select(
-            {
-                "@platforms//os:windows": define_macro_with("LG_SIZEOF_LONG", "2"),
-                "@platforms//cpu:aarch32": define_macro_with("LG_SIZEOF_LONG", "2"),
-                "@platforms//cpu:aarch64": define_macro_with("LG_SIZEOF_LONG", "3"),
-                "@platforms//cpu:x86_32": define_macro_with("LG_SIZEOF_LONG", "2"),
-                "@platforms//cpu:x86_64": define_macro_with("LG_SIZEOF_LONG", "3"),
-            },
-            no_match_error = "Determined by ABI, support for less common target cpus not yet implemented",
-        ) |
-        # GLIBC hooks: Assume glibc > 2.34 after which these were deprecated
-        undefine_macro("JEMALLOC_GLIBC_MALLOC_HOOK") |
-        undefine_macro("JEMALLOC_GLIBC_MEMALIGN_HOOK") |
-        # JEMALLOC_HAVE_PTHREAD_MUTEX_ADAPTIVE_NP: Linux-specific
-        define_macro_if("JEMALLOC_HAVE_PTHREAD_MUTEX_ADAPTIVE_NP", "@platforms//os:linux") |
-        # JEMALLOC_HAVE_PTHREAD: Assume on POSIX systems
-        define_macro_if("JEMALLOC_HAVE_PTHREAD", "//settings/platform:posix") |
-        # JEMALLOC_HAVE_DLSYM: Assume on POSIX systems
-        define_macro_if("JEMALLOC_HAVE_DLSYM", "//settings/platform:posix") |
-        # JEMALLOC_HAVE_SCHED_GETCPU: GNU-specific
-        define_macro_if("JEMALLOC_HAVE_SCHED_GETCPU", "//settings/platform:gnu") |
-        # JEMALLOC_HAVE_SCHED_SETAFFINITY: GNU-specific
-        define_macro_if("JEMALLOC_HAVE_SCHED_SETAFFINITY", "//settings/platform:gnu") |
-        # JEMALLOC_BACKGROUND_THREAD: Assume on POSIX systems without os_unfair_lock
-        define_macro_if_any(
-            "JEMALLOC_BACKGROUND_THREAD",
-            [
-                "@platforms//os:android",
-                "@platforms//os:freebsd",
-                "@platforms//os:linux",
-                "@platforms//os:openbsd",
-            ],
-        ) |
-        # JEMALLOC_EXPORT: Controlled via flag to disable exporting public API
-        define_macro_if("JEMALLOC_EXPORT", "//settings/flags:export") |
-        # JEMALLOC_CONFIG_MALLOC_CONF: Configurable flag
-        define_macro_with("JEMALLOC_CONFIG_MALLOC_CONF", "\"$(MALLOC_CONF)\"") |
-        # JEMALLOC_IS_MALLOC: Defined if no prefix
-        define_macro_if("JEMALLOC_IS_MALLOC", "//settings/flags:no_jemalloc_prefix") |
-        # JEMALLOC_STRERROR_R_RETURNS_CHAR_WITH_GNU_SOURCE: Linux/Android
-        define_macro_if("JEMALLOC_STRERROR_R_RETURNS_CHAR_WITH_GNU_SOURCE", "//settings/platform:gnu") |
-        # JEMALLOC_OPT_SAFETY_CHECKS: Configurable, off by default
-        undefine_macro("JEMALLOC_OPT_SAFETY_CHECKS") |
-        # JEMALLOC_ENABLE_CXX: Configurable flag
-        define_macro_if("JEMALLOC_ENABLE_CXX", "//settings/flags:cxx") |
-        # JEMALLOC_OPT_SIZE_CHECKS: Configurable, off by default
-        undefine_macro("JEMALLOC_OPT_SIZE_CHECKS") |
-        # JEMALLOC_UAF_DETECTION: Configurable flag
-        define_macro_if("JEMALLOC_UAF_DETECTION", "//settings/flags:uaf_detection") |
-        # JEMALLOC_HAVE_VM_MAKE_TAG: Darwin-specific
-        define_macro_if("JEMALLOC_HAVE_VM_MAKE_TAG", "//settings/platform:darwin") |
-        # JEMALLOC_ZERO_REALLOC_DEFAULT_FREE: Hardcoded in configure.ac
-        define_macro_if_any(
-            "JEMALLOC_ZERO_REALLOC_DEFAULT_FREE",
-            [
-                "@platforms//os:android",
-                "@platforms//os:linux",
-                "@platforms//os:windows",
-            ],
-        ),
     tags = ["manual"],
     template = "jemalloc_internal_defs.h.in",
-    toolchains = [
-        "//settings/flags:jemalloc_prefix_resolved",
-        "//settings/flags:jemalloc_cprefix",
-        "//settings/flags:lg_quantum",
-        "//settings/flags:malloc_conf",
-        "//settings/flags:private_namespace",
-        "//settings/platform:lg_hugepage",
-        "//settings/platform:lg_page",
-        "//settings/platform:lg_vaddr",
-    ],
+    deps = [":jemalloc_internal_defs_checks"] + select({
+        "//settings/flags:no_jemalloc_prefix": [],
+        "//conditions:default": [":jemalloc_internal_defs_prefix"],
+    }) + select({
+        "//settings/flags:no_lg_quantum": [],
+        "//conditions:default": [":jemalloc_internal_defs_lg_quantum"],
+    }) + select({
+        "@platforms//cpu:aarch32": [":jemalloc_internal_defs_arm_spinwait"],
+        "@platforms//cpu:aarch64": [":jemalloc_internal_defs_arm_spinwait"],
+        "@platforms//cpu:arm64_32": [":jemalloc_internal_defs_arm_spinwait"],
+        "@platforms//cpu:arm64e": [":jemalloc_internal_defs_arm_spinwait"],
+        "@platforms//cpu:armv6-m": [":jemalloc_internal_defs_arm_spinwait"],
+        "@platforms//cpu:armv7": [":jemalloc_internal_defs_arm_spinwait"],
+        "@platforms//cpu:armv7-m": [":jemalloc_internal_defs_arm_spinwait"],
+        "@platforms//cpu:armv7e-m": [":jemalloc_internal_defs_arm_spinwait"],
+        "@platforms//cpu:armv7e-mf": [":jemalloc_internal_defs_arm_spinwait"],
+        "@platforms//cpu:armv7k": [":jemalloc_internal_defs_arm_spinwait"],
+        "@platforms//cpu:armv8-m": [":jemalloc_internal_defs_arm_spinwait"],
+        "@platforms//cpu:cortex-r52": [":jemalloc_internal_defs_arm_spinwait"],
+        "@platforms//cpu:cortex-r82": [":jemalloc_internal_defs_arm_spinwait"],
+        "@platforms//cpu:x86_32": [":jemalloc_internal_defs_x86_spinwait"],
+        "@platforms//cpu:x86_64": [":jemalloc_internal_defs_x86_spinwait"],
+        "//conditions:default": [":jemalloc_internal_defs_empty_spinwait"],
+    }),
 )
 
 public_symbols(
