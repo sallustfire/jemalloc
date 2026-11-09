@@ -28,7 +28,10 @@ filegroup(
 filegroup(
     name = "sfmt_test_sources",
     srcs = ["SFMT.c"],
-    applicable_licenses = ["//test:sfmt_metadata"],
+    applicable_licenses = [
+        "//:package_metadata",
+        "//test:sfmt_metadata",
+    ],
 )
 
 UNIT_TESTS = [

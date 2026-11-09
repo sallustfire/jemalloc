@@ -42,7 +42,10 @@ exports_files(
 filegroup(
     name = "murmurhash3_headers",
     srcs = ["hash.h"],
-    applicable_licenses = [":murmurhash3_metadata"],
+    applicable_licenses = [
+        ":murmurhash3_metadata",
+        "//:package_metadata",
+    ],
 )
 
 cc_library(

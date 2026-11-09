@@ -22,7 +22,10 @@ package_metadata(
 filegroup(
     name = "sfmt_sources",
     srcs = ["src/SFMT.c"],
-    applicable_licenses = [":sfmt_metadata"],
+    applicable_licenses = [
+        ":sfmt_metadata",
+        "//:package_metadata",
+    ],
 )
 
 filegroup(
@@ -43,7 +46,10 @@ filegroup(
         "include/test/SFMT-params86243.h",
         "include/test/SFMT-sse2.h",
     ],
-    applicable_licenses = [":sfmt_metadata"],
+    applicable_licenses = [
+        ":sfmt_metadata",
+        "//:package_metadata",
+    ],
 )
 
 expand_template(
