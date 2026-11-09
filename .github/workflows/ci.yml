@@ -28,6 +28,8 @@ jobs:
             bazel_config: "--config=bazel8"
           - bazel_version: "9.x"
             bazel_config: "--config=bazel9"
+          - os: ubuntu-24.04
+            bazel_version: "7.4.0"
     steps:
       - uses: actions/checkout@v4
       - uses: bazel-contrib/setup-bazel@0.14.0
@@ -140,6 +142,10 @@ jobs:
             bazel_config: "--config=bazel8"
           - bazel_version: "9.x"
             bazel_config: "--config=bazel9"
+          - os: ubuntu-24.04
+            bazel_version: "7.4.0"
+          - os: macos-15
+            bazel_version: "7.4.0"
     steps:
       - uses: actions/checkout@v4
       - uses: bazel-contrib/setup-bazel@0.14.0
