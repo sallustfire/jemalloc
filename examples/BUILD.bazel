@@ -72,3 +72,17 @@ cc_test(
     malloc = ":jemalloc_custom",
     target_compatible_with = ["@platforms//os:macos"],
 )
+
+# Case 7: An explicit prefix renames the API and the MALLOC_CONF environment variable on every platform
+jemalloc(
+    name = "jemalloc_prefixed",
+    jemalloc_prefix = "my_",
+)
+
+cc_test(
+    name = "test_7_prefix",
+    size = "small",
+    srcs = ["test_prefix.c"],
+    env = {"MY_MALLOC_CONF": "narenas:3"},
+    malloc = ":jemalloc_prefixed",
+)
