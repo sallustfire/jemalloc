@@ -66,11 +66,14 @@ autoconf(
     ] + select({
         "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_USE_CXX_THROW", "")],
         "//conditions:default": [],
-    }) + select({
+    }) + [
+        # configure.ac skips this probe for MSVC compilers; jemalloc_internal_defs.h reads it for JEMALLOC_RETAIN, which
+        # MSVC compilers never get.
+        checks.AC_CHECK_SIZEOF("void *"),
+    ] + select({
         "@rules_cc//cc/compiler:clang-cl": [checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_PTR", "LG_SIZEOF_PTR_WIN")],
         "@rules_cc//cc/compiler:msvc-cl": [checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_PTR", "LG_SIZEOF_PTR_WIN")],
         "//conditions:default": [
-            checks.AC_CHECK_SIZEOF("void *"),
             checks.AC_TRY_COMPILE(
                 name = "pointer_size_supported",
                 code = utils.AC_LANG_PROGRAM("", ""),
@@ -87,6 +90,7 @@ autoconf(
     }),
     copts = HOST_CPPFLAGS,
     tags = ["manual"],
+    visibility = ["//include/jemalloc/internal:__pkg__"],
 )
 
 # configure.ac adds -Wimplicit-fallthrough only around this probe (JE_CFLAGS_SAVE/JE_CFLAGS_RESTORE), so the flag is

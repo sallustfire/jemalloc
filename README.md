@@ -34,8 +34,19 @@ See the [examples/BUILD.bazel](examples/BUILD.bazel) file for examples of how to
 - **Library targets:** @jemalloc//:jemalloc is the target to depend on, through deps or the malloc attribute; it
  provides CcInfo and builds no file of its own. Inside, the archives are lib/libjemalloc_core.a and, with the zone
  allocator, lib/libjemalloc_zone.lo; their names are not part of the interface.
-- **//settings/platform:lg_vaddr:** Defaults to the hard-coded cross compilation value of 57 from the configure script.
- If targeting a 32-bit platform, this should be explicitly set.
+- **//settings/platform:lg_vaddr (--with-lg-vaddr):** Defaults as configure does: 48 on aarch64, 57 on x86_64 (the
+ configure script's cross compilation value; a native configure runs CPUID instead, which gives 48 on a CPU without
+ 5-level paging), and the pointer width on any other CPU whose width @platforms makes clear. Any other CPU, such as
+ ppc, must set it, or the build fails. Set it explicitly to override. The flag defaults to "__auto__", which only
+ jemalloc's own transition resolves, so a select() on the flag or $(LG_VADDR) outside it sees "__auto__". Any value is
+ written into the header as is, without checking that it is a number.
+- **//settings/platform:lg_page (--with-lg-page):** Defaults to 16 (64 KiB) on aarch64 Linux and Android, so one build
+ runs on kernels with 4K, 16K or 64K pages, at the cost of a coarser page granularity on 4K kernels (configure's cross
+ compilation value is 12, which fails at startup on a 16K or 64K kernel). Darwin defaults to 14 and everything else to
+ 12. Set it explicitly to override.
+- **//settings/platform:lg_hugepage (--with-lg-hugepage):** Defaults to 21 (2 MiB), configure's value when it cannot
+ read the huge page size. It must be at least lg_page, as configure requires, or the build fails; so on aarch64 Linux
+ and Android, where lg_page defaults to 16, a value below 16 needs lg_page set explicitly too.
 - **glibc:** Assumes a modern version. If jemalloc is compiled to be the default allocator on linux, it assumes glibc
  and some publicly exposed symbols can be wrapped: __malloc_hook, __realloc_hook, __free_hook, __memalign_hook.
  However, they are deprecated since glibc 2.34. The jemalloc source likely needs to be updated to reflect this.
@@ -46,6 +57,7 @@ Platform configurations that have defaults that are applied via transition.
 - //settings/flags:jemalloc_prefix
 - //settings/platform:glibc_overrides_support
 - //settings/platform:lg_page
+- //settings/platform:lg_vaddr
 - //settings/platform:memalign_support
 - //settings/platform:malloc_size_support
 - //settings/platform:valloc_support

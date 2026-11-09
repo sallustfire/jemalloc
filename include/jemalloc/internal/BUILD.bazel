@@ -222,31 +222,6 @@ selects.config_setting_group(
     ],
 )
 
-selects.config_setting_group(
-    name = "jemalloc_retain_cpu",
-    match_any = [
-        "@platforms//cpu:aarch64",
-        "@platforms//cpu:x86_64",
-    ],
-)
-
-selects.config_setting_group(
-    name = "jemalloc_retain_os",
-    match_any = [
-        "@platforms//os:android",
-        "@platforms//os:linux",
-        "@platforms//os:windows",
-    ],
-)
-
-selects.config_setting_group(
-    name = "jemalloc_retain",
-    match_all = [
-        ":jemalloc_retain_cpu",
-        ":jemalloc_retain_os",
-    ],
-)
-
 config_setting(
     name = "windows_lazy_lock",
     constraint_values = ["@platforms//os:windows"],
@@ -305,12 +280,6 @@ autoconf(
             target = "//settings/flags:malloc_conf",
         ),
         checks.AC_BUILD_SETTING(
-            name = "LG_VADDR",
-            define = "LG_VADDR",
-            target = "//settings/platform:lg_vaddr",
-            unquote = True,
-        ),
-        checks.AC_BUILD_SETTING(
             name = "LG_PAGE",
             define = "LG_PAGE",
             target = "//settings/platform:lg_page",
@@ -325,6 +294,31 @@ autoconf(
     ],
     cc_deps = HOST_CC_DEPS + HOST_LIBS,
     checks = [
+        # configure.ac's "Huge page size must be at least page size". compile_defines hands the string_flag lg_page to the
+        # probe as a string literal ("12"), so the check is C++ and reads a number or its decimal digits. Any other
+        # failure to compile it, such as a toolchain without C++, also reports this error.
+        checks.AC_TRY_COMPILE(
+            name = "lg_hugepage_at_least_lg_page",
+            code = "\n".join([
+                "constexpr int as_int(int value) { return value; }",
+                "constexpr int as_int(const char *digits, int value = 0) {",
+                "  return *digits == '\\0' ? value : as_int(digits + 1, value * 10 + (*digits - '0'));",
+                "}",
+                "static_assert(as_int(LG_HUGEPAGE) >= as_int(LG_PAGE), \"LG_HUGEPAGE < LG_PAGE\");",
+                "int main() { return 0; }",
+                "",
+            ]),
+            compile_defines = [
+                "LG_HUGEPAGE",
+                "LG_PAGE",
+            ],
+            error = " ".join([
+                "Huge page size must be at least page size: --@jemalloc//settings/platform:lg_hugepage is less than",
+                "--@jemalloc//settings/platform:lg_page, whose default is 16 on aarch64 Linux and Android, 14 on Darwin",
+                "and 12 elsewhere. Raise lg_hugepage or set lg_page.",
+            ]),
+            language = "cpp",
+        ),
         checks.AC_TRY_COMPILE(
             name = "ac_cv_c_compiler_gnu",
             code = utils.AC_LANG_PROGRAM(
@@ -699,7 +693,19 @@ autoconf(
         "@platforms//os:windows": [],
         "//conditions:default": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_MAPS_COALESCE", "")],
     }) + select({
-        ":jemalloc_retain": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_RETAIN", "")],
+        # configure.ac's host table retains where LG_SIZEOF_PTR is 3, which an MSVC compiler's LG_SIZEOF_PTR_WIN is not.
+        os: [
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_RETAIN",
+                condition = "ac_cv_sizeof_void_p==8 && !je_cv_msvc",
+            ),
+        ]
+        for os in [
+            "@platforms//os:android",
+            "@platforms//os:linux",
+            "@platforms//os:windows",
+        ]
+    } | {
         "//conditions:default": [],
     }) + select({
         "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_ZERO_REALLOC_DEFAULT_FREE", "")],
@@ -1461,6 +1467,7 @@ autoconf(
     ],
     copts = HOST_CPPFLAGS,
     tags = ["manual"],
+    deps = ["//include/jemalloc:jemalloc_defs_checks"],
 )
 
 # A define takes one of two values, so CPU_SPINWAIT reads je_cv_pause_msvc or je_cv_pause by compiler, and a check
@@ -1647,6 +1654,19 @@ autoconf(
 )
 
 autoconf(
+    name = "jemalloc_internal_defs_lg_vaddr",
+    build_settings = [
+        checks.AC_BUILD_SETTING(
+            name = "LG_VADDR",
+            define = "LG_VADDR",
+            target = "//settings/platform:lg_vaddr",
+            unquote = True,
+        ),
+    ],
+    tags = ["manual"],
+)
+
+autoconf(
     name = "jemalloc_internal_defs_lg_quantum",
     build_settings = [
         checks.AC_BUILD_SETTING(
@@ -1666,6 +1686,7 @@ autoconf_hdr(
     template = "jemalloc_internal_defs.h.in",
     deps = [
         ":jemalloc_internal_defs_checks",
+        ":jemalloc_internal_defs_lg_vaddr",
         ":jemalloc_internal_defs_std_gnu99_checks",
         ":jemalloc_internal_defs_warnings_as_errors_checks",
     ] + select({

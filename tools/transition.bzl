@@ -11,22 +11,62 @@ PLATFORM = select({
     "//conditions:default": "unknown",
 })
 
-# The CPU class the platform defaults can read, alongside the platform: aarch64, x86_64 or any other.
+# The CPU class the platform defaults read. aarch64 and x86_64 have defaults of their own; any other CPU is classed by
+# its pointer width, and a CPU whose width @platforms leaves ambiguous (ppc) or that is not listed is "unknown".
 CPU = select({
     "@platforms//cpu:aarch64": "aarch64",
     "@platforms//cpu:x86_64": "x86_64",
-    "//conditions:default": "other",
-})
+} | {
+    cpu: "other_64_bit"
+    for cpu in [
+        "@platforms//cpu:arm64e",
+        "@platforms//cpu:cortex-r82",
+        "@platforms//cpu:mips64",
+        "@platforms//cpu:ppc64le",
+        "@platforms//cpu:riscv64",
+        "@platforms//cpu:s390x",
+        "@platforms//cpu:wasm64",
+    ]
+} | {
+    cpu: "other_32_bit"
+    for cpu in [
+        "@platforms//cpu:aarch32",
+        "@platforms//cpu:arm64_32",
+        "@platforms//cpu:armv6-m",
+        "@platforms//cpu:armv7",
+        "@platforms//cpu:armv7-m",
+        "@platforms//cpu:armv7e-m",
+        "@platforms//cpu:armv7e-mf",
+        "@platforms//cpu:armv7k",
+        "@platforms//cpu:armv8-m",
+        "@platforms//cpu:cortex-r52",
+        "@platforms//cpu:i386",
+        "@platforms//cpu:ppc32",
+        "@platforms//cpu:riscv32",
+        "@platforms//cpu:wasm32",
+        "@platforms//cpu:x86_32",
+    ]
+} | {"//conditions:default": "unknown"})
 
 # Assume typical defaults for target platforms. A "<platform>-<cpu>" key takes precedence over a "<platform>" key, and
-# that over a "*-<cpu>" key.
+# that over a "*-<cpu>" key. A setting without a "default" key must be set explicitly where no other key matches.
 _PLATFORM_DEFAULTS = {
     "//settings/flags:enable_lazy_lock": {"freebsd": "yes", "default": "no"},
     "//settings/flags:enable_zone_allocator": {"darwin": "yes", "default": "no"},
     # configure.ac's --with-jemalloc-prefix default: "je_" for the macho and pecoff ABIs, "" otherwise.
     "//settings/flags:jemalloc_prefix": {"darwin": "je_", "windows": "je_", "default": ""},
     "//settings/platform:glibc_overrides_support": {"linux": "yes", "default": "no"},
-    "//settings/platform:lg_page": {"darwin": "14", "default": "12"},
+    # 64K pages on aarch64 Linux and Android: LG_PAGE must be at least the kernel's page size or pages_boot fails, and
+    # aarch64 kernels use 4K, 16K or 64K pages. configure.ac's cross-compiling answer is 12.
+    "//settings/platform:lg_page": {"android-aarch64": "16", "darwin": "14", "linux-aarch64": "16", "default": "12"},
+    # configure.ac's LG_VADDR: 48 on aarch64, 57 on x86_64 (its cross-compiling answer; natively it runs CPUID), and the
+    # pointer width on any other CPU. A CPU of unknown width has no default, as the value is a fact about the target.
+    "//settings/platform:lg_vaddr": {
+        "*-aarch64": "48",
+        "*-other_32_bit": "32",
+        "*-other_64_bit": "64",
+        "*-x86_64": "57",
+    },
     "//settings/platform:memalign_support": {"linux": "yes", "default": "no"},
     "//settings/platform:malloc_size_support": {"darwin": "yes", "default": "no"},
     "//settings/platform:valloc_support": {"darwin": "yes", "linux": "yes", "default": "no"},
@@ -62,8 +102,14 @@ def _platform_constraints_transition_impl(settings, attr):
             defaults = _PLATFORM_DEFAULTS[setting]
             value = defaults.get(
                 "{}-{}".format(attr.platform, attr.cpu),
-                defaults.get(attr.platform, defaults.get("*-" + attr.cpu, defaults["default"])),
+                defaults.get(attr.platform, defaults.get("*-" + attr.cpu, defaults.get("default"))),
             )
+            if value == None:
+                fail("{} has no default for the {} platform with a CPU of class {}; set it explicitly".format(
+                    setting,
+                    attr.platform,
+                    attr.cpu,
+                ))
         result[setting] = value
 
     # configure.ac: AC_MSG_ERROR([--enable-zone-allocator is only supported on Darwin]). Without it, zone.c stops at
@@ -102,7 +148,9 @@ transition_default_constraints = rule(
             mandatory = True,
             values = [
                 "aarch64",
-                "other",
+                "other_32_bit",
+                "other_64_bit",
+                "unknown",
                 "x86_64",
             ],
         ),
