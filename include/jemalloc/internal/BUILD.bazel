@@ -745,24 +745,26 @@ autoconf(
                 condition = "!je_cv_os_unfair_lock",
             ),
         ],
-    }) + select({
-        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_MALLOC_THREAD_CLEANUP", "")],
-        "//conditions:default": [],
-    }) + select({
-        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_MUTEX_INIT_CB", "")],
-        "//conditions:default": [],
-    }) + select({
-        "@platforms//os:android": [],
-        # configure.ac forces TLS on where _malloc_thread_cleanup exists, which this header asserts for FreeBSD.
-        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_TLS", "")],
-        "@platforms//os:ios": [],
-        "@platforms//os:macos": [],
-        "@platforms//os:openbsd": [],
-        "@platforms//os:qnx": [],
-        "@platforms//os:tvos": [],
-        "@platforms//os:watchos": [],
-        "@platforms//os:windows": [],
-        "//conditions:default": [
+    }) + [
+        checks.AC_CHECK_FUNC(
+            "_malloc_thread_cleanup",
+            code = utils.AC_LANG_FUNC_LINK_TRY("_malloc_thread_cleanup"),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_MALLOC_THREAD_CLEANUP",
+            condition = "ac_cv_func__malloc_thread_cleanup",
+        ),
+        checks.AC_CHECK_FUNC(
+            "_pthread_mutex_init_calloc_cb",
+            code = utils.AC_LANG_FUNC_LINK_TRY("_pthread_mutex_init_calloc_cb"),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_MUTEX_INIT_CB",
+            condition = "ac_cv_func__pthread_mutex_init_calloc_cb",
+        ),
+    ] + select({
+        # configure.ac's host table sets force_tls=0 for these, and _malloc_thread_cleanup overrides it with force_tls=1.
+        os: [
             checks.AC_TRY_COMPILE(
                 name = "enable_tls",
                 code = utils.AC_LANG_PROGRAM(
@@ -773,13 +775,40 @@ autoconf(
                         "    return 0;",
                     ],
                 ),
+                requires = ["ac_cv_func__malloc_thread_cleanup"],
             ),
             checks.AC_DEFINE_UNQUOTED(
                 "JEMALLOC_TLS",
                 condition = "enable_tls",
             ),
-        ],
-    }) + [
+        ]
+        for os in [
+            "@platforms//os:android",
+            "@platforms//os:ios",
+            "@platforms//os:macos",
+            "@platforms//os:openbsd",
+            "@platforms//os:qnx",
+            "@platforms//os:tvos",
+            "@platforms//os:watchos",
+            "@platforms//os:windows",
+        ]
+    } | {"//conditions:default": [
+        checks.AC_TRY_COMPILE(
+            name = "enable_tls",
+            code = utils.AC_LANG_PROGRAM(
+                "    __thread int x;",
+                [
+                    "    x = 42;",
+                    "",
+                    "    return 0;",
+                ],
+            ),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_TLS",
+            condition = "enable_tls",
+        ),
+    ]}) + [
         checks.AC_CHECK_FUNC(
             "sbrk",
             code = utils.AC_LANG_FUNC_LINK_TRY("sbrk"),
@@ -797,13 +826,108 @@ autoconf(
             ),
         ],
     }) + select({
+        "//settings/flags:no_jemalloc_prefix": [
+            checks.AC_CHECK_FUNC(
+                "__libc_calloc",
+                code = utils.AC_LANG_FUNC_LINK_TRY("__libc_calloc"),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_OVERRIDE___LIBC_CALLOC",
+                condition = "ac_cv_func___libc_calloc",
+            ),
+            checks.AC_CHECK_FUNC(
+                "__libc_free",
+                code = utils.AC_LANG_FUNC_LINK_TRY("__libc_free"),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_OVERRIDE___LIBC_FREE",
+                condition = "ac_cv_func___libc_free",
+            ),
+            checks.AC_CHECK_FUNC(
+                "__libc_malloc",
+                code = utils.AC_LANG_FUNC_LINK_TRY("__libc_malloc"),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_OVERRIDE___LIBC_MALLOC",
+                condition = "ac_cv_func___libc_malloc",
+            ),
+            checks.AC_CHECK_FUNC(
+                "__libc_memalign",
+                code = utils.AC_LANG_FUNC_LINK_TRY("__libc_memalign"),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_OVERRIDE___LIBC_MEMALIGN",
+                condition = "ac_cv_func___libc_memalign",
+            ),
+            checks.AC_CHECK_FUNC(
+                "__libc_realloc",
+                code = utils.AC_LANG_FUNC_LINK_TRY("__libc_realloc"),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_OVERRIDE___LIBC_REALLOC",
+                condition = "ac_cv_func___libc_realloc",
+            ),
+            checks.AC_CHECK_FUNC(
+                "__libc_valloc",
+                code = utils.AC_LANG_FUNC_LINK_TRY("__libc_valloc"),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_OVERRIDE___LIBC_VALLOC",
+                condition = "ac_cv_func___libc_valloc",
+            ),
+            checks.AC_CHECK_FUNC(
+                "__posix_memalign",
+                code = utils.AC_LANG_FUNC_LINK_TRY("__posix_memalign"),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_OVERRIDE___POSIX_MEMALIGN",
+                condition = "ac_cv_func___posix_memalign",
+            ),
+        ],
+        "//conditions:default": [],
+    }) + select({
+        # configure.ac checks the hooks only for its glibc host, which is Linux other than Android.
         ":override_glibc_allocator": [
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_OVERRIDE___LIBC_CALLOC", ""),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_OVERRIDE___LIBC_FREE", ""),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_OVERRIDE___LIBC_MALLOC", ""),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_OVERRIDE___LIBC_MEMALIGN", ""),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_OVERRIDE___LIBC_REALLOC", ""),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_OVERRIDE___LIBC_VALLOC", ""),
+            checks.AC_TRY_LINK(
+                name = "je_cv_glibc_malloc_hook",
+                code = utils.AC_LANG_PROGRAM(
+                    [
+                        "  #include <stddef.h>",
+                        "",
+                        "  extern void (* __free_hook)(void *ptr);",
+                        "  extern void *(* __malloc_hook)(size_t size);",
+                        "  extern void *(* __realloc_hook)(void *ptr, size_t size);",
+                    ],
+                    [
+                        "    void *ptr = 0L;",
+                        "    if (__malloc_hook) ptr = __malloc_hook(1);",
+                        "    if (__realloc_hook) ptr = __realloc_hook(ptr, 2);",
+                        "    if (__free_hook && ptr) __free_hook(ptr);",
+                    ],
+                ),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_GLIBC_MALLOC_HOOK",
+                condition = "je_cv_glibc_malloc_hook",
+            ),
+            checks.AC_TRY_LINK(
+                name = "je_cv_glibc_memalign_hook",
+                code = utils.AC_LANG_PROGRAM(
+                    [
+                        "  #include <stddef.h>",
+                        "",
+                        "  extern void *(* __memalign_hook)(size_t alignment, size_t size);",
+                    ],
+                    [
+                        "    void *ptr = 0L;",
+                        "    if (__memalign_hook) ptr = __memalign_hook(16, 7);",
+                    ],
+                ),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_GLIBC_MEMALIGN_HOOK",
+                condition = "je_cv_glibc_memalign_hook",
+            ),
         ],
         "//conditions:default": [],
     }) + [
@@ -1146,13 +1270,14 @@ autoconf(
             "JEMALLOC_HAVE_MPROTECT",
             condition = "je_cv_mprotect",
         ),
-    ] + select({
-        "@platforms//os:ios": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MALLOC_SIZE", "")],
-        "@platforms//os:macos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MALLOC_SIZE", "")],
-        "@platforms//os:tvos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MALLOC_SIZE", "")],
-        "@platforms//os:watchos": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_MALLOC_SIZE", "")],
-        "//conditions:default": [],
-    }) + [
+        checks.AC_CHECK_FUNC(
+            "malloc_size",
+            code = utils.AC_LANG_FUNC_LINK_TRY("malloc_size"),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_MALLOC_SIZE",
+            condition = "ac_cv_func_malloc_size",
+        ),
         # configure.ac's AC_C_BIGENDIAN tries <sys/param.h>, then <limits.h>. Where neither names the byte order it
         # runs a program, or greps an object file when cross-compiling; the compiler's predefined macros stand in.
         checks.AC_TRY_COMPILE(
