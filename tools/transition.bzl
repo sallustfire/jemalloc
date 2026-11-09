@@ -3,6 +3,7 @@
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
 PLATFORM = select({
+    "@platforms//os:android": "android",
     "@platforms//os:freebsd": "freebsd",
     "@platforms//os:linux": "linux",
     "@platforms//os:windows": "windows",
@@ -10,7 +11,15 @@ PLATFORM = select({
     "//conditions:default": "unknown",
 })
 
-# Assume typical defaults for target platforms
+# The CPU class the platform defaults can read, alongside the platform: aarch64, x86_64 or any other.
+CPU = select({
+    "@platforms//cpu:aarch64": "aarch64",
+    "@platforms//cpu:x86_64": "x86_64",
+    "//conditions:default": "other",
+})
+
+# Assume typical defaults for target platforms. A "<platform>-<cpu>" key takes precedence over a "<platform>" key, and
+# that over a "*-<cpu>" key.
 _PLATFORM_DEFAULTS = {
     "//settings/flags:enable_zone_allocator": {"darwin": "yes", "default": "no"},
     # configure.ac's --with-jemalloc-prefix default: "je_" for the macho and pecoff ABIs, "" otherwise.
@@ -50,7 +59,11 @@ def _platform_constraints_transition_impl(settings, attr):
         else:
             value = settings[setting]
         if value == "__auto__" and setting in _PLATFORM_DEFAULTS:
-            value = _PLATFORM_DEFAULTS[setting].get(attr.platform, _PLATFORM_DEFAULTS[setting]["default"])
+            defaults = _PLATFORM_DEFAULTS[setting]
+            value = defaults.get(
+                "{}-{}".format(attr.platform, attr.cpu),
+                defaults.get(attr.platform, defaults.get("*-" + attr.cpu, defaults["default"])),
+            )
         result[setting] = value
 
     # configure.ac: AC_MSG_ERROR([--enable-zone-allocator is only supported on Darwin]). Without it, zone.c stops at
@@ -84,10 +97,20 @@ transition_default_constraints = rule(
     implementation = _transition_default_constraints_impl,
     attrs = {
         "src": attr.label(cfg = platform_constraints_transition),
+        "cpu": attr.string(
+            doc = "The CPU class the transition reads, alongside platform, to apply unset defaults",
+            mandatory = True,
+            values = [
+                "aarch64",
+                "other",
+                "x86_64",
+            ],
+        ),
         "platform": attr.string(
             doc = "Hack to inject platform constraints into the transition to apply unset defaults",
             mandatory = True,
             values = [
+                "android",
                 "freebsd",
                 "linux",
                 "darwin",

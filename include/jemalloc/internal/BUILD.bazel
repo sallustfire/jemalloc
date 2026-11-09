@@ -5,7 +5,7 @@ load("@package_metadata//licenses/rules:license_kind.bzl", "license_kind")
 load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//tools:autoconf.bzl", "configure_header", "define_macro", "define_macro_if", "define_macro_if_any", "define_macro_if_with", "define_macro_with", "undefine_macro")
-load("//tools:transition.bzl", "PLATFORM")
+load("//tools:transition.bzl", "CPU", "PLATFORM")
 load(":private_namespace.bzl", "private_namespace", "private_namespace_leak_test")
 load(":public_symbols.bzl", "public_symbols", "public_symbols_header")
 load(":symbols.bzl", "PUBLIC_SYMBOLS", "SYM_PREFIX", "WRAP_SYMBOLS")
@@ -599,6 +599,7 @@ private_namespace(
 private_namespace_leak_test(
     name = "private_namespace_leak_test",
     size = "small",
+    cpu = CPU,
     library = "//:jemalloc",
     namespace = ":private_namespace",
     platform = PLATFORM,

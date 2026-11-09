@@ -188,6 +188,7 @@ private_namespace_leak_test = rule(
             mandatory = True,
             cfg = platform_constraints_transition,
         ),
+        "cpu": attr.string(doc = "Read by the transition; see transition_default_constraints.", mandatory = True),
         "platform": attr.string(doc = "Read by the transition; see transition_default_constraints.", mandatory = True),
         "settings": attr.label_keyed_string_dict(doc = "Read by the transition; see transition_default_constraints."),
         "sym_prefix": attr.string(doc = "configure's SYM_PREFIX for the target platform.", mandatory = True, values = ["", "_"]),
