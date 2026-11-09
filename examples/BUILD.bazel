@@ -53,11 +53,11 @@ cc_test(
     malloc = ":jemalloc_custom",
 )
 
-# Case 5: On macOS, plain malloc reaches jemalloc through its zone
+# Case 5: On macOS the default prefix is je_, so jemalloc reads JE_MALLOC_CONF
 cc_test(
-    name = "test_5_macos_zone",
+    name = "test_5_macos_default_prefix",
     size = "small",
-    srcs = ["test_zone.c"],
+    srcs = ["test_conf.c"],
     env = {"JE_MALLOC_CONF": "narenas:3"},
     malloc = "@jemalloc",
     target_compatible_with = ["@platforms//os:macos"],
@@ -65,9 +65,9 @@ cc_test(
 
 # Case 6: jemalloc() keeps the platform's default prefix when its jemalloc_prefix is unset
 cc_test(
-    name = "test_6_macos_zone_config",
+    name = "test_6_macos_default_prefix_config",
     size = "small",
-    srcs = ["test_zone.c"],
+    srcs = ["test_conf.c"],
     env = {"JE_MALLOC_CONF": "narenas:3"},
     malloc = ":jemalloc_custom",
     target_compatible_with = ["@platforms//os:macos"],
@@ -82,12 +82,12 @@ jemalloc(
 cc_test(
     name = "test_7_prefix",
     size = "small",
-    srcs = ["test_prefix.c"],
+    srcs = ["test_conf.c"],
     env = {"MY_MALLOC_CONF": "narenas:3"},
     malloc = ":jemalloc_prefixed",
 )
 
-# Case 8: Plain malloc reaches jemalloc under the platform's default prefix
+# Case 8: Plain malloc reaches jemalloc under the platform's default prefix, and on macOS through jemalloc_zone
 cc_test(
     name = "test_8_malloc",
     size = "small",
