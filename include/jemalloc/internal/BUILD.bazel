@@ -7,6 +7,7 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc_autoconf//autoconf:autoconf.bzl", "autoconf")
 load("@rules_cc_autoconf//autoconf:autoconf_hdr.bzl", "autoconf_hdr")
 load("@rules_cc_autoconf//autoconf:checks.bzl", "checks", "macros", "utils")
+load("//tools:cc.bzl", "CONLYOPTS", "CXXOPTS")
 load("//tools:configure_host.bzl", "HOST_CC_DEPS", "HOST_CPPFLAGS", "HOST_LIBS")
 load("//tools:transition.bzl", "CPU", "PLATFORM")
 load(":private_namespace.bzl", "jemalloc_private_namespace", "private_namespace", "private_namespace_leak_test")
@@ -340,6 +341,12 @@ autoconf(
                 ],
             ),
             requires = ["!ac_cv_c_compiler_gnu"],
+        ),
+        # configure.ac defines it when a GNU compiler accepts -std=gnu11 (or gnu99). Every check here compiles with
+        # CONLYOPTS, the standard jemalloc's sources declare, so a GNU compiler that reaches this point accepted it.
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAS_RESTRICT",
+            condition = "ac_cv_c_compiler_gnu",
         ),
     ] + select({
         # configure.ac's host table defines it for Android whatever the probe finds.
@@ -1464,7 +1471,9 @@ autoconf(
             condition = "je_cv_vm_make_tag",
         ),
     ],
+    conlyopts = CONLYOPTS,
     copts = HOST_CPPFLAGS,
+    cxxopts = CXXOPTS,
     tags = ["manual"],
     deps = ["//include/jemalloc:jemalloc_defs_checks"],
 )
@@ -1518,6 +1527,7 @@ autoconf(
             if_true = "__asm__ volatile(\"pause\")",
         ),
     ]}),
+    conlyopts = CONLYOPTS,
     copts = HOST_CPPFLAGS,
     tags = ["manual"],
     deps = [":jemalloc_internal_defs_checks"],
@@ -1583,56 +1593,12 @@ autoconf(
             condition = "je_cv_strerror_r_returns_char_with_gnu_source",
         ),
     ],
+    conlyopts = CONLYOPTS,
     copts = select({
         "@rules_cc//cc/compiler:msvc-cl": [],
         "//conditions:default": ["-Werror"],
     }) + HOST_CPPFLAGS,
     tags = ["manual"],
-)
-
-autoconf(
-    name = "jemalloc_internal_defs_std_gnu11_checks",
-    cc_deps = HOST_CC_DEPS + HOST_LIBS,
-    checks = [
-        checks.AC_TRY_COMPILE(
-            name = "je_cv_cflags_added_std_gnu11",
-            code = utils.AC_LANG_PROGRAM("", "return 0;"),
-            requires = ["ac_cv_c_compiler_gnu"],
-        ),
-    ],
-    copts = select({
-        "@rules_cc//cc/compiler:clang-cl": [],
-        "@rules_cc//cc/compiler:msvc-cl": [],
-        "//conditions:default": ["-std=gnu11"],
-    }) + HOST_CPPFLAGS,
-    tags = ["manual"],
-    deps = [":jemalloc_internal_defs_checks"],
-)
-
-autoconf(
-    name = "jemalloc_internal_defs_std_gnu99_checks",
-    cc_deps = HOST_CC_DEPS + HOST_LIBS,
-    checks = [
-        checks.AC_TRY_COMPILE(
-            name = "je_cv_cflags_added_std_gnu99",
-            code = utils.AC_LANG_PROGRAM("", "return 0;"),
-            requires = [
-                "ac_cv_c_compiler_gnu",
-                "!je_cv_cflags_added_std_gnu11",
-            ],
-        ),
-        checks.AC_DEFINE_UNQUOTED(
-            "JEMALLOC_HAS_RESTRICT",
-            condition = "je_cv_cflags_added_std_gnu11 || je_cv_cflags_added_std_gnu99",
-        ),
-    ],
-    copts = select({
-        "@rules_cc//cc/compiler:clang-cl": [],
-        "@rules_cc//cc/compiler:msvc-cl": [],
-        "//conditions:default": ["-std=gnu99"],
-    }) + HOST_CPPFLAGS,
-    tags = ["manual"],
-    deps = [":jemalloc_internal_defs_std_gnu11_checks"],
 )
 
 autoconf(
@@ -1687,7 +1653,6 @@ autoconf_hdr(
     deps = [
         ":jemalloc_internal_defs_checks",
         ":jemalloc_internal_defs_lg_vaddr",
-        ":jemalloc_internal_defs_std_gnu99_checks",
         ":jemalloc_internal_defs_warnings_as_errors_checks",
     ] + select({
         "//settings/flags:no_jemalloc_prefix": [],

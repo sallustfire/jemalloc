@@ -3,6 +3,7 @@ load("@rules_cc_autoconf//autoconf:autoconf.bzl", "autoconf")
 load("@rules_cc_autoconf//autoconf:autoconf_hdr.bzl", "autoconf_hdr")
 load("@rules_cc_autoconf//autoconf:checks.bzl", "checks", "macros", "utils")
 load("//include/jemalloc/internal:public_symbols.bzl", "public_symbols_header")
+load("//tools:cc.bzl", "CONLYOPTS")
 load("//tools:configure_host.bzl", "HOST_CC_DEPS", "HOST_CPPFLAGS")
 load("//tools:version.bzl", "VERSION")
 load(":jemalloc_hdr.bzl", "jemalloc_hdr")
@@ -88,6 +89,7 @@ autoconf(
             ),
         ],
     }),
+    conlyopts = CONLYOPTS,
     copts = HOST_CPPFLAGS,
     tags = ["manual"],
     visibility = ["//include/jemalloc/internal:__pkg__"],
@@ -122,6 +124,7 @@ autoconf(
             condition = "je_cv_fallthrough",
         ),
     ],
+    conlyopts = CONLYOPTS,
     copts = select({
         "@rules_cc//cc/compiler:msvc-cl": [],
         "//conditions:default": ["-Wimplicit-fallthrough"],
@@ -177,6 +180,7 @@ autoconf(
             condition = "je_cv_cold",
         ),
     ],
+    conlyopts = CONLYOPTS,
     copts = select({
         "@rules_cc//cc/compiler:msvc-cl": [],
         "//conditions:default": ["-Werror"],
