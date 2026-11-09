@@ -1,3 +1,5 @@
+"""Rules that generate private_namespace.h from the library's symbols."""
+
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolchain")
 

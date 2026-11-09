@@ -1,5 +1,5 @@
-load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("@jemalloc//settings:config.bzl", "jemalloc")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
 # Under the platform's default prefix, plain malloc reaches jemalloc through the replaced symbols, or on macOS through
 # the zone. On Windows the default prefix is je_ and there is no zone to overlay, so plain malloc stays with the C
