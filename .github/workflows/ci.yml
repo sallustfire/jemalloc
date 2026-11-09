@@ -127,6 +127,38 @@ jobs:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
         run: bazel test //... --config=prof-gcc ${{ matrix.bazel_config }}
 
+  upstream-oracle:
+    name: Upstream oracle (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default
+          - name: prefix je_
+            configure_args: --with-jemalloc-prefix=je_
+            bazel_args: --//settings/flags:jemalloc_prefix=je_
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          repository-cache: true
+      - name: Download upstream release
+        run: |
+          version="$(sed -n '/^ *version = "/{s/^ *version = "\([^"]*\)".*/\1/p;q}' MODULE.bazel)"
+          upstream="${version%%-bcr.*}"
+          curl --fail --silent --show-error --location -o "${RUNNER_TEMP}/upstream.tar.bz2" \
+            "https://github.com/jemalloc/jemalloc/releases/download/${upstream}/jemalloc-${upstream}.tar.bz2"
+      - name: Compare generated headers
+        env:
+          USE_BAZEL_VERSION: 8.x
+          CONFIGURE_ARGS: ${{ matrix.configure_args }}
+          BAZEL_ARGS: ${{ matrix.bazel_args }}
+        run: |
+          # shellcheck disable=SC2086
+          .github/scripts/upstream_oracle.sh "${RUNNER_TEMP}/upstream.tar.bz2" ${CONFIGURE_ARGS} -- --config=bazel8 ${BAZEL_ARGS}
+
   examples:
     name: Examples (${{ matrix.os }}, Bazel ${{ matrix.bazel_version }})
     runs-on: ${{ matrix.os }}
