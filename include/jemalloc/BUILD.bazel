@@ -189,7 +189,10 @@ autoconf_hdr(
     out = "jemalloc_defs.h",
     tags = ["manual"],
     template = "jemalloc_defs.h.in",
-    visibility = ["//tools/fidelity:__pkg__"],
+    visibility = [
+        "//include/jemalloc/internal:__pkg__",
+        "//tools/fidelity:__pkg__",
+    ],
     deps = [
         ":jemalloc_defs_checks",
         ":jemalloc_defs_implicit_fallthrough_checks",

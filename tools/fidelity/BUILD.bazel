@@ -2,7 +2,7 @@ load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
 load("@bazel_skylib//rules:native_binary.bzl", "native_test")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("//include/jemalloc/internal:private_namespace.bzl", "private_namespace")
-load("//include/jemalloc/internal:public_symbols.bzl", "public_symbols", "public_symbols_header")
+load("//include/jemalloc/internal:public_symbols.bzl", "public_symbols", "public_symbols_header", "symbol_list")
 load("//include/jemalloc/internal:symbols.bzl", "ALL_PUBLIC_SYMBOLS", "ALL_WRAP_SYMBOLS", "SYM_PREFIX")
 load("//tools:transition.bzl", "CPU", "PLATFORM", "transition_default_constraints")
 load("//tools:version.bzl", "UPSTREAM_VERSION", "VERSION")
@@ -36,8 +36,6 @@ native_test(
         "-vgid=" + VERSION.gid,
         "-vpublic=" + ",".join(ALL_PUBLIC_SYMBOLS),
         "-vwrap=" + ",".join(ALL_WRAP_SYMBOLS),
-        # configure.ac adds these only alongside JEMALLOC_OVERRIDE___POSIX_MEMALIGN and JEMALLOC_GLIBC_*_HOOK, which the fork undefines
-        "-vunwrapped=__posix_memalign,__free_hook,__malloc_hook,__realloc_hook,__memalign_hook",
         "$(rootpath //:configure.ac)",
     ],
     data = [
@@ -116,12 +114,20 @@ _MANGLING_SYMBOLS = [
     "mallocx",
 ]
 
+symbol_list(
+    name = "public_syms_mangling",
+    testonly = True,
+    out = "public_syms_mangling.txt",
+    symbols = _MANGLING_SYMBOLS,
+    tags = ["manual"],
+)
+
 public_symbols(
     name = "public_symbols_mangling",
     testonly = True,
     out = "public_symbols_mangling.txt",
     mangling_map = _MANGLING_MAP,
-    symbols = _MANGLING_SYMBOLS,
+    symbols = ":public_syms_mangling",
     tags = ["manual"],
 )
 
@@ -170,15 +176,32 @@ private_namespace_fidelity_test(
     sym_prefix = SYM_PREFIX,
 )
 
+# The fixtures' public_syms and wrap_syms
+symbol_list(
+    name = "malloc_public_syms",
+    testonly = True,
+    out = "malloc_public_syms.txt",
+    symbols = ["malloc"],
+    tags = ["manual"],
+)
+
+symbol_list(
+    name = "pthread_create_wrap_syms",
+    testonly = True,
+    out = "pthread_create_wrap_syms.txt",
+    symbols = ["pthread_create"],
+    tags = ["manual"],
+)
+
 private_namespace(
     name = "private_namespace_fixture",
     testonly = True,
     out = "private_namespace_fixture.h",
     listing = ":private_namespace_fixture.nm",
-    public_symbols = ["malloc"],
+    public_symbols = ":malloc_public_syms",
     sym_prefix = "",
     tags = ["manual"],
-    wrap_symbols = ["pthread_create"],
+    wrap_symbols = ":pthread_create_wrap_syms",
 )
 
 private_namespace_fidelity_test(
@@ -194,10 +217,10 @@ private_namespace(
     testonly = True,
     out = "private_namespace_fixture_macho.h",
     listing = ":private_namespace_fixture_macho.nm",
-    public_symbols = ["malloc"],
+    public_symbols = ":malloc_public_syms",
     sym_prefix = "_",
     tags = ["manual"],
-    wrap_symbols = ["pthread_create"],
+    wrap_symbols = ":pthread_create_wrap_syms",
 )
 
 private_namespace_fidelity_test(
@@ -213,10 +236,10 @@ private_namespace(
     testonly = True,
     out = "private_namespace_fixture_dumpbin.h",
     listing = ":private_namespace_fixture_dumpbin.nm",
-    public_symbols = ["malloc"],
+    public_symbols = ":malloc_public_syms",
     sym_prefix = "",
     tags = ["manual"],
-    wrap_symbols = ["pthread_create"],
+    wrap_symbols = ":pthread_create_wrap_syms",
 )
 
 private_namespace_fidelity_test(

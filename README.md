@@ -47,27 +47,30 @@ See the [examples/BUILD.bazel](examples/BUILD.bazel) file for examples of how to
 - **//settings/platform:lg_hugepage (--with-lg-hugepage):** Defaults to 21 (2 MiB), configure's value when it cannot
  read the huge page size. It must be at least lg_page, as configure requires, or the build fails; so on aarch64 Linux
  and Android, where lg_page defaults to 16, a value below 16 needs lg_page set explicitly too.
-- **glibc:** Assumes a modern version. If jemalloc is compiled to be the default allocator on linux, it assumes glibc
- and some publicly exposed symbols can be wrapped: __malloc_hook, __realloc_hook, __free_hook, __memalign_hook.
- However, they are deprecated since glibc 2.34. The jemalloc source likely needs to be updated to reflect this.
+- **glibc:** Without a prefix, the __libc_* functions and __posix_memalign are probed and listed (exempt from private
+ renaming) wherever they link, and on Linux the hooks __malloc_hook, __realloc_hook, __free_hook and __memalign_hook
+ where they still link (glibc before 2.34), exactly as configure does. jemalloc defines the hooks, and aliases the
+ __libc_* functions and __posix_memalign, only where the malloc hooks link on glibc; elsewhere, as with configure,
+ these names are listed but not defined.
 
 Platform configurations that have defaults that are applied via transition.
 - //settings/flags:enable_lazy_lock
 - //settings/flags:enable_zone_allocator
 - //settings/flags:jemalloc_prefix
-- //settings/platform:glibc_overrides_support
 - //settings/platform:lg_page
 - //settings/platform:lg_vaddr
-- //settings/platform:memalign_support
-- //settings/platform:malloc_size_support
-- //settings/platform:valloc_support
+
+The optional public functions (memalign, valloc, malloc_size) are exported exactly where configure would export them:
+where the target's toolchain links them, as the configured headers record.
 
 ## Fidelity with upstream
 
 The upstream build generates several headers with shell, awk and sed scripts, run by configure and make on the host.
-Here Bazel generates them from Starlark rules and a small C++ tool, so a module that depends on `@jemalloc` needs only
-its C and C++ toolchain: no host shell, awk or sed. private_namespace.h comes from running the toolchain's `nm`, which
-the tool can only do on POSIX hosts for now (see Windows under Known Issues).
+Here Bazel generates them with small C++ tools, so a module that depends on `@jemalloc` needs only its C and C++
+toolchain: no host shell, awk or sed. As in configure, the public symbols include optional functions only where the
+configured headers define the matching macro, so the headers built from them are written when the build runs.
+private_namespace.h comes from running the toolchain's `nm`, which the tool can only do on POSIX hosts for now (see
+Windows under Known Issues).
 
 The upstream scripts are kept, not replaced. Each generated header has a `fidelity_test` in
 [tools/fidelity](tools/fidelity) that runs the unmodified upstream script, as configure.ac invokes it, on the
@@ -76,7 +79,7 @@ and coreutils, which are dev dependencies: they are fetched for this repository'
 `upstream-oracle` CI job goes further, building the upstream release with configure and make and comparing every
 script-generated header with the Bazel build's.
 
-When upgrading jemalloc, a failing fidelity test means an upstream script changed and its Starlark counterpart must
+When upgrading jemalloc, a failing fidelity test means an upstream script changed and its Bazel counterpart must
 follow.
 
 ## Validated Platforms

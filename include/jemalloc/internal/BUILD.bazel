@@ -10,8 +10,8 @@ load("@rules_cc_autoconf//autoconf:checks.bzl", "checks", "macros", "utils")
 load("//tools:configure_host.bzl", "HOST_CC_DEPS", "HOST_CPPFLAGS", "HOST_LIBS")
 load("//tools:transition.bzl", "CPU", "PLATFORM")
 load(":private_namespace.bzl", "jemalloc_private_namespace", "private_namespace", "private_namespace_leak_test")
-load(":public_symbols.bzl", "public_symbols", "public_symbols_header")
-load(":symbols.bzl", "PUBLIC_SYMBOLS", "SYM_PREFIX", "WRAP_SYMBOLS")
+load(":public_symbols.bzl", "public_symbols", "public_symbols_header", "symbol_list")
+load(":symbols.bzl", "OPTIONAL_PUBLIC_SYMBOLS", "OPTIONAL_WRAP_SYMBOLS", "PUBLIC_SYMBOLS", "SYM_PREFIX", "WRAP_SYMBOLS")
 
 license_kind(
     name = "public_domain",
@@ -213,13 +213,12 @@ selects.config_setting_group(
     ],
 )
 
-# jemalloc is built to be the default allocator
-selects.config_setting_group(
+# configure.ac checks for the glibc hooks only on its glibc host, Linux other than Android, and defines them only without
+# a jemalloc prefix.
+config_setting(
     name = "override_glibc_allocator",
-    match_all = [
-        "//settings/platform:has_glibc_overrides",
-        "//settings/flags:no_jemalloc_prefix",
-    ],
+    constraint_values = ["@platforms//os:linux"],
+    flag_values = {"//settings/flags:jemalloc_prefix_resolved": ""},
 )
 
 config_setting(
@@ -1702,10 +1701,31 @@ autoconf_hdr(
     }),
 )
 
+symbol_list(
+    name = "public_syms",
+    out = "public_syms.txt",
+    headers = [
+        ":jemalloc_internal_defs",
+        "//include/jemalloc:jemalloc_defs",
+    ],
+    optional_symbols = OPTIONAL_PUBLIC_SYMBOLS,
+    symbols = PUBLIC_SYMBOLS,
+    tags = ["manual"],
+)
+
+symbol_list(
+    name = "wrap_syms",
+    out = "wrap_syms.txt",
+    headers = [":jemalloc_internal_defs"],
+    optional_symbols = OPTIONAL_WRAP_SYMBOLS,
+    symbols = WRAP_SYMBOLS,
+    tags = ["manual"],
+)
+
 public_symbols(
     name = "public_symbols",
     out = "public_symbols.txt",
-    symbols = PUBLIC_SYMBOLS,
+    symbols = ":public_syms",
     tags = ["manual"],
     visibility = ["//:__subpackages__"],
 )
@@ -1714,11 +1734,11 @@ private_namespace(
     name = "private_namespace",
     out = "private_namespace.h",
     input = "//:lib/jemalloc",
-    public_symbols = PUBLIC_SYMBOLS,
+    public_symbols = ":public_syms",
     sym_prefix = SYM_PREFIX,
     tags = ["manual"],
     visibility = ["//tools/fidelity:__pkg__"],
-    wrap_symbols = WRAP_SYMBOLS,
+    wrap_symbols = ":wrap_syms",
 )
 
 private_namespace_leak_test(
@@ -1737,11 +1757,11 @@ private_namespace(
     enable_jet = True,
     input = "//:lib/jemalloc",
     prefix = "jet_",
-    public_symbols = PUBLIC_SYMBOLS,
+    public_symbols = ":public_syms",
     sym_prefix = SYM_PREFIX,
     tags = ["manual"],
     visibility = ["//tools/fidelity:__pkg__"],
-    wrap_symbols = WRAP_SYMBOLS,
+    wrap_symbols = ":wrap_syms",
 )
 
 public_symbols_header(

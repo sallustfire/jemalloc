@@ -21,7 +21,6 @@ BEGIN {
     PROCINFO["sorted_in"] = "@ind_str_asc"
     add(fork_public, public, "PUBLIC_SYMBOLS")
     add(fork_wrap, wrap, "WRAP_SYMBOLS")
-    add(fork_wrap, unwrapped, "configure_symbols_test's unwrapped")
 }
 
 match($0, /^[[:space:]]*(public|wrap)_syms="([^"]*)"/, m) {

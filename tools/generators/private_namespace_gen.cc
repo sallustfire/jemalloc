@@ -3,8 +3,12 @@
 // wrapper nm needs remain the C++ toolchain's dependencies.
 //
 //   private_namespace_gen nm NM LISTING STDERR ARCHIVE...
-//   private_namespace_gen header HEADER LISTING STDERR SYM_PREFIX LISTING_SOURCE UNFOUND_REASON
-//       [--public=SYMBOL]... [--wrap=SYMBOL]...
+//   private_namespace_gen header HEADER LISTING STDERR SYM_PREFIX LISTING_SOURCE UNFOUND_REASON [--prefix=PREFIX]
+//       [--public=SYMBOL]... [--public-file=PATH]... [--wrap=SYMBOL]... [--wrap-file=PATH]... [--export-syms=PATH]
+//
+// Each public symbol, given directly or as a line of a --public-file, is exported as PREFIX followed by the symbol;
+// each wrapped symbol as is. --export-syms writes configure.ac's export_syms: the exported public symbols, then the
+// wrapped ones, one per line.
 
 #include <cstring>
 #include <fstream>
@@ -32,8 +36,36 @@ using private_namespace::read_nm_diagnostics;
 using private_namespace::split_fields;
 using private_namespace::starts_with;
 
+const std::string kPrefixFlag = "--prefix=";
 const std::string kPublicFlag = "--public=";
+const std::string kPublicFileFlag = "--public-file=";
 const std::string kWrapFlag = "--wrap=";
+const std::string kWrapFileFlag = "--wrap-file=";
+const std::string kExportSymsFlag = "--export-syms=";
+
+// Appends each nonempty line of `path` to *symbols.
+bool read_symbols(const std::string& path, std::vector<std::string>* symbols) {
+    std::vector<std::string> lines;
+    if (!read_lines(path, &lines)) return false;
+    for (std::string& line : lines) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (!line.empty()) symbols->push_back(line);
+    }
+    return true;
+}
+
+bool write_export_syms(const std::string& path, const std::vector<std::string>& public_symbols,
+                       const std::vector<std::string>& wrap_symbols) {
+    std::ofstream export_syms(path, std::ios::binary);
+    for (const std::string& symbol : public_symbols) export_syms << symbol << "\n";
+    for (const std::string& symbol : wrap_symbols) export_syms << symbol << "\n";
+    export_syms.close();
+    if (!export_syms) {
+        std::cerr << "private_namespace: error writing " << path << "\n";
+        return false;
+    }
+    return true;
+}
 
 int run_nm(const std::string& nm, const std::string& listing_path, const std::string& stderr_path,
            const std::vector<std::string>& archives) {
@@ -160,23 +192,36 @@ int main(int argc, char* argv[]) {
                       std::vector<std::string>(arguments.begin() + 4, arguments.end()));
     }
     if (arguments.size() >= 7 && arguments[0] == "header") {
-        std::vector<std::string> public_symbols, wrap_symbols;
+        std::string prefix, export_syms_path;
+        std::vector<std::string> unprefixed_public_symbols, wrap_symbols;
         for (std::size_t index = 7; index < arguments.size(); ++index) {
             const std::string& argument = arguments[index];
-            if (starts_with(argument, kPublicFlag)) {
-                public_symbols.push_back(argument.substr(kPublicFlag.size()));
+            if (starts_with(argument, kPrefixFlag)) {
+                prefix = argument.substr(kPrefixFlag.size());
+            } else if (starts_with(argument, kPublicFlag)) {
+                unprefixed_public_symbols.push_back(argument.substr(kPublicFlag.size()));
+            } else if (starts_with(argument, kPublicFileFlag)) {
+                if (!read_symbols(argument.substr(kPublicFileFlag.size()), &unprefixed_public_symbols)) return 1;
             } else if (starts_with(argument, kWrapFlag)) {
                 wrap_symbols.push_back(argument.substr(kWrapFlag.size()));
+            } else if (starts_with(argument, kWrapFileFlag)) {
+                if (!read_symbols(argument.substr(kWrapFileFlag.size()), &wrap_symbols)) return 1;
+            } else if (starts_with(argument, kExportSymsFlag)) {
+                export_syms_path = argument.substr(kExportSymsFlag.size());
             } else {
                 std::cerr << "private_namespace_gen: unexpected argument " << argument << "\n";
                 return 2;
             }
         }
+        std::vector<std::string> public_symbols;
+        for (const std::string& symbol : unprefixed_public_symbols) public_symbols.push_back(prefix + symbol);
+        if (!export_syms_path.empty() && !write_export_syms(export_syms_path, public_symbols, wrap_symbols)) return 1;
         return write_header(arguments[1], arguments[2], arguments[3], arguments[4], arguments[5], arguments[6],
                             public_symbols, wrap_symbols);
     }
     std::cerr << "usage: private_namespace_gen nm NM LISTING STDERR ARCHIVE...\n"
                  "       private_namespace_gen header HEADER LISTING STDERR SYM_PREFIX LISTING_SOURCE UNFOUND_REASON "
-                 "[--public=SYMBOL]... [--wrap=SYMBOL]...\n";
+                 "[--prefix=PREFIX] [--public=SYMBOL]... [--public-file=PATH]... [--wrap=SYMBOL]... [--wrap-file=PATH]... "
+                 "[--export-syms=PATH]\n";
     return 2;
 }

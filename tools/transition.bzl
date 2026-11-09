@@ -55,7 +55,6 @@ _PLATFORM_DEFAULTS = {
     "//settings/flags:enable_zone_allocator": {"darwin": "yes", "default": "no"},
     # configure.ac's --with-jemalloc-prefix default: "je_" for the macho and pecoff ABIs, "" otherwise.
     "//settings/flags:jemalloc_prefix": {"darwin": "je_", "windows": "je_", "default": ""},
-    "//settings/platform:glibc_overrides_support": {"linux": "yes", "default": "no"},
     # 64K pages on aarch64 Linux and Android: LG_PAGE must be at least the kernel's page size or pages_boot fails, and
     # aarch64 kernels use 4K, 16K or 64K pages. configure.ac's cross-compiling answer is 12.
     "//settings/platform:lg_page": {"android-aarch64": "16", "darwin": "14", "linux-aarch64": "16", "default": "12"},
@@ -67,9 +66,6 @@ _PLATFORM_DEFAULTS = {
         "*-other_64_bit": "64",
         "*-x86_64": "57",
     },
-    "//settings/platform:memalign_support": {"linux": "yes", "default": "no"},
-    "//settings/platform:malloc_size_support": {"darwin": "yes", "default": "no"},
-    "//settings/platform:valloc_support": {"darwin": "yes", "linux": "yes", "default": "no"},
 }
 
 _BOOL_SETTINGS = ["//settings:enable_jet", "//settings/flags:enable_experimental_smallocx", "//settings/flags:enable_fill"]

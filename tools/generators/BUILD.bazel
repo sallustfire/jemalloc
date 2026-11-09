@@ -1,6 +1,9 @@
+load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
+load("//include/jemalloc/internal:public_symbols.bzl", "symbol_list")
 
 cc_binary(
     name = "jemalloc_hdr_gen",
@@ -10,6 +13,93 @@ cc_binary(
         "//conditions:default": ["-std=c++14"],
     }),
     visibility = ["//include/jemalloc:__pkg__"],
+)
+
+cc_binary(
+    name = "public_symbols_gen",
+    srcs = ["public_symbols_gen.cc"],
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
+    visibility = ["//include/jemalloc/internal:__pkg__"],
+)
+
+# A configured header for public_symbols_gen's list mode: each way configure and autoconf_hdr write a macro as defined
+# or undefined, and lines that must not count as either. Written here so one line can end in CRLF.
+write_file(
+    name = "public_symbols_gen_fixture",
+    out = "public_symbols_gen_fixture.h",
+    content = [
+        "/* Fixture for public_symbols_gen list. */",
+        "#define DEFINED_PLAIN",
+        "#  define DEFINED_INDENTED 1",
+        "#define DEFINED_COMMENTED/**/",
+        "#define DEFINED_FUNCTION_LIKE(x) (x)",
+        "#define DEFINED_CRLF\r",
+        "/* #undef UNDEFINED_COMMENTED */",
+        "#undef UNDEFINED_PLAIN",
+        "/*",
+        " * #define IN_BLOCK_COMMENT",
+        " */",
+        "/* #define DEFINE_IN_COMMENT */",
+        "/* #undef UNDEF_WITH_TRAILER */ x",
+        "#ifdef SOMETHING",
+        "#  define CONFLICTING 1",
+        "#else",
+        "/* #undef CONFLICTING */",
+        "#endif",
+        "",
+    ],
+)
+
+_FIXTURE_HEADER = "public_symbols_gen_fixture.h"
+
+# Each symbol in the fixture list, mapped to the fixture header and the macro that decides it.
+_LIST_FIXTURE_SYMBOLS = {
+    "defined_plain": [
+        _FIXTURE_HEADER,
+        "DEFINED_PLAIN",
+    ],
+    "undefined_commented": [
+        _FIXTURE_HEADER,
+        "UNDEFINED_COMMENTED",
+    ],
+    "defined_indented": [
+        _FIXTURE_HEADER,
+        "DEFINED_INDENTED",
+    ],
+    "undefined_plain": [
+        _FIXTURE_HEADER,
+        "UNDEFINED_PLAIN",
+    ],
+    "defined_commented": [
+        _FIXTURE_HEADER,
+        "DEFINED_COMMENTED",
+    ],
+    "defined_function_like": [
+        _FIXTURE_HEADER,
+        "DEFINED_FUNCTION_LIKE",
+    ],
+    "defined_crlf": [
+        _FIXTURE_HEADER,
+        "DEFINED_CRLF",
+    ],
+}
+
+symbol_list(
+    name = "public_symbols_gen_list",
+    out = "public_symbols_gen_list.txt",
+    headers = [":public_symbols_gen_fixture"],
+    optional_symbols = _LIST_FIXTURE_SYMBOLS,
+    symbols = ["always"],
+)
+
+diff_test(
+    name = "public_symbols_gen_list_test",
+    size = "small",
+    file1 = ":public_symbols_gen_list",
+    file2 = "public_symbols_gen_list.expected",
 )
 
 cc_library(
@@ -99,8 +189,43 @@ _HEADER_ARGS = [
     "@TEST_TMPDIR@/private_namespace.h",
 ]
 
+# public_symbols_gen list on a macro the fixture header does not decide, or decides both ways.
+_LIST_FAILURE_CASES = [
+    ("public_symbols_gen_absent_macro_test", "neither defines nor undefines ABSENT", "ABSENT"),
+    ("public_symbols_gen_block_comment_test", "neither defines nor undefines IN_BLOCK_COMMENT", "IN_BLOCK_COMMENT"),
+    ("public_symbols_gen_commented_test", "neither defines nor undefines DEFINE_IN_COMMENT", "DEFINE_IN_COMMENT"),
+    ("public_symbols_gen_undef_trailer_test", "neither defines nor undefines UNDEF_WITH_TRAILER", "UNDEF_WITH_TRAILER"),
+    ("public_symbols_gen_conflicting_test", "both defines and undefines CONFLICTING", "CONFLICTING"),
+]
+
 # Each case runs a generator tool on a fixture that must make it fail, naming the problem.
 _FAILURE_CASES = [
+    {
+        "name": name,
+        "expected": expected,
+        "command": ":public_symbols_gen",
+        "args": [
+            "list",
+            "@TEST_TMPDIR@/list.txt",
+            "--symbol=symbol:{}:$(rootpath :public_symbols_gen_fixture)".format(macro),
+        ],
+        "data": [":public_symbols_gen_fixture"],
+        "env": {},
+    }
+    for name, expected, macro in _LIST_FAILURE_CASES
+] + [
+    {
+        "name": "public_symbols_gen_no_header_test",
+        "expected": "expected --symbol=NAME:MACRO:HEADER",
+        "command": ":public_symbols_gen",
+        "args": [
+            "list",
+            "@TEST_TMPDIR@/list.txt",
+            "--symbol=symbol:DEFINED_PLAIN",
+        ],
+        "data": [],
+        "env": {},
+    },
     {
         "name": "private_namespace_gen_unreadable_member_test",
         "expected": "could not read every archive member",
