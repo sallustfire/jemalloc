@@ -1,6 +1,7 @@
 load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
 load("@bazel_skylib//rules:native_binary.bzl", "native_test")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("//include/jemalloc/internal:private_namespace.bzl", "private_namespace")
 load("//include/jemalloc/internal:public_symbols.bzl", "public_symbols", "public_symbols_header")
 load("//include/jemalloc/internal:symbols.bzl", "ALL_PUBLIC_SYMBOLS", "ALL_WRAP_SYMBOLS", "SYM_PREFIX")
 load("//tools:version.bzl", "UPSTREAM_VERSION", "VERSION")
@@ -166,4 +167,61 @@ private_namespace_fidelity_test(
     name = "private_namespace_jet_test",
     namespace = "//include/jemalloc/internal:private_namespace_jet",
     sym_prefix = SYM_PREFIX,
+)
+
+private_namespace(
+    name = "private_namespace_fixture",
+    testonly = True,
+    out = "private_namespace_fixture.h",
+    listing = ":private_namespace_fixture.nm",
+    public_symbols = ["malloc"],
+    sym_prefix = "",
+    tags = ["manual"],
+    wrap_symbols = ["pthread_create"],
+)
+
+private_namespace_fidelity_test(
+    name = "private_namespace_fixture_test",
+    namespace = ":private_namespace_fixture",
+    # The listing defines the unprefixed malloc.
+    settings = {"//settings/flags:jemalloc_prefix": ""},
+    sym_prefix = "",
+)
+
+private_namespace(
+    name = "private_namespace_fixture_macho",
+    testonly = True,
+    out = "private_namespace_fixture_macho.h",
+    listing = ":private_namespace_fixture_macho.nm",
+    public_symbols = ["malloc"],
+    sym_prefix = "_",
+    tags = ["manual"],
+    wrap_symbols = ["pthread_create"],
+)
+
+private_namespace_fidelity_test(
+    name = "private_namespace_fixture_macho_test",
+    namespace = ":private_namespace_fixture_macho",
+    # The listing defines the unprefixed malloc.
+    settings = {"//settings/flags:jemalloc_prefix": ""},
+    sym_prefix = "_",
+)
+
+private_namespace(
+    name = "private_namespace_fixture_dumpbin",
+    testonly = True,
+    out = "private_namespace_fixture_dumpbin.h",
+    listing = ":private_namespace_fixture_dumpbin.nm",
+    public_symbols = ["malloc"],
+    sym_prefix = "",
+    tags = ["manual"],
+    wrap_symbols = ["pthread_create"],
+)
+
+private_namespace_fidelity_test(
+    name = "private_namespace_fixture_dumpbin_test",
+    namespace = ":private_namespace_fixture_dumpbin",
+    # The listing defines the unprefixed malloc, in dumpbin format only.
+    settings = {"//settings/flags:jemalloc_prefix": ""},
+    sym_prefix = "",
 )

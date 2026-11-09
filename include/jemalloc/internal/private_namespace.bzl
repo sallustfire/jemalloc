@@ -9,21 +9,29 @@ def _private_namespace_impl(ctx):
     public = [prefix + symbol for symbol in ctx.attr.public_symbols]
 
     output = ctx.actions.declare_file(ctx.attr.out)
+    if bool(ctx.attr.input) == bool(ctx.file.listing):
+        fail("set exactly one of input and listing")
     nm_stderr = ctx.actions.declare_file(ctx.label.name + ".nm.stderr")
     sym_prefix = ctx.attr.sym_prefix
-    listing_source = "`{}`".format(cc_toolchain.nm_executable)
-    unfound_reason = "it read no symbol table (for example from LTO bitcode it cannot parse)"
-    archives = [file for file in ctx.files.input if file.path.endswith(".a")]
-    if not archives:
-        fail("{} provides no static archive (.a) to list, got {}".format(ctx.attr.input[0].label, ctx.files.input))
-    listing = ctx.actions.declare_file(ctx.label.name + ".nm")
-    ctx.actions.run(
-        executable = ctx.executable._generator,
-        arguments = ["nm", cc_toolchain.nm_executable, listing.path, nm_stderr.path] + [archive.path for archive in archives],
-        inputs = depset(archives, transitive = [cc_toolchain.all_files]),
-        outputs = [listing, nm_stderr],
-        mnemonic = "PrivateNamespaceNM",
-    )
+    if ctx.file.listing:
+        listing = ctx.file.listing
+        ctx.actions.write(output = nm_stderr, content = "")
+        listing_source = listing.short_path
+        unfound_reason = "public_symbols, prefix or sym_prefix does not match it"
+    else:
+        listing_source = "`{}`".format(cc_toolchain.nm_executable)
+        unfound_reason = "it read no symbol table (for example from LTO bitcode it cannot parse)"
+        archives = [file for file in ctx.files.input if file.path.endswith(".a")]
+        if not archives:
+            fail("{} provides no static archive (.a) to list, got {}".format(ctx.attr.input[0].label, ctx.files.input))
+        listing = ctx.actions.declare_file(ctx.label.name + ".nm")
+        ctx.actions.run(
+            executable = ctx.executable._generator,
+            arguments = ["nm", cc_toolchain.nm_executable, listing.path, nm_stderr.path] + [archive.path for archive in archives],
+            inputs = depset(archives, transitive = [cc_toolchain.all_files]),
+            outputs = [listing, nm_stderr],
+            mnemonic = "PrivateNamespaceNM",
+        )
 
     args = ctx.actions.args()
     args.add_all(["header", output.path, listing, nm_stderr, sym_prefix, listing_source, unfound_reason])
@@ -74,12 +82,16 @@ private_namespace = rule(
             cfg = transition_config_settings,
         ),
         "enable_jet": attr.bool(default = False),
+        "listing": attr.label(
+            doc = "An `nm -a` or `dumpbin /SYMBOLS` listing to use in place of listing `input`.",
+            allow_single_file = True,
+        ),
         "out": attr.string(
             doc = "Name of the generated file",
             mandatory = True,
         ),
         "sym_prefix": attr.string(
-            doc = "configure's SYM_PREFIX: \"_\" for Mach-O targets.",
+            doc = "configure's SYM_PREFIX: \"_\" for Mach-O targets, or whatever a `listing`'s format fixes.",
             mandatory = True,
             values = ["", "_"],
         ),
