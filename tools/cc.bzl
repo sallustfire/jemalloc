@@ -28,12 +28,14 @@ _COPTS_MSVC_COMPATIBLE = [
 # no GNU C dialect, so C compiles there keep cl's default, as upstream's msvc/
 # projects do.
 CONLYOPTS = select({
-    "//settings/compiler:msvc_compatible": [],
+    "@rules_cc//cc/compiler:clang-cl": [],
+    "@rules_cc//cc/compiler:msvc-cl": [],
     "//conditions:default": ["-std=gnu11"],
 })
 
 CXXOPTS = select({
-    "//settings/compiler:msvc_compatible": ["/std:c++17"],
+    "@rules_cc//cc/compiler:clang-cl": ["/std:c++17"],
+    "@rules_cc//cc/compiler:msvc-cl": ["/std:c++17"],
     "//conditions:default": ["-std=c++17"],
 })
 
@@ -46,9 +48,13 @@ COPTS = ["-D_REENTRANT"] + select({
     "@rules_cc//cc/compiler:clang-cl": _COPTS_MSVC_COMPATIBLE,
     "//conditions:default": [],
 }) + select({
-    "@platforms//os:windows": [],
-    "//settings/platform:darwin": [],
-    "//settings/compiler:gcc_compatible": ["-fvisibility=hidden"],
+    # configure.ac adds it only for the ELF ABI. This select used to have Windows and Darwin arms too, but cquery showed
+    # the flag added on every OS for these compilers in practice, so it still is.
+    "@rules_cc//cc/compiler:clang": ["-fvisibility=hidden"],
+    "@rules_cc//cc/compiler:clang-cl": ["-fvisibility=hidden"],
+    "@rules_cc//cc/compiler:emscripten": ["-fvisibility=hidden"],
+    "@rules_cc//cc/compiler:gcc": ["-fvisibility=hidden"],
+    "@rules_cc//cc/compiler:mingw-gcc": ["-fvisibility=hidden"],
     "//conditions:default": [],
 }) + select({
     "@platforms//os:android": [

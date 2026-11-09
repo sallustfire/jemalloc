@@ -142,7 +142,8 @@ cc_library(
     tags = ["manual"],
     visibility = ["//visibility:private"],
     deps = ["//include/jemalloc/internal"] + select({
-        "//settings/compiler:msvc_compatible": ["//include/msvc_compat"],
+        "@rules_cc//cc/compiler:clang-cl": ["//include/msvc_compat"],
+        "@rules_cc//cc/compiler:msvc-cl": ["//include/msvc_compat"],
         "//conditions:default": [],
     }) + select({
         "//settings/flags:prof_libunwind": ["@libunwind"],

@@ -5,23 +5,23 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("//include/jemalloc/internal:public_symbols.bzl", "symbol_list")
 
+_CXXOPTS = select({
+    "@rules_cc//cc/compiler:clang-cl": ["/std:c++14"],
+    "@rules_cc//cc/compiler:msvc-cl": ["/std:c++14"],
+    "//conditions:default": ["-std=c++14"],
+})
+
 cc_binary(
     name = "jemalloc_hdr_gen",
     srcs = ["jemalloc_hdr_gen.cc"],
-    cxxopts = select({
-        "//settings/compiler:msvc_compatible": ["/std:c++14"],
-        "//conditions:default": ["-std=c++14"],
-    }),
+    cxxopts = _CXXOPTS,
     visibility = ["//include/jemalloc:__pkg__"],
 )
 
 cc_binary(
     name = "public_symbols_gen",
     srcs = ["public_symbols_gen.cc"],
-    cxxopts = select({
-        "//settings/compiler:msvc_compatible": ["/std:c++14"],
-        "//conditions:default": ["-std=c++14"],
-    }),
+    cxxopts = _CXXOPTS,
     visibility = ["//include/jemalloc/internal:__pkg__"],
 )
 
@@ -106,19 +106,13 @@ cc_library(
     name = "private_namespace_listing",
     srcs = ["private_namespace_listing.cc"],
     hdrs = ["private_namespace_listing.h"],
-    cxxopts = select({
-        "//settings/compiler:msvc_compatible": ["/std:c++14"],
-        "//conditions:default": ["-std=c++14"],
-    }),
+    cxxopts = _CXXOPTS,
 )
 
 cc_binary(
     name = "private_namespace_gen",
     srcs = ["private_namespace_gen.cc"],
-    cxxopts = select({
-        "//settings/compiler:msvc_compatible": ["/std:c++14"],
-        "//conditions:default": ["-std=c++14"],
-    }),
+    cxxopts = _CXXOPTS,
     visibility = ["//include/jemalloc/internal:__pkg__"],
     deps = [":private_namespace_listing"],
 )
@@ -127,10 +121,7 @@ cc_binary(
     name = "private_namespace_leak_check",
     testonly = True,
     srcs = ["private_namespace_leak_check.cc"],
-    cxxopts = select({
-        "//settings/compiler:msvc_compatible": ["/std:c++14"],
-        "//conditions:default": ["-std=c++14"],
-    }),
+    cxxopts = _CXXOPTS,
     visibility = ["//include/jemalloc/internal:__pkg__"],
     deps = [
         ":private_namespace_listing",
@@ -148,10 +139,7 @@ cc_binary(
     name = "fake_nm",
     testonly = True,
     srcs = ["fake_nm.cc"],
-    cxxopts = select({
-        "//settings/compiler:msvc_compatible": ["/std:c++14"],
-        "//conditions:default": ["-std=c++14"],
-    }),
+    cxxopts = _CXXOPTS,
     target_compatible_with = _POSIX,
 )
 
@@ -172,10 +160,7 @@ cc_test(
     name = "private_namespace_leak_check_clean_test",
     size = "small",
     srcs = ["private_namespace_leak_check.cc"],
-    cxxopts = select({
-        "//settings/compiler:msvc_compatible": ["/std:c++14"],
-        "//conditions:default": ["-std=c++14"],
-    }),
+    cxxopts = _CXXOPTS,
     data = _LEAK_DATA + [":private_namespace_leak_fixture.nm"],
     env = _LEAK_ENV | {"PRIVATE_NAMESPACE_LEAK_LISTING": "$(rlocationpath :private_namespace_leak_fixture.nm)"},
     deps = [
@@ -307,10 +292,7 @@ _FAILURE_CASES = [
             "'{}'".format(case["expected"]),
             "$(rootpath {})".format(case["command"]),
         ] + case["args"],
-        cxxopts = select({
-            "//settings/compiler:msvc_compatible": ["/std:c++14"],
-            "//conditions:default": ["-std=c++14"],
-        }),
+        cxxopts = _CXXOPTS,
         data = [case["command"]] + case["data"],
         env = case["env"],
         target_compatible_with = _POSIX,

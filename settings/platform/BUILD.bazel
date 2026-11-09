@@ -34,72 +34,12 @@ string_flag(
 
 ### Convenience settings groups ###
 
-# ARM
-selects.config_setting_group(
-    name = "aarch",
-    match_any = [
-        "@platforms//cpu:aarch32",
-        "@platforms//cpu:aarch64",
-    ],
-    visibility = ["//:__subpackages__"],
-)
-
-# X86
-selects.config_setting_group(
-    name = "x86",
-    match_any = [
-        "@platforms//cpu:x86_32",
-        "@platforms//cpu:x86_64",
-    ],
-    visibility = ["//:__subpackages__"],
-)
-
-# BSD systems
-selects.config_setting_group(
-    name = "bsd",
-    match_any = [
-        "@platforms//os:freebsd",
-        "@platforms//os:ios",
-        "@platforms//os:macos",
-        "@platforms//os:openbsd",
-        "@platforms//os:tvos",
-        "@platforms//os:watchos",
-    ],
-    visibility = ["//:__subpackages__"],
-)
-
 # Darwin systems
 selects.config_setting_group(
     name = "darwin",
     match_any = [
         "@platforms//os:ios",
         "@platforms//os:macos",
-        "@platforms//os:tvos",
-        "@platforms//os:watchos",
-    ],
-    visibility = ["//:__subpackages__"],
-)
-
-# GNU systems
-selects.config_setting_group(
-    name = "gnu",
-    match_any = [
-        "@platforms//os:android",
-        "@platforms//os:linux",
-    ],
-    visibility = ["//:__subpackages__"],
-)
-
-# POSIX systems
-selects.config_setting_group(
-    name = "posix",
-    match_any = [
-        "@platforms//os:android",
-        "@platforms//os:freebsd",
-        "@platforms//os:ios",
-        "@platforms//os:linux",
-        "@platforms//os:macos",
-        "@platforms//os:openbsd",
         "@platforms//os:tvos",
         "@platforms//os:watchos",
     ],
