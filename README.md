@@ -15,11 +15,15 @@ See the [examples/BUILD.bazel](examples/BUILD.bazel) file for examples of how to
 
 ## Notes
 
-- **//settings/flags:jemalloc_prefix (--with-jemalloc-prefix):** In contrast to the make build, this defaults to having
- no prefix. The original reasoning was that jemalloc was likely to replace malloc on linux but not MacOS or Windows.
- In practice in Bazel, this forcibly bifurcates the API based on target platform making the cc_library more difficult
- to consume by cross-platform downstream targets. Anyone wanting to eject jemalloc as an .so will likely want to
- reintroduce this behavior.
+- **//settings/flags:jemalloc_prefix (--with-jemalloc-prefix):** As in the make build, this defaults to "je_" on macOS
+ and Windows and to no prefix elsewhere. On macOS jemalloc is designed to replace malloc by overlaying the default
+ malloc zone rather than by exporting malloc, free and so on; see Known Issues for why this build does not do so yet. A
+ prefix renames the public API, malloc_conf, /etc/malloc.conf and MALLOC_CONF as INSTALL.md's --with-jemalloc-prefix
+ describes. To call the API by its je_* names (je_mallctl, je_mallocx, ...) under any prefix, define
+ JEMALLOC_NO_DEMANGLE before including jemalloc/jemalloc.h. Set the flag, or jemalloc()'s jemalloc_prefix, to choose a
+ prefix explicitly. The flag defaults to "__auto__", which only jemalloc's own transition resolves, so a select() on the
+ flag outside it sees "__auto__", and the flag provides no $(JEMALLOC_PREFIX). Set the prefix explicitly where a
+ consumer needs to know it.
 - **//settings/platform:lg_vaddr:** Defaults to the hard-coded cross compilation value of 57 from the configure script.
  If targeting a 32-bit platform, this should be explicitly set.
 - **glibc:** Assumes a modern version. If jemalloc is compiled to be the default allocator on linux, it assumes glibc
@@ -28,6 +32,7 @@ See the [examples/BUILD.bazel](examples/BUILD.bazel) file for examples of how to
 
 Platform configurations that have defaults that are applied via transition.
 - //settings/flags:enable_zone_allocator
+- //settings/flags:jemalloc_prefix
 - //settings/platform:glibc_overrides_support
 - //settings/platform:lg_page
 - //settings/platform:memalign_support
@@ -51,6 +56,9 @@ Platform configurations that have defaults that are applied via transition.
     `MADV_FREE` is present. Supporting both and being faithful to the configure script would require an additional 
     platform setting.
 - C++ compilation might be broken for LLVM around detecting libstdc++.
+- **macOS:** Plain malloc does not reach jemalloc yet. The zone that replaces it is registered by a constructor in
+    src/zone.c that nothing references, so linking the static archive leaves it out. The je_* API works.
+    examples/test_8_malloc and test_9_malloc_config skip macOS until the zone is always linked.
 
 ## Contributing
 

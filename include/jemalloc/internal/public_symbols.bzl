@@ -41,6 +41,6 @@ public_symbols = rule(
             doc = "Name of the generated file",
             mandatory = True,
         ),
-        "_prefix": attr.label(default = "//settings/flags:jemalloc_prefix"),
+        "_prefix": attr.label(default = "//settings/flags:jemalloc_prefix_resolved"),
     },
 )
