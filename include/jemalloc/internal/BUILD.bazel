@@ -1,14 +1,21 @@
 load("@bazel_lib//lib:expand_template.bzl", "expand_template")
 load("@bazel_skylib//lib:selects.bzl", "selects")
-load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
-load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
-load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//tools:autoconf.bzl", "configure_header", "define_macro", "define_macro_if", "define_macro_if_any", "define_macro_if_with", "define_macro_with", "undefine_macro")
-load("//tools:transition.bzl", "PLATFORM", "transition_default_constraints")
-load("//tools:version.bzl", "VERSION")
-load(":private_namespace.bzl", "private_namespace")
-load(":public_symbols.bzl", "public_symbols")
+load("//tools:transition.bzl", "PLATFORM")
+load(":private_namespace.bzl", "private_namespace", "private_namespace_leak_test")
+load(":public_symbols.bzl", "public_symbols", "public_symbols_header")
+load(":symbols.bzl", "PUBLIC_SYMBOLS", "SYM_PREFIX", "WRAP_SYMBOLS")
+
+exports_files(
+    [
+        "private_namespace.sh",
+        "private_symbols.sh",
+        "public_namespace.sh",
+        "public_unnamespace.sh",
+    ],
+    visibility = ["//tools/fidelity:__pkg__"],
+)
 
 cc_library(
     name = "internal",
@@ -138,10 +145,11 @@ cc_library(
         ":public_namespace",
     ] + select({
         "//settings:no_private_namespace": [],
-        "//conditions:default": [
-            ":private_namespace",
-            ":private_namespace_jet",
-        ],
+        "//conditions:default": [":private_namespace"],
+    }) + select({
+        # jemalloc_preamble.h includes private_namespace_jet.h only under JEMALLOC_JET
+        ":jet_private_namespace": [":private_namespace_jet"],
+        "//conditions:default": [],
     }),
     tags = ["manual"],
     visibility = ["//:__subpackages__"],
@@ -157,6 +165,14 @@ expand_template(
     },
     template = "jemalloc_preamble.h.in",
     toolchains = ["//settings/flags:private_namespace"],
+)
+
+selects.config_setting_group(
+    name = "jet_private_namespace",
+    match_all = [
+        "//settings:jet",
+        "//settings:with_private_namespace",
+    ],
 )
 
 # jemalloc is built to be the default allocator
@@ -519,7 +535,7 @@ configure_header(
     tags = ["manual"],
     template = "jemalloc_internal_defs.h.in",
     toolchains = [
-        "//settings/flags:jemalloc_prefix",
+        "//settings/flags:jemalloc_prefix_resolved",
         "//settings/flags:jemalloc_cprefix",
         "//settings/flags:lg_quantum",
         "//settings/flags:malloc_conf",
@@ -530,49 +546,6 @@ configure_header(
     ],
 )
 
-PUBLIC_SYMBOLS = [
-    "aligned_alloc",
-    "calloc",
-    "dallocx",
-    "free",
-    "mallctl",
-    "mallctlbymib",
-    "mallctlnametomib",
-    "malloc",
-    "malloc_conf",
-    "malloc_conf_2_conf_harder",
-    "malloc_message",
-    "malloc_stats_print",
-    "malloc_usable_size",
-    "mallocx",
-    "smallocx_%s" % VERSION.gid,
-    "nallocx",
-    "posix_memalign",
-    "rallocx",
-    "realloc",
-    "sallocx",
-    "sdallocx",
-    "xallocx",
-] + select(
-    {
-        "//settings/platform:has_memalign": ["memalign"],
-        "//settings/platform:no_memalign": [],
-    },
-    no_match_error = "Availability of memalign must explicitly be declared via //settings/platform:memalign_support",
-) + select(
-    {
-        "//settings/platform:has_valloc": ["valloc"],
-        "//settings/platform:no_valloc": [],
-    },
-    no_match_error = "Availability of valloc must explicitly be declared via //settings/platform:valloc_support",
-) + select(
-    {
-        "//settings/platform:has_malloc_size": ["malloc_size"],
-        "//settings/platform:no_malloc_size": [],
-    },
-    no_match_error = "Availability of malloc_size must explicitly be declared via //settings/platform:malloc_size_support",
-)
-
 public_symbols(
     name = "public_symbols",
     out = "public_symbols.txt",
@@ -581,81 +554,24 @@ public_symbols(
     visibility = ["//:__subpackages__"],
 )
 
-# The expected output is what configure.ac's public_symbols.txt command writes for this map, whose entries cover a
-# name that is not a public symbol, a space and a trailing comma as separators, an extra field and an empty value. The
-# prefix is set through the flag, the rule's only source for it.
-public_symbols(
-    name = "public_symbols_mangling",
-    testonly = True,
-    out = "public_symbols_mangling.txt",
-    mangling_map = "calloc:my_calloc,not_public:np_impl, malloc:my_malloc:extra,free:,",
-    symbols = [
-        "malloc",
-        "free",
-        "calloc",
-        "realloc",
-    ],
-    tags = ["manual"],
-)
-
-write_file(
-    name = "public_symbols_mangling_expected",
-    testonly = True,
-    out = "public_symbols_mangling_expected.txt",
-    content = [
-        "calloc:my_calloc",
-        "not_public:np_impl",
-        "malloc:my_malloc",
-        "free:",
-        "realloc:pre_realloc",
-        "",
-    ],
-    newline = "unix",
-)
-
-transition_default_constraints(
-    name = "public_symbols_mangling_pre",
-    testonly = True,
-    src = ":public_symbols_mangling",
-    platform = PLATFORM,
-    settings = {"//settings/flags:jemalloc_prefix": "pre_"},
-)
-
-diff_test(
-    name = "public_symbols_mangling_test",
-    file1 = ":public_symbols_mangling_pre",
-    file2 = ":public_symbols_mangling_expected",
-)
-
-WRAP_SYMBOLS = select({
-    "@platforms//os:windows": ["tls_callback"],
-    "@platforms//os:freebsd": [
-        "pthread_create",
-        "_malloc_thread_cleanup",
-        "_malloc_tsd_cleanup_register",
-        "_malloc_prefork",
-        "_malloc_postfork",
-    ],
-    "//conditions:default": ["pthread_create"],
-}) + select({
-    ":override_glibc_allocator": [
-        "__libc_calloc",
-        "__libc_free",
-        "__libc_malloc",
-        "__libc_memalign",
-        "__libc_realloc",
-        "__libc_valloc",
-    ],
-    "//conditions:default": [],
-})
-
 private_namespace(
     name = "private_namespace",
     out = "private_namespace.h",
     input = "//:lib/jemalloc",
     public_symbols = PUBLIC_SYMBOLS,
+    sym_prefix = SYM_PREFIX,
     tags = ["manual"],
+    visibility = ["//tools/fidelity:__pkg__"],
     wrap_symbols = WRAP_SYMBOLS,
+)
+
+private_namespace_leak_test(
+    name = "private_namespace_leak_test",
+    size = "small",
+    library = "//:jemalloc",
+    namespace = ":private_namespace",
+    platform = PLATFORM,
+    sym_prefix = SYM_PREFIX,
 )
 
 private_namespace(
@@ -665,42 +581,26 @@ private_namespace(
     input = "//:lib/jemalloc",
     prefix = "jet_",
     public_symbols = PUBLIC_SYMBOLS,
+    sym_prefix = SYM_PREFIX,
     tags = ["manual"],
+    visibility = ["//tools/fidelity:__pkg__"],
     wrap_symbols = WRAP_SYMBOLS,
 )
 
-sh_binary(
-    name = "public_namespace_sh",
-    srcs = ["public_namespace.sh"],
-)
-
-genrule(
+public_symbols_header(
     name = "public_namespace",
-    srcs = [
-        ":public_symbols",
-    ],
-    outs = ["public_namespace.h"],
-    cmd = "$(execpath :public_namespace_sh) $(execpath :public_symbols) > $@",
-    cmd_bat = "$(execpath :public_namespace_sh) $(execpath :public_symbols) > $@",
+    out = "public_namespace.h",
+    public_symbols = ":public_symbols",
+    script = "public_namespace.sh",
     tags = ["manual"],
-    tools = [":public_namespace_sh"],
     visibility = ["//visibility:public"],
 )
 
-sh_binary(
-    name = "public_unnamespace_sh",
-    srcs = ["public_unnamespace.sh"],
-)
-
-genrule(
+public_symbols_header(
     name = "public_unnamespace",
-    srcs = [
-        ":public_symbols",
-    ],
-    outs = ["public_unnamespace.h"],
-    cmd = "$(execpath :public_unnamespace_sh) $(execpath :public_symbols) > $@",
-    cmd_bat = "$(execpath :public_unnamespace_sh) $(execpath :public_symbols) > $@",
+    out = "public_unnamespace.h",
+    public_symbols = ":public_symbols",
+    script = "public_unnamespace.sh",
     tags = ["manual"],
-    tools = [":public_unnamespace_sh"],
-    visibility = ["//visibility:public"],
+    visibility = ["//tools/fidelity:__pkg__"],
 )

@@ -2,6 +2,9 @@
 
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
+# The empty string is a real prefix (none), so an unset jemalloc_prefix needs its own value.
+_UNSET = "__unset__"
+
 def _jemalloc_config_impl(ctx):
     target = ctx.attr._target[0]
     providers = [DefaultInfo, CcInfo, InstrumentedFilesInfo, OutputGroupInfo]
@@ -33,7 +36,8 @@ def _jemalloc_transition_impl(settings, attr):
             result[flag] = False
 
     # String flags
-    result["//settings/flags:jemalloc_prefix"] = attr.jemalloc_prefix
+    if attr.jemalloc_prefix != _UNSET:
+        result["//settings/flags:jemalloc_prefix"] = attr.jemalloc_prefix
 
     if attr.zone_allocator != "":
         result["//settings/flags:enable_zone_allocator"] = attr.zone_allocator
@@ -79,14 +83,18 @@ _jemalloc_transition = transition(
 )
 
 jemalloc = rule(
-    doc = "Convenience rule that returns the jemalloc cc_library transitioned the optional build settings based on user-provided constraints.",
+    doc = "Convenience rule that returns the jemalloc cc_library transitioned the optional build settings based on user-provided constraints. " +
+          "An attribute left unset keeps the value of its //settings/flags setting.",
     implementation = _jemalloc_config_impl,
     attrs = {
         "cache_oblivious": attr.string(values = ["True", "False", ""]),
         "cxx": attr.string(values = ["True", "False", ""]),
         "experimental_smallocx": attr.string(values = ["True", "False", ""]),
         "fill": attr.string(values = ["True", "False", ""]),
-        "jemalloc_prefix": attr.string(),
+        "jemalloc_prefix": attr.string(
+            doc = "Prefix for the public API, as --with-jemalloc-prefix; \"\" for none, \"__auto__\" for configure's platform default.",
+            default = _UNSET,
+        ),
         "lazy_lock": attr.string(values = ["True", "False", ""]),
         "lg_quantum": attr.int(default = -1),
         "log": attr.string(values = ["True", "False", ""]),

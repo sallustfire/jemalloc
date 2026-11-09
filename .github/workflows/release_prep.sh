@@ -53,7 +53,6 @@ FULL_DIFF=$(diff -r "jemalloc-${UPSTREAM}" . \
   --exclude='MODULE.bazel' \
   --exclude='MODULE.bazel.lock' \
   --exclude='*.bzl' \
-  --exclude='jemalloc_hdr_gen.cc' \
   --exclude='README.md' \
   --exclude='settings' \
   --exclude='tools' \

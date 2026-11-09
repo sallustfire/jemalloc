@@ -1,5 +1,15 @@
-load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("@jemalloc//settings:config.bzl", "jemalloc")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+# Under the platform's default prefix, plain malloc reaches jemalloc through the replaced symbols, or on macOS through
+# the zone. On Windows the default prefix is je_ and there is no zone to overlay, so plain malloc stays with the C
+# runtime. On macOS the zone is not registered yet: src/zone.c's constructor is the only way into its object, which a
+# static link of the archive leaves out.
+_MALLOC_REPLACED = select({
+    "@platforms//os:macos": ["@platforms//:incompatible"],
+    "@platforms//os:windows": ["@platforms//:incompatible"],
+    "//conditions:default": [],
+})
 
 # Case 1: Test libc malloc can be replaced
 cc_test(
@@ -9,7 +19,7 @@ cc_test(
     malloc = "@jemalloc",
 )
 
-# Case 2: Test that the jemalloc API can be used
+# Case 2: Test that the jemalloc API can be used under any prefix
 cc_test(
     name = "test_2_api",
     size = "small",
@@ -41,4 +51,56 @@ cc_test(
     srcs = ["test_api.c"],
     args = ["--expect-stats-unavailable"],
     malloc = ":jemalloc_custom",
+)
+
+# Case 5: On macOS the default prefix is je_, so jemalloc reads JE_MALLOC_CONF
+cc_test(
+    name = "test_5_macos_default_prefix",
+    size = "small",
+    srcs = ["test_conf.c"],
+    env = {"JE_MALLOC_CONF": "narenas:3"},
+    malloc = "@jemalloc",
+    target_compatible_with = ["@platforms//os:macos"],
+)
+
+# Case 6: jemalloc() keeps the platform's default prefix when its jemalloc_prefix is unset
+cc_test(
+    name = "test_6_macos_default_prefix_config",
+    size = "small",
+    srcs = ["test_conf.c"],
+    env = {"JE_MALLOC_CONF": "narenas:3"},
+    malloc = ":jemalloc_custom",
+    target_compatible_with = ["@platforms//os:macos"],
+)
+
+# Case 7: An explicit prefix renames the API and the MALLOC_CONF environment variable on every platform
+jemalloc(
+    name = "jemalloc_prefixed",
+    jemalloc_prefix = "my_",
+)
+
+cc_test(
+    name = "test_7_prefix",
+    size = "small",
+    srcs = ["test_conf.c"],
+    env = {"MY_MALLOC_CONF": "narenas:3"},
+    malloc = ":jemalloc_prefixed",
+)
+
+# Case 8: Plain malloc reaches jemalloc under the platform's default prefix, and on macOS through jemalloc_zone
+cc_test(
+    name = "test_8_malloc",
+    size = "small",
+    srcs = ["test_malloc.c"],
+    malloc = "@jemalloc",
+    target_compatible_with = _MALLOC_REPLACED,
+)
+
+# Case 9: The same through a jemalloc() build without stats
+cc_test(
+    name = "test_9_malloc_config",
+    size = "small",
+    srcs = ["test_malloc.c"],
+    malloc = ":jemalloc_custom",
+    target_compatible_with = _MALLOC_REPLACED,
 )
