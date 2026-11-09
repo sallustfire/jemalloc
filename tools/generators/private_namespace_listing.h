@@ -1,4 +1,4 @@
-// Parsing of `nm -a` and `dumpbin /SYMBOLS` listings for private_namespace_gen.
+// Parsing shared by private_namespace_gen and private_namespace_leak_check.
 
 #ifndef TOOLS_GENERATORS_PRIVATE_NAMESPACE_LISTING_H
 #define TOOLS_GENERATORS_PRIVATE_NAMESPACE_LISTING_H

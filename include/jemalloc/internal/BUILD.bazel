@@ -2,7 +2,8 @@ load("@bazel_lib//lib:expand_template.bzl", "expand_template")
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//tools:autoconf.bzl", "configure_header", "define_macro", "define_macro_if", "define_macro_if_any", "define_macro_if_with", "define_macro_with", "undefine_macro")
-load(":private_namespace.bzl", "private_namespace")
+load("//tools:transition.bzl", "PLATFORM")
+load(":private_namespace.bzl", "private_namespace", "private_namespace_leak_test")
 load(":public_symbols.bzl", "public_symbols", "public_symbols_header")
 load(":symbols.bzl", "PUBLIC_SYMBOLS", "SYM_PREFIX", "WRAP_SYMBOLS")
 
@@ -562,6 +563,15 @@ private_namespace(
     tags = ["manual"],
     visibility = ["//tools/fidelity:__pkg__"],
     wrap_symbols = WRAP_SYMBOLS,
+)
+
+private_namespace_leak_test(
+    name = "private_namespace_leak_test",
+    size = "small",
+    library = "//:jemalloc",
+    namespace = ":private_namespace",
+    platform = PLATFORM,
+    sym_prefix = SYM_PREFIX,
 )
 
 private_namespace(

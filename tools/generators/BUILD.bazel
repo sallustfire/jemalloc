@@ -31,3 +31,18 @@ cc_binary(
     visibility = ["//include/jemalloc/internal:__pkg__"],
     deps = [":private_namespace_listing"],
 )
+
+cc_binary(
+    name = "private_namespace_leak_check",
+    testonly = True,
+    srcs = ["private_namespace_leak_check.cc"],
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
+    visibility = ["//include/jemalloc/internal:__pkg__"],
+    deps = [
+        ":private_namespace_listing",
+        "@rules_cc//cc/runfiles",
+    ],
+)

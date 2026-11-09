@@ -1,7 +1,8 @@
-"""Rules that generate private_namespace.h from the library's symbols."""
+"""Rules that generate private_namespace.h from the library's symbols and check the library against it."""
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolchain")
+load("//tools:transition.bzl", "platform_constraints_transition")
 
 def _private_namespace_impl(ctx):
     cc_toolchain = find_cc_toolchain(ctx)
@@ -101,6 +102,76 @@ private_namespace = rule(
         ),
         "_prefix": attr.label(default = "//settings/flags:jemalloc_prefix_resolved"),
         "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
+        "_generator": attr.label(
+            default = Label("//tools/generators:private_namespace_gen"),
+            cfg = "exec",
+            executable = True,
+        ),
+    },
+    toolchains = use_cc_toolchain(True),
+)
+
+def _rlocationpath(ctx, file):
+    return file.short_path[3:] if file.short_path.startswith("../") else ctx.workspace_name + "/" + file.short_path
+
+def _private_namespace_leak_test_impl(ctx):
+    cc_toolchain = find_cc_toolchain(ctx)
+    archives = [file for file in ctx.files.library if file.path.endswith(".a")]
+    if not archives:
+        fail("expected a static archive from {}, got {}".format(ctx.attr.library.label, ctx.files.library))
+    namespace = ctx.attr.namespace[0]
+    export_syms = [file for file in namespace[OutputGroupInfo].upstream_inputs.to_list() if file.path.endswith(".export_syms")][0]
+    header = namespace[DefaultInfo].files.to_list()[0]
+
+    listing = ctx.actions.declare_file(ctx.label.name + ".nm")
+    nm_stderr = ctx.actions.declare_file(ctx.label.name + ".nm.stderr")
+    ctx.actions.run(
+        executable = ctx.executable._generator,
+        arguments = ["nm", cc_toolchain.nm_executable, listing.path, nm_stderr.path] + [archive.path for archive in archives],
+        inputs = depset(archives, transitive = [cc_toolchain.all_files]),
+        outputs = [listing, nm_stderr],
+        mnemonic = "PrivateNamespaceLeakNM",
+    )
+
+    executable = ctx.actions.declare_file(ctx.label.name)
+    ctx.actions.symlink(output = executable, target_file = ctx.executable._checker, is_executable = True)
+
+    return [
+        DefaultInfo(
+            executable = executable,
+            runfiles = ctx.runfiles(files = [listing, nm_stderr, export_syms, header]).merge(ctx.attr._checker[DefaultInfo].default_runfiles),
+        ),
+        RunEnvironmentInfo(environment = {
+            "PRIVATE_NAMESPACE_LEAK_STDERR": _rlocationpath(ctx, nm_stderr),
+            "PRIVATE_NAMESPACE_LEAK_EXPORTS": _rlocationpath(ctx, export_syms),
+            "PRIVATE_NAMESPACE_LEAK_HEADER": _rlocationpath(ctx, header),
+            "PRIVATE_NAMESPACE_LEAK_LISTING": _rlocationpath(ctx, listing),
+            "PRIVATE_NAMESPACE_LEAK_PREFIX": ctx.attr._private_namespace[BuildSettingInfo].value + "je_",
+            "PRIVATE_NAMESPACE_LEAK_SYM_PREFIX": ctx.attr.sym_prefix,
+        }),
+    ]
+
+private_namespace_leak_test = rule(
+    doc = "Checks that `library` defines no symbol outside the public API, the wrapped symbols and the private namespace.",
+    implementation = _private_namespace_leak_test_impl,
+    test = True,
+    attrs = {
+        "library": attr.label(doc = "The library consumers link.", mandatory = True),
+        "namespace": attr.label(
+            doc = "The private_namespace target that names the exported and private symbols.",
+            mandatory = True,
+            cfg = platform_constraints_transition,
+        ),
+        "platform": attr.string(doc = "Read by the transition; see transition_default_constraints.", mandatory = True),
+        "settings": attr.label_keyed_string_dict(doc = "Read by the transition; see transition_default_constraints."),
+        "sym_prefix": attr.string(doc = "configure's SYM_PREFIX for the target platform.", mandatory = True, values = ["", "_"]),
+        "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
+        "_private_namespace": attr.label(default = "//settings/flags:private_namespace"),
+        "_checker": attr.label(
+            default = Label("//tools/generators:private_namespace_leak_check"),
+            cfg = "target",
+            executable = True,
+        ),
         "_generator": attr.label(
             default = Label("//tools/generators:private_namespace_gen"),
             cfg = "exec",
