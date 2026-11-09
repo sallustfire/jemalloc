@@ -111,8 +111,6 @@ cc_library(
            }) +
            select({
                "//settings/compiler:msvc_compatible": [
-                   "include/msvc_compat/C99/stdbool.h",
-                   "include/msvc_compat/C99/stdint.h",
                    "include/msvc_compat/strings.h",
                    "include/msvc_compat/windows_extra.h",
                ],
@@ -124,10 +122,7 @@ cc_library(
     hdrs = ["//include/jemalloc"],
     conlyopts = CONLYOPTS,
     copts = ["-Iinclude/jemalloc/internal"] + select({
-        "//settings/compiler:msvc_compatible": [
-            "-Iinclude/msvc_compat",
-            "-Iinclude/msvc_compat/C99",
-        ],
+        "//settings/compiler:msvc_compatible": ["-Iinclude/msvc_compat"],
         "//conditions:default": [],
     }) + COPTS,
     cxxopts = CXXOPTS,
