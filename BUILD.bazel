@@ -122,6 +122,7 @@ cc_library(
         "//conditions:default": [],
     }),
     hdrs = ["//include/jemalloc"],
+    conlyopts = CONLYOPTS,
     copts = ["-Iinclude/jemalloc/internal"] + select({
         "//settings/compiler:msvc_compatible": [
             "-Iinclude/msvc_compat",
@@ -129,7 +130,6 @@ cc_library(
         ],
         "//conditions:default": [],
     }) + COPTS,
-    conlyopts = CONLYOPTS,
     cxxopts = CXXOPTS,
     includes = ["include"],
     linkopts = select({
@@ -175,8 +175,8 @@ cc_library(
         "src/ticker.c",
     ],
     hdrs = ["//include/jemalloc"],
-    copts = ["-Iinclude/jemalloc/internal"] + COPTS,
     conlyopts = CONLYOPTS,
+    copts = ["-Iinclude/jemalloc/internal"] + COPTS,
     cxxopts = CXXOPTS,
     includes = ["include"],
     linkopts = select({

@@ -274,8 +274,8 @@ transition_default_constraints(
 [cc_test(
     name = test_name(test),
     srcs = [test["src"]],
-    copts = COPTS,
     conlyopts = CONLYOPTS,
+    copts = COPTS,
     cxxopts = CXXOPTS,
     env = select({
         "//settings/flags:prof": {"JE_TEST_MALLOC_CONF": join_conf(
@@ -292,8 +292,8 @@ transition_default_constraints(
 cc_test(
     name = "arena_reset_prof",
     srcs = ["arena_reset_prof.c"],
-    copts = COPTS,
     conlyopts = CONLYOPTS,
+    copts = COPTS,
     cxxopts = CXXOPTS,
     env = {"JE_TEST_MALLOC_CONF": "prof:true,lg_prof_sample:0"},
     linkstatic = True,
@@ -311,8 +311,8 @@ cc_test(
 cc_test(
     name = "batch_alloc_prof",
     srcs = ["batch_alloc_prof.c"],
-    copts = COPTS,
     conlyopts = CONLYOPTS,
+    copts = COPTS,
     cxxopts = CXXOPTS,
     env = {"JE_TEST_MALLOC_CONF": "prof:true,lg_prof_sample:14"},
     linkstatic = True,
