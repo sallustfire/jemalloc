@@ -229,3 +229,9 @@ cc_library(
     visibility = ["//:__subpackages__"],
     deps = ["//include/jemalloc/internal"],
 )
+
+cc_library(
+    name = "pthread",
+    linkopts = ["-pthread"],
+    visibility = ["//include/jemalloc:__subpackages__"],
+)

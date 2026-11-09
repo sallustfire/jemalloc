@@ -14,3 +14,10 @@ HOST_CC_DEPS = select({
     "@rules_cc//cc/compiler:msvc-cl": ["//include/msvc_compat"],
     "//conditions:default": [],
 })
+
+# configure.ac links every later check with -pthread once libpthread provides pthread_create, which it looks for
+# outside the pecoff ABI.
+HOST_LIBS = select({
+    "@platforms//os:windows": [],
+    "//conditions:default": ["//:pthread"],
+})
