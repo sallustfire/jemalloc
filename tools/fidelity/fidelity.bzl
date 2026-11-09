@@ -142,3 +142,39 @@ def fidelity_test(name, generated, srcs = [], script = None, script_args = [], s
         file1 = ":" + upstream,
         file2 = ":" + generated_out,
     )
+
+def private_namespace_fidelity_test(name, namespace, sym_prefix, settings = {}):
+    """Compares a private_namespace target with upstream's private_symbols.sh, awk and private_namespace.sh.
+
+    The upstream side runs over the target's `nm` listing (`<namespace>.nm`) and its
+    export_syms, both from its `upstream_inputs` output group.
+
+    Args:
+      name: The test's name.
+      namespace: The private_namespace target.
+      sym_prefix: configure's SYM_PREFIX; may be a select.
+      settings: Settings to transition to; see transition_default_constraints.
+    """
+    label = native.package_relative_label(namespace)
+    stem = label.package + "/" + label.name
+    inputs = label.name + "_upstream_inputs"
+    native.filegroup(
+        name = inputs,
+        testonly = True,
+        srcs = [label],
+        output_group = "upstream_inputs",
+        tags = ["manual"],
+    )
+    fidelity_test(
+        name = name,
+        srcs = [
+            "//include/jemalloc/internal:private_symbols.sh",
+            ":" + inputs,
+        ],
+        generated = label,
+        script = "//include/jemalloc/internal:private_namespace.sh",
+        script_args = [label.name + ".sym"],
+        settings = settings,
+        setup = ("include/jemalloc/internal/private_symbols.sh \"" + sym_prefix + "\" `cat " + stem + ".export_syms` > " + label.name + ".awk && " +
+                 "awk -f " + label.name + ".awk " + stem + ".nm > " + label.name + ".sym"),
+    )

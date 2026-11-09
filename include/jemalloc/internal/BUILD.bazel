@@ -4,10 +4,12 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//tools:autoconf.bzl", "configure_header", "define_macro", "define_macro_if", "define_macro_if_any", "define_macro_if_with", "define_macro_with", "undefine_macro")
 load(":private_namespace.bzl", "private_namespace")
 load(":public_symbols.bzl", "public_symbols", "public_symbols_header")
-load(":symbols.bzl", "PUBLIC_SYMBOLS", "WRAP_SYMBOLS")
+load(":symbols.bzl", "PUBLIC_SYMBOLS", "SYM_PREFIX", "WRAP_SYMBOLS")
 
 exports_files(
     [
+        "private_namespace.sh",
+        "private_symbols.sh",
         "public_namespace.sh",
         "public_unnamespace.sh",
     ],
@@ -547,7 +549,9 @@ private_namespace(
     out = "private_namespace.h",
     input = "//:lib/jemalloc",
     public_symbols = PUBLIC_SYMBOLS,
+    sym_prefix = SYM_PREFIX,
     tags = ["manual"],
+    visibility = ["//tools/fidelity:__pkg__"],
     wrap_symbols = WRAP_SYMBOLS,
 )
 
@@ -558,7 +562,9 @@ private_namespace(
     input = "//:lib/jemalloc",
     prefix = "jet_",
     public_symbols = PUBLIC_SYMBOLS,
+    sym_prefix = SYM_PREFIX,
     tags = ["manual"],
+    visibility = ["//tools/fidelity:__pkg__"],
     wrap_symbols = WRAP_SYMBOLS,
 )
 

@@ -2,9 +2,9 @@ load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
 load("@bazel_skylib//rules:native_binary.bzl", "native_test")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("//include/jemalloc/internal:public_symbols.bzl", "public_symbols", "public_symbols_header")
-load("//include/jemalloc/internal:symbols.bzl", "ALL_PUBLIC_SYMBOLS", "ALL_WRAP_SYMBOLS")
+load("//include/jemalloc/internal:symbols.bzl", "ALL_PUBLIC_SYMBOLS", "ALL_WRAP_SYMBOLS", "SYM_PREFIX")
 load("//tools:version.bzl", "UPSTREAM_VERSION", "VERSION")
-load(":fidelity.bzl", "fidelity_test")
+load(":fidelity.bzl", "fidelity_test", "private_namespace_fidelity_test")
 
 write_file(
     name = "upstream_version",
@@ -154,4 +154,16 @@ fidelity_test(
     script = "//include/jemalloc:jemalloc_rename.sh",
     script_args = ["tools/fidelity/public_symbols_mangling.txt"],
     settings = {"//settings/flags:jemalloc_prefix": ":je_"},
+)
+
+private_namespace_fidelity_test(
+    name = "private_namespace_test",
+    namespace = "//include/jemalloc/internal:private_namespace",
+    sym_prefix = SYM_PREFIX,
+)
+
+private_namespace_fidelity_test(
+    name = "private_namespace_jet_test",
+    namespace = "//include/jemalloc/internal:private_namespace_jet",
+    sym_prefix = SYM_PREFIX,
 )

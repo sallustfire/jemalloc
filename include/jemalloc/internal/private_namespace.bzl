@@ -5,64 +5,45 @@ load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolcha
 
 def _private_namespace_impl(ctx):
     cc_toolchain = find_cc_toolchain(ctx)
-    output = ctx.actions.declare_file(ctx.attr.out)
-
-    # Extract private symbols
-    args = ctx.actions.args()
-
     prefix = ctx.attr.prefix if ctx.attr.prefix else ctx.attr._prefix[BuildSettingInfo].value
-    for sym in ctx.attr.public_symbols:
-        args.add(prefix + sym)
+    public = [prefix + symbol for symbol in ctx.attr.public_symbols]
 
-    # Wrap symbols without prefix
-    args.add_all(ctx.attr.wrap_symbols)
-
-    # Write out awk script
-    constraint = ctx.attr._constraint_macos[platform_common.ConstraintValueInfo]
-    sym_prefix = "_" if ctx.target_platform_has_constraint(constraint) else ""
-    output_awk = ctx.actions.declare_file("{name}.awk".format(name = ctx.attr.name))
-    ctx.actions.run_shell(
-        inputs = [],
-        outputs = [output_awk],
-        arguments = [args],
-        command = "{script} \"{sym_prefix}\" $@ > {output}".format(
-            script = ctx.file._private_symbols_sh.path,
-            output = output_awk.path,
-            sym_prefix = sym_prefix,
-        ),
-        mnemonic = "PrivateSymbols",
-        tools = [ctx.file._private_symbols_sh],
-    )
-
-    inputs = [src for src in ctx.files.input if src.path.endswith(".a")]
-    output_symbols = ctx.actions.declare_file("symbols{jet}.sym".format(jet = "_jet" if ctx.attr.enable_jet else ""))
-
-    ctx.actions.run_shell(
-        inputs = depset(inputs, transitive = [cc_toolchain.all_files]),
-        outputs = [output_symbols],
-        command = "{nm} -a {inputs} | awk -f {script} > {output}".format(
-            nm = cc_toolchain.nm_executable,
-            inputs = " ".join([input.path for input in inputs]),
-            script = output_awk.path,
-            output = output_symbols.path,
-        ),
-        tools = [output_awk],
+    output = ctx.actions.declare_file(ctx.attr.out)
+    nm_stderr = ctx.actions.declare_file(ctx.label.name + ".nm.stderr")
+    sym_prefix = ctx.attr.sym_prefix
+    listing_source = "`{}`".format(cc_toolchain.nm_executable)
+    unfound_reason = "it read no symbol table (for example from LTO bitcode it cannot parse)"
+    archives = [file for file in ctx.files.input if file.path.endswith(".a")]
+    if not archives:
+        fail("{} provides no static archive (.a) to list, got {}".format(ctx.attr.input[0].label, ctx.files.input))
+    listing = ctx.actions.declare_file(ctx.label.name + ".nm")
+    ctx.actions.run(
+        executable = ctx.executable._generator,
+        arguments = ["nm", cc_toolchain.nm_executable, listing.path, nm_stderr.path] + [archive.path for archive in archives],
+        inputs = depset(archives, transitive = [cc_toolchain.all_files]),
+        outputs = [listing, nm_stderr],
         mnemonic = "PrivateNamespaceNM",
     )
 
-    ctx.actions.run_shell(
-        inputs = [output_symbols],
+    args = ctx.actions.args()
+    args.add_all(["header", output.path, listing, nm_stderr, sym_prefix, listing_source, unfound_reason])
+    args.add_all(public, format_each = "--public=%s")
+    args.add_all(ctx.attr.wrap_symbols, format_each = "--wrap=%s")
+    ctx.actions.run(
+        executable = ctx.executable._generator,
+        arguments = [args],
+        inputs = [listing, nm_stderr],
         outputs = [output],
-        command = "{script} {symbols} > {output}".format(
-            script = ctx.file._private_namespace_sh.path,
-            symbols = output_symbols.path,
-            output = output.path,
-        ),
         mnemonic = "PrivateNamespace",
-        tools = [ctx.file._private_namespace_sh],
     )
 
-    return [DefaultInfo(files = depset([output]))]
+    export_syms = ctx.actions.declare_file(ctx.label.name + ".export_syms")
+    ctx.actions.write(output = export_syms, content = "".join([symbol + "\n" for symbol in public + ctx.attr.wrap_symbols]))
+
+    return [
+        DefaultInfo(files = depset([output])),
+        OutputGroupInfo(upstream_inputs = depset([listing, export_syms])),
+    ]
 
 def _transition_impl(_settings, attr):
     return {
@@ -79,8 +60,8 @@ transition_config_settings = transition(
 )
 
 private_namespace = rule(
-    doc = "Generate the private namespace header from compiled object files. This combines the private_symbols.awk " +
-          "generation with the header generation to bridge the requriements between the exec and target platforms.",
+    doc = "Generate the private namespace header from the `nm -a` listing of `input`, as upstream's private_symbols.awk " +
+          "and private_namespace.sh do. Output group `upstream_inputs` holds that listing and configure's export_syms.",
     implementation = _private_namespace_impl,
     attrs = {
         "prefix": attr.string(doc = "Explicit prefix for public symbols, overrides value selected by build setting."),
@@ -97,22 +78,21 @@ private_namespace = rule(
             doc = "Name of the generated file",
             mandatory = True,
         ),
+        "sym_prefix": attr.string(
+            doc = "configure's SYM_PREFIX: \"_\" for Mach-O targets.",
+            mandatory = True,
+            values = ["", "_"],
+        ),
         "wrap_symbols": attr.string_list(
             doc = "List of symbols to wrap without prefix",
             default = [],
         ),
         "_prefix": attr.label(default = "//settings/flags:jemalloc_prefix_resolved"),
         "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
-        "_constraint_macos": attr.label(default = "@platforms//os:macos", cfg = "target"),
-        "_private_namespace_sh": attr.label(
-            default = "//include/jemalloc/internal:private_namespace.sh",
-            allow_single_file = True,
+        "_generator": attr.label(
+            default = Label("//tools/generators:private_namespace_gen"),
             cfg = "exec",
-        ),
-        "_private_symbols_sh": attr.label(
-            default = "//include/jemalloc/internal:private_symbols.sh",
-            allow_single_file = True,
-            cfg = "exec",
+            executable = True,
         ),
     },
     toolchains = use_cc_toolchain(True),

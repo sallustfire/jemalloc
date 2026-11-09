@@ -1,4 +1,5 @@
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
 cc_binary(
     name = "jemalloc_hdr_gen",
@@ -8,4 +9,25 @@ cc_binary(
         "//conditions:default": ["-std=c++14"],
     }),
     visibility = ["//include/jemalloc:__pkg__"],
+)
+
+cc_library(
+    name = "private_namespace_listing",
+    srcs = ["private_namespace_listing.cc"],
+    hdrs = ["private_namespace_listing.h"],
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
+)
+
+cc_binary(
+    name = "private_namespace_gen",
+    srcs = ["private_namespace_gen.cc"],
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
+    visibility = ["//include/jemalloc/internal:__pkg__"],
+    deps = [":private_namespace_listing"],
 )

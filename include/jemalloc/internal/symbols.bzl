@@ -1,4 +1,4 @@
-"""The public and wrapped symbol lists configure.ac assembles."""
+"""The public and wrapped symbol lists configure.ac assembles, and configure's SYM_PREFIX."""
 
 load("//tools:version.bzl", "VERSION")
 
@@ -83,3 +83,9 @@ WRAP_SYMBOLS = select(_WRAP_OS) + select(_WRAP_GLIBC)
 ALL_PUBLIC_SYMBOLS = _PUBLIC_SYMBOLS + [symbol for arms in (_MEMALIGN, _VALLOC, _MALLOC_SIZE) for symbols in arms.values() for symbol in symbols]
 
 ALL_WRAP_SYMBOLS = [symbol for arms in (_WRAP_OS, _WRAP_GLIBC) for symbols in arms.values() for symbol in symbols]
+
+# configure.ac's SYM_PREFIX
+SYM_PREFIX = select({
+    "//settings/platform:darwin": "_",
+    "//conditions:default": "",
+})
