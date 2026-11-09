@@ -92,7 +92,7 @@ jemalloc = rule(
         "experimental_smallocx": attr.string(values = ["True", "False", ""]),
         "fill": attr.string(values = ["True", "False", ""]),
         "jemalloc_prefix": attr.string(
-            doc = "Prefix for the public API, as --with-jemalloc-prefix; \"\" for none.",
+            doc = "Prefix for the public API, as --with-jemalloc-prefix; \"\" for none, \"__auto__\" for configure's platform default.",
             default = _UNSET,
         ),
         "lazy_lock": attr.string(values = ["True", "False", ""]),

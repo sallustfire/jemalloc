@@ -9,6 +9,8 @@ def _private_namespace_impl(ctx):
     args = ctx.actions.args()
 
     prefix = ctx.attr.prefix if ctx.attr.prefix else ctx.attr._prefix[BuildSettingInfo].value
+    if prefix == "__auto__":
+        fail("//settings/flags:jemalloc_prefix is __auto__, which only the platform transition resolves; build through //:jemalloc")
     for sym in ctx.attr.public_symbols:
         args.add(prefix + sym)
 

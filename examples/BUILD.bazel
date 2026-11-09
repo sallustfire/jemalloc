@@ -1,6 +1,14 @@
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("@jemalloc//settings:config.bzl", "jemalloc")
 
+# test_api.c calls the API by its unprefixed names, which only a build without a prefix exports; configure defaults to
+# je_ on macOS and Windows.
+_UNPREFIXED = select({
+    "@platforms//os:macos": ["@platforms//:incompatible"],
+    "@platforms//os:windows": ["@platforms//:incompatible"],
+    "//conditions:default": [],
+})
+
 # Case 1: Test libc malloc can be replaced
 cc_test(
     name = "test_1_basic",
@@ -15,6 +23,7 @@ cc_test(
     size = "small",
     srcs = ["test_api.c"],
     malloc = "@jemalloc",
+    target_compatible_with = _UNPREFIXED,
 )
 
 # Case 3: Test convenience rule can modify the library build settings
@@ -41,4 +50,25 @@ cc_test(
     srcs = ["test_api.c"],
     args = ["--expect-stats-unavailable"],
     malloc = ":jemalloc_custom",
+    target_compatible_with = _UNPREFIXED,
+)
+
+# Case 5: On macOS, plain malloc reaches jemalloc through its zone
+cc_test(
+    name = "test_5_macos_zone",
+    size = "small",
+    srcs = ["test_zone.c"],
+    env = {"JE_MALLOC_CONF": "narenas:3"},
+    malloc = "@jemalloc",
+    target_compatible_with = ["@platforms//os:macos"],
+)
+
+# Case 6: jemalloc() keeps the platform's default prefix when its jemalloc_prefix is unset
+cc_test(
+    name = "test_6_macos_zone_config",
+    size = "small",
+    srcs = ["test_zone.c"],
+    env = {"JE_MALLOC_CONF": "narenas:3"},
+    malloc = ":jemalloc_custom",
+    target_compatible_with = ["@platforms//os:macos"],
 )

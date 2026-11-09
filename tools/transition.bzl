@@ -13,6 +13,8 @@ PLATFORM = select({
 # Assume typical defaults for target platforms
 _PLATFORM_DEFAULTS = {
     "//settings/flags:enable_zone_allocator": {"darwin": "yes", "default": "no"},
+    # configure.ac's --with-jemalloc-prefix default: "je_" for the macho and pecoff ABIs, "" otherwise.
+    "//settings/flags:jemalloc_prefix": {"darwin": "je_", "windows": "je_", "default": ""},
     "//settings/platform:glibc_overrides_support": {"linux": "yes", "default": "no"},
     "//settings/platform:lg_page": {"darwin": "14", "default": "12"},
     "//settings/platform:memalign_support": {"linux": "yes", "default": "no"},
@@ -23,7 +25,7 @@ _PLATFORM_DEFAULTS = {
 
 _BOOL_SETTINGS = ["//settings:enable_jet", "//settings/flags:enable_experimental_smallocx", "//settings/flags:enable_fill"]
 
-_SETTINGS = _BOOL_SETTINGS + ["//settings:with_test", "//settings/flags:jemalloc_prefix"] + list(_PLATFORM_DEFAULTS)
+_SETTINGS = _BOOL_SETTINGS + ["//settings:with_test"] + list(_PLATFORM_DEFAULTS)
 
 _CPREFIX = "//settings/flags:jemalloc_cprefix"
 

@@ -119,10 +119,11 @@ config_setting(
     flag_values = {":enable_xmalloc": "True"},
 )
 
-# JEMALLOC_PREFIX optionally set via --with-jemalloc-prefix
+# JEMALLOC_PREFIX (--with-jemalloc-prefix). __auto__ takes configure's default for the target platform; see
+# //tools:transition.bzl.
 string_flag(
     name = "jemalloc_prefix",
-    build_setting_default = "",
+    build_setting_default = "__auto__",
     make_variable = "JEMALLOC_PREFIX",
     visibility = ["//visibility:public"],
 )
