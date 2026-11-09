@@ -90,8 +90,12 @@ cc_test(
     name = "test_8_malloc",
     size = "small",
     srcs = ["test_malloc.c"],
-    # links the archive, as a cc_binary does by default
-    linkstatic = True,
+    # On macOS this links the archive, as a cc_binary does by default, which is where the zone was dropped; elsewhere
+    # the test keeps the default link.
+    linkstatic = select({
+        "@platforms//os:macos": True,
+        "//conditions:default": False,
+    }),
     malloc = "@jemalloc",
     target_compatible_with = _MALLOC_REPLACED,
 )
@@ -101,14 +105,19 @@ cc_test(
     name = "test_9_malloc_config",
     size = "small",
     srcs = ["test_malloc.c"],
-    # links the archive, as a cc_binary does by default
-    linkstatic = True,
+    # On macOS this links the archive, as a cc_binary does by default, which is where the zone was dropped; elsewhere
+    # the test keeps the default link.
+    linkstatic = select({
+        "@platforms//os:macos": True,
+        "//conditions:default": False,
+    }),
     malloc = ":jemalloc_custom",
     target_compatible_with = _MALLOC_REPLACED,
 )
 
-# Case 10: On macOS an application may define its own global operator new/delete over jemalloc's zone. Linking the
-# whole archive to keep the zone would also force jemalloc's operators into the link, and fail on duplicate symbols.
+# Case 10: On macOS an application may define its own global operator new/delete, every overload it calls, over
+# jemalloc's zone. Linking the whole archive to keep the zone would also force jemalloc's operators into the link, and
+# fail on duplicate symbols.
 cc_test(
     name = "test_10_macos_custom_operators",
     size = "small",

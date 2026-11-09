@@ -3,6 +3,10 @@
  * still link against jemalloc and keep its operators. On macOS malloc then reaches jemalloc through jemalloc_zone, so
  * the memory operator new returns is owned by that zone. jemalloc_zone's size() returns 0 for a pointer it does not
  * own; the pointer's zone cannot show this, as malloc_zone_from_ptr() reports a virtual default zone.
+ *
+ * The application must define every overload its code calls. An overload it leaves out is resolved from
+ * jemalloc_cpp.o, which also defines the ones it replaced, and the link fails on duplicate symbols. So this defines the
+ * sized operator delete too: compilers that enable sized deallocation by default emit a call to it for delete p.
  */
 #include <malloc/malloc.h>
 
@@ -23,6 +27,8 @@ void *operator new(std::size_t size) {
 }
 
 void operator delete(void *p) noexcept { std::free(p); }
+
+void operator delete(void *p, std::size_t) noexcept { std::free(p); }
 
 static bool owned_by_jemalloc_zone(const void *p) {
     vm_address_t *zones = nullptr;
