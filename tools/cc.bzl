@@ -48,8 +48,8 @@ COPTS = ["-D_REENTRANT"] + select({
     "@rules_cc//cc/compiler:clang-cl": _COPTS_MSVC_COMPATIBLE,
     "//conditions:default": [],
 }) + select({
-    # configure.ac adds it only for the ELF ABI (configure.ac:845-849). It is keyed on the compiler alone here, which
-    # keeps the flag these compilers were already given on every OS.
+    # configure.ac adds it only when GCC=yes and the ABI is ELF (configure.ac:846-849). It is keyed on the compiler
+    # alone here, so these compilers also get it on Mach-O and PE targets.
     "@rules_cc//cc/compiler:clang": ["-fvisibility=hidden"],
     "@rules_cc//cc/compiler:clang-cl": ["-fvisibility=hidden"],
     "@rules_cc//cc/compiler:emscripten": ["-fvisibility=hidden"],
