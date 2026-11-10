@@ -3,11 +3,12 @@
 This is a minimal fork of [jemalloc](https://github.com/jemalloc/jemalloc) to maintain a set of overlay files for 
 building jemalloc with [Bazel](https://bazel.build/). 
 
-The upstream jemalloc build performs a number of feature detection steps in the configure script. All of which need to be
-statically declared via platform and compiler constraints. Some of these have been made configurable under
-//settings, but the list is not exhaustive. An attempt has been made to default to logical values assuming the most
-common configurations. But these assumptions cannot satisfy all cases in the wild and may break on some systems. 
-Contributors are encouraged to open MRs to add more configuration options to //settings/platform.
+The upstream jemalloc build performs a number of feature detection steps in the configure script. Here the checks
+that ask the toolchain (functions and their signatures, MADV_* constants, builtins, attributes, atomics, type sizes and
+byte order) are copies of configure.ac's test programs, compiled or linked by rules_cc_autoconf with the target's
+toolchain. configure's host table is expressed as platform selects and transition defaults. What configure learns by
+running a program on the build machine (page size, virtual address bits, huge page size) is set by flags under
+//settings/platform, with per-platform defaults.
 
 ## Usage
 
@@ -99,9 +100,8 @@ Profiling (`--config=prof-*`) is tested on Linux only.
     likely fail. Generating private_namespace.h also fails there: the tool that runs `nm` is not implemented on Windows.
 - **FreeBSD:** An effort was made to translate existing autoconf feature detection to Bazel config settings, but no 
     attempt has been made to build on FreeBSD.
-- **Centos 7:** Fails due to the lack of defining `JEMALLOC_MADV_FREE`. Though, the original build does not set it when 
-    `MADV_FREE` is present. Supporting both and being faithful to the configure script would require an additional 
-    platform setting.
+- **CentOS 7:** Untested. Its headers lack MADV_FREE; as with configure, x86 Linux builds then define it themselves
+    (JEMALLOC_DEFINE_MADVISE_FREE, configure.ac:2224-2230).
 - C++ compilation might be broken for LLVM around detecting libstdc++.
 
 ## Contributing
