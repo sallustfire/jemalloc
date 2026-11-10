@@ -34,14 +34,18 @@ def _upstream_output_impl(ctx):
         ctx.actions.symlink(output = link, target_file = src)
         staged.append(link)
 
+    # A registry overlay delivers files without their executable bit on Bazel 7, so run an executable copy.
+    script = ctx.actions.declare_file("{}.script/{}".format(ctx.label.name, ctx.file.script.basename))
+    ctx.actions.expand_template(template = ctx.file.script, output = script, substitutions = {}, is_executable = True)
+
     output = ctx.actions.declare_file(ctx.label.name + ".out")
     ctx.actions.run_shell(
         mnemonic = "FidelityScript",
-        inputs = [ctx.file.script] + tools + staged,
+        inputs = [script] + tools + staged,
         outputs = [output],
         command = 'script="$PWD/$1" out="$PWD/$2" && export PATH="$PWD/$3" && cd "$4" && eval "$5" && shift 5 && "$script" "$@" > "$out"',
         arguments = [
-            ctx.file.script.path,
+            script.path,
             output.path,
             tools[0].dirname,
             "/".join([ctx.bin_dir.path, ctx.label.package, objroot]),
