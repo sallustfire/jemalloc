@@ -7,7 +7,7 @@ the script's inputs and the target alike.
 """
 
 load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
-load("//tools:transition.bzl", "PLATFORM", "platform_constraints_transition", "transition_default_constraints")
+load("//tools:transition.bzl", "CPU", "PLATFORM", "platform_constraints_transition", "transition_default_constraints")
 
 _COREUTILS = "@bazel_lib//lib:coreutils_toolchain_type"
 
@@ -55,6 +55,7 @@ _upstream_output = rule(
           "(uutils coreutils), grep and sed (GNU); /bin/sh is the host's.",
     implementation = _upstream_output_impl,
     attrs = {
+        "cpu": attr.string(doc = "Read by the transition; see transition_default_constraints.", mandatory = True),
         "platform": attr.string(
             doc = "Read by the transition; see transition_default_constraints.",
             mandatory = True,
@@ -119,6 +120,7 @@ def fidelity_test(name, generated, srcs = [], script = None, script_args = [], s
         name = upstream,
         testonly = True,
         srcs = srcs,
+        cpu = CPU,
         platform = PLATFORM,
         script = script,
         script_args = script_args,
@@ -131,6 +133,7 @@ def fidelity_test(name, generated, srcs = [], script = None, script_args = [], s
         name = generated_out,
         testonly = True,
         src = generated,
+        cpu = CPU,
         platform = PLATFORM,
         settings = settings,
         tags = ["manual"],

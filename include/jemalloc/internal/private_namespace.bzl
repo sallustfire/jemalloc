@@ -1,4 +1,5 @@
-"""Rules that generate private_namespace.h from the library's symbols and check the library against it."""
+"""Rules that generate private_namespace.h from the library's symbols, check the library against it, and resolve
+JEMALLOC_PRIVATE_NAMESPACE."""
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolchain")
@@ -29,10 +30,26 @@ def _static_archives(target):
 def _linker_input_owners(target):
     return [str(linker_input.owner) for linker_input in target[CcInfo].linking_context.linker_inputs.to_list()]
 
+def _jemalloc_private_namespace_impl(ctx):
+    # Equivalent of JEMALLOC_PRIVATE_NAMESPACE="${with_private_namespace}je_"
+    value = ctx.attr._private_namespace[BuildSettingInfo].value + "je_"
+    return [
+        BuildSettingInfo(value = value),
+        platform_common.TemplateVariableInfo({"JEMALLOC_PRIVATE_NAMESPACE": value}),
+    ]
+
+jemalloc_private_namespace = rule(
+    doc = "JEMALLOC_PRIVATE_NAMESPACE, the private_namespace flag followed by \"je_\", as a BuildSettingInfo for " +
+          "rules_cc_autoconf's AC_BUILD_SETTING and as the $(JEMALLOC_PRIVATE_NAMESPACE) make variable.",
+    implementation = _jemalloc_private_namespace_impl,
+    attrs = {
+        "_private_namespace": attr.label(default = "//settings/flags:private_namespace"),
+    },
+)
+
 def _private_namespace_impl(ctx):
     cc_toolchain = find_cc_toolchain(ctx)
     prefix = ctx.attr.prefix if ctx.attr.prefix else ctx.attr._prefix[BuildSettingInfo].value
-    public = [prefix + symbol for symbol in ctx.attr.public_symbols]
 
     output = ctx.actions.declare_file(ctx.attr.out)
     if bool(ctx.attr.input) == bool(ctx.file.listing):
@@ -59,24 +76,27 @@ def _private_namespace_impl(ctx):
             mnemonic = "PrivateNamespaceNM",
         )
 
+    export_syms = ctx.actions.declare_file(ctx.label.name + ".export_syms")
     args = ctx.actions.args()
     args.add_all(["header", output.path, listing, nm_stderr, sym_prefix, listing_source, unfound_reason])
-    args.add_all(public, format_each = "--public=%s")
-    args.add_all(ctx.attr.wrap_symbols, format_each = "--wrap=%s")
+    args.add(prefix, format = "--prefix=%s")
+    args.add(ctx.file.public_symbols, format = "--public-file=%s")
+    args.add(ctx.file.wrap_symbols, format = "--wrap-file=%s")
+    args.add(export_syms, format = "--export-syms=%s")
     ctx.actions.run(
         executable = ctx.executable._generator,
         arguments = [args],
-        inputs = [listing, nm_stderr],
-        outputs = [output],
+        inputs = [listing, nm_stderr, ctx.file.public_symbols, ctx.file.wrap_symbols],
+        outputs = [output, export_syms],
         mnemonic = "PrivateNamespace",
     )
 
-    export_syms = ctx.actions.declare_file(ctx.label.name + ".export_syms")
-    ctx.actions.write(output = export_syms, content = "".join([symbol + "\n" for symbol in public + ctx.attr.wrap_symbols]))
-
     return [
         DefaultInfo(files = depset([output])),
-        OutputGroupInfo(upstream_inputs = depset([listing, export_syms])),
+        OutputGroupInfo(
+            export_syms = depset([export_syms]),
+            upstream_inputs = depset([listing, export_syms]),
+        ),
     ]
 
 def _transition_impl(_settings, attr):
@@ -95,12 +115,14 @@ transition_config_settings = transition(
 
 private_namespace = rule(
     doc = "Generate the private namespace header from the `nm -a` listing of `input`, as upstream's private_symbols.awk " +
-          "and private_namespace.sh do. Output group `upstream_inputs` holds that listing and configure's export_syms.",
+          "and private_namespace.sh do. Output group `export_syms` holds configure's export_syms, and " +
+          "`upstream_inputs` holds that and the listing.",
     implementation = _private_namespace_impl,
     attrs = {
         "prefix": attr.string(doc = "Explicit prefix for public symbols, overrides value selected by build setting."),
-        "public_symbols": attr.string_list(
-            doc = "List of public API symbols",
+        "public_symbols": attr.label(
+            doc = "configure.ac's public_syms, one symbol per line, as a symbol_list writes it.",
+            allow_single_file = True,
             mandatory = True,
         ),
         "input": attr.label(
@@ -122,9 +144,10 @@ private_namespace = rule(
             mandatory = True,
             values = ["", "_"],
         ),
-        "wrap_symbols": attr.string_list(
-            doc = "List of symbols to wrap without prefix",
-            default = [],
+        "wrap_symbols": attr.label(
+            doc = "configure.ac's wrap_syms, exported without prefix, one symbol per line, as a symbol_list writes it.",
+            allow_single_file = True,
+            mandatory = True,
         ),
         "_prefix": attr.label(default = "//settings/flags:jemalloc_prefix_resolved"),
         "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
@@ -146,7 +169,7 @@ def _private_namespace_leak_test_impl(ctx):
     if not archives:
         fail("expected a static archive from {}; its linker inputs are owned by {}".format(ctx.attr.library.label, _linker_input_owners(ctx.attr.library)))
     namespace = ctx.attr.namespace[0]
-    export_syms = [file for file in namespace[OutputGroupInfo].upstream_inputs.to_list() if file.path.endswith(".export_syms")][0]
+    export_syms = namespace[OutputGroupInfo].export_syms.to_list()[0]
     header = namespace[DefaultInfo].files.to_list()[0]
 
     listing = ctx.actions.declare_file(ctx.label.name + ".nm")
@@ -188,6 +211,7 @@ private_namespace_leak_test = rule(
             mandatory = True,
             cfg = platform_constraints_transition,
         ),
+        "cpu": attr.string(doc = "Read by the transition; see transition_default_constraints.", mandatory = True),
         "platform": attr.string(doc = "Read by the transition; see transition_default_constraints.", mandatory = True),
         "settings": attr.label_keyed_string_dict(doc = "Read by the transition; see transition_default_constraints."),
         "sym_prefix": attr.string(doc = "configure's SYM_PREFIX for the target platform.", mandatory = True, values = ["", "_"]),

@@ -30,6 +30,11 @@ jobs:
             bazel_config: "--config=bazel9"
           - os: ubuntu-24.04
             bazel_version: "7.4.0"
+          # The sed dev dependency compiles its SELinux calls where the host has libselinux headers (ubuntu-22.04
+          # does) but never links -lselinux: rules_cc_autoconf's gnulib port probes selinux/selinux.h whatever
+          # with_selinux says. Remove once a rules_cc_autoconf release gates that probe as gnulib does.
+          - os: ubuntu-22.04
+            host_linkopts: "--host_linkopt=-lselinux"
     steps:
       - uses: actions/checkout@v4
       - uses: bazel-contrib/setup-bazel@0.14.0
@@ -39,11 +44,11 @@ jobs:
       - name: Build
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
-        run: bazel build //... ${{ matrix.bazel_config }}
+        run: bazel build //... ${{ matrix.bazel_config }} ${{ matrix.host_linkopts }}
       - name: Test
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
-        run: bazel test //... ${{ matrix.bazel_config }}
+        run: bazel test //... ${{ matrix.bazel_config }} ${{ matrix.host_linkopts }}
 
   prof-libunwind:
     name: Prof libunwind (${{ matrix.os }}, Bazel ${{ matrix.bazel_version }})
@@ -58,6 +63,9 @@ jobs:
             bazel_config: "--config=bazel8"
           - bazel_version: "9.x"
             bazel_config: "--config=bazel9"
+          # As in the build job: sed's SELinux link on ubuntu-22.04.
+          - os: ubuntu-22.04
+            host_linkopts: "--host_linkopt=-lselinux"
     steps:
       - uses: actions/checkout@v4
       - uses: bazel-contrib/setup-bazel@0.14.0
@@ -67,11 +75,11 @@ jobs:
       - name: Build
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
-        run: bazel build //... --config=prof-libunwind ${{ matrix.bazel_config }}
+        run: bazel build //... --config=prof-libunwind ${{ matrix.bazel_config }} ${{ matrix.host_linkopts }}
       - name: Test
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
-        run: bazel test //... --config=prof-libunwind ${{ matrix.bazel_config }}
+        run: bazel test //... --config=prof-libunwind ${{ matrix.bazel_config }} ${{ matrix.host_linkopts }}
 
   prof-libgcc:
     name: Prof libgcc (${{ matrix.os }}, Bazel ${{ matrix.bazel_version }})
@@ -131,28 +139,76 @@ jobs:
 
   upstream-oracle:
     name: Upstream oracle (${{ matrix.name }})
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: default
+            os: ubuntu-24.04
           - name: prefix je_
+            os: ubuntu-24.04
             configure_args: --with-jemalloc-prefix=je_
             bazel_args: --//settings/flags:jemalloc_prefix=je_
+          - name: macOS default
+            os: macos-15
+          - name: Alpine default
+            os: ubuntu-24.04
+            container: alpine:3.22
+          - name: Alpine prefix je_
+            os: ubuntu-24.04
+            container: alpine:3.22
+            configure_args: --with-jemalloc-prefix=je_
+            bazel_args: --//settings/flags:jemalloc_prefix=je_
+          - name: Linux aarch64 default
+            os: ubuntu-24.04-arm
+          # glibc before 2.34 still links the malloc hooks, which the probes then define and list.
+          - name: Debian 11 default
+            os: ubuntu-24.04
+            container: debian:11
     steps:
+      # Bazel's release binaries and their embedded JDK need glibc, so on musl the launcher runs under gcompat and
+      # the server on Alpine's JDK.
+      - name: Install Alpine packages
+        if: startsWith(matrix.container, 'alpine')
+        run: |
+          apk add --no-cache bash build-base bzip2 coreutils curl diffutils gcompat git libstdc++ openjdk21-jdk tar
+          echo "startup --server_javabase=/usr/lib/jvm/java-21-openjdk" > /etc/bazel.bazelrc
+      - name: Install Debian packages
+        if: startsWith(matrix.container, 'debian')
+        run: |
+          # Debian 11's LTS has ended: deb.debian.org still serves its indexes but no longer the security pool's
+          # packages, so take all three suites from archive.debian.org.
+          printf '%s\n' \
+            'deb http://archive.debian.org/debian bullseye main' \
+            'deb http://archive.debian.org/debian bullseye-updates main' \
+            'deb http://archive.debian.org/debian-security bullseye-security main' > /etc/apt/sources.list
+          apt-get update
+          apt-get install --yes --no-install-recommends build-essential bzip2 ca-certificates curl git
+      - name: Install Bazelisk
+        if: matrix.container != ''
+        run: |
+          curl --fail --silent --show-error --location -o /usr/local/bin/bazel \
+            https://github.com/bazelbuild/bazelisk/releases/download/v1.27.0/bazelisk-linux-amd64
+          # The digest GitHub publishes for the v1.27.0 release asset bazelisk-linux-amd64.
+          echo "e1508323f347ad1465a887bc5d2bfb91cffc232d11e8e997b623227c6b32fb76  /usr/local/bin/bazel" | sha256sum -c -
+          chmod +x /usr/local/bin/bazel
       - uses: actions/checkout@v4
       - uses: bazel-contrib/setup-bazel@0.14.0
+        if: matrix.container == ''
         with:
           bazelisk-cache: true
           repository-cache: true
       - name: Download upstream release
+        shell: bash
         run: |
-          version="$(sed -n '/^ *version = "/{s/^ *version = "\([^"]*\)".*/\1/p;q}' MODULE.bazel)"
+          version="$(sed -n '/^ *version = "/{s/^ *version = "\([^"]*\)".*/\1/p;q;}' MODULE.bazel)"
           upstream="${version%%-bcr.*}"
           curl --fail --silent --show-error --location -o "${RUNNER_TEMP}/upstream.tar.bz2" \
             "https://github.com/jemalloc/jemalloc/releases/download/${upstream}/jemalloc-${upstream}.tar.bz2"
       - name: Compare generated headers
+        shell: bash
         env:
           USE_BAZEL_VERSION: 8.x
           CONFIGURE_ARGS: ${{ matrix.configure_args }}

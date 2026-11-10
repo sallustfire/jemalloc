@@ -60,15 +60,20 @@ config_setting(
 )
 
 # JEMALLOC_LAZY_LOCK
-bool_flag(
+string_flag(
     name = "enable_lazy_lock",
-    build_setting_default = False,
+    build_setting_default = "__auto__",
+    values = [
+        "yes",
+        "no",
+        "__auto__",
+    ],
     visibility = ["//visibility:public"],
 )
 
 config_setting(
     name = "lazy_lock",
-    flag_values = {":enable_lazy_lock": "True"},
+    flag_values = {":enable_lazy_lock": "yes"},
 )
 
 # JEMALLOC_LOG

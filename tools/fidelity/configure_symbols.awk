@@ -4,10 +4,26 @@ function add(set, list, name,    n, a, i) {
         set[a[i]] = name
 }
 
-function compare(var, list, upstream, fork,    s) {
+# list holds SYMBOL=MACRO entries.
+function add_macros(set, list,    n, a, i, pair) {
+    n = split(list, a, ",")
+    for (i = 1; i <= n; i++) {
+        split(a[i], pair, "=")
+        set[pair[1]] = pair[2]
+    }
+}
+
+function describe(macro) {
+    return macro == "" ? "without a macro" : "where " macro " is defined"
+}
+
+function compare(var, list, optional, upstream, upstream_macro, fork, fork_macro,    s) {
     for (s in upstream)
         if (!(s in fork)) {
-            printf "%s: configure.ac adds %s to %s; add it to %s in include/jemalloc/internal/symbols.bzl\n", upstream[s], s, var, list
+            printf "%s: configure.ac adds %s to %s; add it to %s or %s in include/jemalloc/internal/symbols.bzl\n", upstream[s], s, var, list, optional
+            failed = 1
+        } else if (upstream_macro[s] != fork_macro[s]) {
+            printf "%s: configure.ac adds %s to %s %s, but include/jemalloc/internal/symbols.bzl lists it %s\n", upstream[s], s, var, describe(upstream_macro[s]), describe(fork_macro[s])
             failed = 1
         }
     for (s in fork)
@@ -21,11 +37,23 @@ BEGIN {
     PROCINFO["sorted_in"] = "@ind_str_asc"
     add(fork_public, public, "PUBLIC_SYMBOLS")
     add(fork_wrap, wrap, "WRAP_SYMBOLS")
-    add(fork_wrap, unwrapped, "configure_symbols_test's unwrapped")
+    add_macros(fork_public_macro, public_macros)
+    add_macros(fork_wrap_macro, wrap_macros)
+}
+
+# configure.ac appends an optional symbol in the branch that defines its macro: the last AC_DEFINE since the branch
+# opened. A line that opens, separates or closes a branch forgets it.
+/^[[:space:]]*(if|elif|else|fi|case|esac|;;)([^A-Za-z0-9_]|$)/ {
+    macro = ""
+}
+
+match($0, /AC_DEFINE\(\[([A-Za-z0-9_]+)\]/, d) {
+    macro = d[1]
 }
 
 match($0, /^[[:space:]]*(public|wrap)_syms="([^"]*)"/, m) {
     n = split(m[2], tokens, /[[:space:]]+/)
+    appends = index(m[2], "${" m[1] "_syms}") > 0
     for (i = 1; i <= n; i++) {
         t = tokens[i]
         if (t == "" || t == "${" m[1] "_syms}")
@@ -36,8 +64,10 @@ match($0, /^[[:space:]]*(public|wrap)_syms="([^"]*)"/, m) {
             failed = 1
         } else if (m[1] == "public") {
             upstream_public[t] = FILENAME ":" FNR
+            upstream_public_macro[t] = appends ? macro : ""
         } else {
             upstream_wrap[t] = FILENAME ":" FNR
+            upstream_wrap_macro[t] = appends ? macro : ""
         }
     }
     next
@@ -53,7 +83,7 @@ END {
         printf "%s: found no public_syms or wrap_syms assignments\n", FILENAME
         exit 1
     }
-    compare("public_syms", "PUBLIC_SYMBOLS", upstream_public, fork_public)
-    compare("wrap_syms", "WRAP_SYMBOLS", upstream_wrap, fork_wrap)
+    compare("public_syms", "PUBLIC_SYMBOLS", "OPTIONAL_PUBLIC_SYMBOLS", upstream_public, upstream_public_macro, fork_public, fork_public_macro)
+    compare("wrap_syms", "WRAP_SYMBOLS", "OPTIONAL_WRAP_SYMBOLS", upstream_wrap, upstream_wrap_macro, fork_wrap, fork_wrap_macro)
     exit failed
 }

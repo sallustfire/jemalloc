@@ -3,7 +3,7 @@ load("@package_metadata//purl:purl.bzl", "purl")
 load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
-load("//tools:transition.bzl", "PLATFORM", "transition_default_constraints")
+load("//tools:transition.bzl", "CPU", "PLATFORM", "transition_default_constraints")
 
 ####
 # Due to the complexity of the build, the overlay is maintained independently.
@@ -41,10 +41,7 @@ alias(
 )
 
 # Shared by the core library and the zone, which upstream compiles as one set of objects
-_LIB_COPTS = ["-Iinclude/jemalloc/internal"] + select({
-    "//settings/compiler:msvc_compatible": ["-Iinclude/msvc_compat"],
-    "//conditions:default": [],
-}) + COPTS
+_LIB_COPTS = ["-Iinclude/jemalloc/internal"] + COPTS
 
 _LIB_LOCAL_DEFINES = select({
     "//settings:jet": ["JEMALLOC_JET"],
@@ -58,75 +55,69 @@ _LIB_LOCAL_DEFINES = select({
 cc_library(
     name = "lib/jemalloc_core",
     srcs = [
-               "src/arena.c",
-               "src/background_thread.c",
-               "src/base.c",
-               "src/bin.c",
-               "src/bin_info.c",
-               "src/bitmap.c",
-               "src/buf_writer.c",
-               "src/cache_bin.c",
-               "src/ckh.c",
-               "src/counter.c",
-               "src/ctl.c",
-               "src/decay.c",
-               "src/div.c",
-               "src/ecache.c",
-               "src/edata.c",
-               "src/edata_cache.c",
-               "src/ehooks.c",
-               "src/emap.c",
-               "src/eset.c",
-               "src/exp_grow.c",
-               "src/extent.c",
-               "src/extent_dss.c",
-               "src/extent_mmap.c",
-               "src/fxp.c",
-               "src/hook.c",
-               "src/hpa.c",
-               "src/hpa_hooks.c",
-               "src/hpdata.c",
-               "src/inspect.c",
-               "src/jemalloc.c",
-               "src/large.c",
-               "src/log.c",
-               "src/malloc_io.c",
-               "src/mutex.c",
-               "src/nstime.c",
-               "src/pa.c",
-               "src/pa_extra.c",
-               "src/pac.c",
-               "src/pages.c",
-               "src/pai.c",
-               "src/peak_event.c",
-               "src/prof.c",
-               "src/prof_data.c",
-               "src/prof_log.c",
-               "src/prof_recent.c",
-               "src/prof_stats.c",
-               "src/prof_sys.c",
-               "src/psset.c",
-               "src/rtree.c",
-               "src/safety_check.c",
-               "src/san.c",
-               "src/san_bump.c",
-               "src/sc.c",
-               "src/sec.c",
-               "src/stats.c",
-               "src/sz.c",
-               "src/tcache.c",
-               "src/test_hooks.c",
-               "src/thread_event.c",
-               "src/ticker.c",
-               "src/tsd.c",
-               "src/witness.c",
-           ] + select({
-               "//settings/compiler:msvc_compatible": [
-                   "include/msvc_compat/strings.h",
-                   "include/msvc_compat/windows_extra.h",
-               ],
-               "//conditions:default": [],
-           }) + select({
+        "src/arena.c",
+        "src/background_thread.c",
+        "src/base.c",
+        "src/bin.c",
+        "src/bin_info.c",
+        "src/bitmap.c",
+        "src/buf_writer.c",
+        "src/cache_bin.c",
+        "src/ckh.c",
+        "src/counter.c",
+        "src/ctl.c",
+        "src/decay.c",
+        "src/div.c",
+        "src/ecache.c",
+        "src/edata.c",
+        "src/edata_cache.c",
+        "src/ehooks.c",
+        "src/emap.c",
+        "src/eset.c",
+        "src/exp_grow.c",
+        "src/extent.c",
+        "src/extent_dss.c",
+        "src/extent_mmap.c",
+        "src/fxp.c",
+        "src/hook.c",
+        "src/hpa.c",
+        "src/hpa_hooks.c",
+        "src/hpdata.c",
+        "src/inspect.c",
+        "src/jemalloc.c",
+        "src/large.c",
+        "src/log.c",
+        "src/malloc_io.c",
+        "src/mutex.c",
+        "src/nstime.c",
+        "src/pa.c",
+        "src/pa_extra.c",
+        "src/pac.c",
+        "src/pages.c",
+        "src/pai.c",
+        "src/peak_event.c",
+        "src/prof.c",
+        "src/prof_data.c",
+        "src/prof_log.c",
+        "src/prof_recent.c",
+        "src/prof_stats.c",
+        "src/prof_sys.c",
+        "src/psset.c",
+        "src/rtree.c",
+        "src/safety_check.c",
+        "src/san.c",
+        "src/san_bump.c",
+        "src/sc.c",
+        "src/sec.c",
+        "src/stats.c",
+        "src/sz.c",
+        "src/tcache.c",
+        "src/test_hooks.c",
+        "src/thread_event.c",
+        "src/ticker.c",
+        "src/tsd.c",
+        "src/witness.c",
+    ] + select({
         "//settings/flags:cxx": ["src/jemalloc_cpp.cpp"],
         "//conditions:default": [],
     }),
@@ -151,6 +142,10 @@ cc_library(
     tags = ["manual"],
     visibility = ["//visibility:private"],
     deps = ["//include/jemalloc/internal"] + select({
+        "@rules_cc//cc/compiler:clang-cl": ["//include/msvc_compat"],
+        "@rules_cc//cc/compiler:msvc-cl": ["//include/msvc_compat"],
+        "//conditions:default": [],
+    }) + select({
         "//settings/flags:prof_libunwind": ["@libunwind"],
         "//conditions:default": [],
     }),
@@ -174,7 +169,6 @@ cc_library(
     cxxopts = CXXOPTS,
     includes = ["include"],
     local_defines = _LIB_LOCAL_DEFINES,
-    alwayslink = True,
     tags = ["manual"],
     # zone.c is darwin-only and stops with #error without the zone allocator, which only the platform transition
     # resolves; build it through lib/jemalloc.
@@ -187,6 +181,7 @@ cc_library(
         ":lib/jemalloc_core",
         "//include/jemalloc/internal",
     ],
+    alwayslink = True,
 )
 
 # The library every consumer and test links. Whether it includes the zone is an implementation detail: it does where
@@ -205,6 +200,7 @@ cc_library(
 transition_default_constraints(
     name = "jemalloc_with_defaults",
     src = ":lib/jemalloc",
+    cpu = CPU,
     platform = PLATFORM,
     settings = {},
 )
@@ -233,4 +229,10 @@ cc_library(
     tags = ["manual"],
     visibility = ["//:__subpackages__"],
     deps = ["//include/jemalloc/internal"],
+)
+
+cc_library(
+    name = "pthread",
+    linkopts = ["-pthread"],
+    visibility = ["//include/jemalloc:__subpackages__"],
 )

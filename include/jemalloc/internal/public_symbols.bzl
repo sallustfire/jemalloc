@@ -1,44 +1,82 @@
-"Reproduce the public_symbols.txt generation from configure.ac and the headers generated from it"
+"Reproduce configure.ac's public_syms and wrap_syms, its public_symbols.txt generation and the headers generated from it"
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 
-PublicSymbolsInfo = provider(
-    doc = "The contents of public_symbols.txt.",
-    fields = ["txt"],
+_GENERATOR = attr.label(
+    default = Label("//tools/generators:public_symbols_gen"),
+    cfg = "exec",
+    executable = True,
+)
+
+def _symbol_list_impl(ctx):
+    output = ctx.actions.declare_file(ctx.attr.out)
+    headers = {}
+    for header in ctx.files.headers:
+        if header.basename in headers:
+            fail("headers holds two files named {}".format(header.basename))
+        headers[header.basename] = header
+
+    args = ctx.actions.args()
+    args.add_all(["list", output])
+    args.add_all(ctx.attr.symbols, format_each = "--symbol=%s")
+    for symbol, coupling in ctx.attr.optional_symbols.items():
+        if len(coupling) != 2:
+            fail("optional_symbols[{}] must be [header, macro], got {}".format(symbol, coupling))
+        header, macro = coupling
+        if header not in headers:
+            fail("optional_symbols[{}] names {}, which is not among headers {}".format(symbol, header, sorted(headers)))
+        args.add("--symbol={}:{}:{}".format(symbol, macro, headers[header].path))
+
+    ctx.actions.run(
+        executable = ctx.executable._generator,
+        arguments = [args],
+        inputs = ctx.files.headers,
+        outputs = [output],
+        mnemonic = "SymbolList",
+    )
+    return [DefaultInfo(files = depset([output]))]
+
+symbol_list = rule(
+    doc = "Writes configure.ac's public_syms or wrap_syms, one symbol per line: `symbols`, then each optional symbol " +
+          "whose macro its configured header defines. configure.ac appends an optional symbol in the branch where it " +
+          "defines that macro, so the list follows the probes exactly.",
+    implementation = _symbol_list_impl,
+    attrs = {
+        "headers": attr.label_list(
+            doc = "The configured headers that optional_symbols name by basename.",
+            allow_files = [".h"],
+        ),
+        "optional_symbols": attr.string_list_dict(
+            doc = "Each optional symbol, in configure.ac's order, mapped to [header basename, macro].",
+        ),
+        "out": attr.string(
+            doc = "Name of the generated file",
+            mandatory = True,
+        ),
+        "symbols": attr.string_list(doc = "The symbols listed unconditionally, in configure.ac's order."),
+        "_generator": _GENERATOR,
+    },
 )
 
 def _public_symbols_impl(ctx):
     output = ctx.actions.declare_file(ctx.attr.out)
-    prefix = ctx.attr._prefix[BuildSettingInfo].value
-
-    # configure.ac splits entries with `echo ${mangling_map} |tr ',' ' '` and writes each as $1:$2 of
-    # `echo ${nm} |tr ':' ' ' |awk`, so whitespace also separates entries, empty fields are skipped, and an entry whose
-    # name is not a public symbol is still written.
-    content = ""
-    symbols = list(ctx.attr.symbols)
-    words = ctx.attr.mangling_map.replace(",", " ").replace("\t", " ").replace("\n", " ").split(" ")
-    for word in [word for word in words if word]:
-        fields = [field for field in word.split(":") if field] + ["", ""]
-        content += "{}:{}\n".format(fields[0], fields[1])
-        symbols = [symbol for symbol in symbols if symbol != fields[0]]
-    for symbol in symbols:
-        content += "{}:{}{}\n".format(symbol, prefix, symbol)
-
-    ctx.actions.write(
-        output = output,
-        content = content,
+    args = ctx.actions.args()
+    args.add_all(["txt", output, ctx.file.symbols])
+    args.add(ctx.attr._prefix[BuildSettingInfo].value, format = "--prefix=%s")
+    args.add(ctx.attr.mangling_map, format = "--mangling-map=%s")
+    ctx.actions.run(
+        executable = ctx.executable._generator,
+        arguments = [args],
+        inputs = [ctx.file.symbols],
+        outputs = [output],
+        mnemonic = "PublicSymbols",
     )
-
-    return [DefaultInfo(files = depset([output])), PublicSymbolsInfo(txt = content)]
+    return [DefaultInfo(files = depset([output]))]
 
 public_symbols = rule(
+    doc = "Writes public_symbols.txt as configure.ac's AC_CONFIG_COMMANDS does, from the public_syms `symbols`.",
     implementation = _public_symbols_impl,
     attrs = {
-        "symbols": attr.string_list(
-            doc = "List of all public symbols",
-            allow_empty = False,
-            mandatory = True,
-        ),
         "mangling_map": attr.string(
             doc = "The equivalent of --with-mangling=<key_1>:<value_1>,<key_2>:<value_2>,...",
         ),
@@ -46,83 +84,34 @@ public_symbols = rule(
             doc = "Name of the generated file",
             mandatory = True,
         ),
+        "symbols": attr.label(
+            doc = "configure.ac's public_syms, as a symbol_list writes it",
+            allow_single_file = True,
+            mandatory = True,
+        ),
+        "_generator": _GENERATOR,
         "_prefix": attr.label(default = "//settings/flags:jemalloc_prefix_resolved"),
     },
 )
 
-_MANGLE_HEAD = """\
-/*
- * By default application code must explicitly refer to mangled symbol names,
- * so that it is possible to use jemalloc in conjunction with another allocator
- * in the same application.  Define JEMALLOC_MANGLE in order to cause automatic
- * name mangling that matches the API prefixing that happened as a result of
- * --with-mangling and/or --with-jemalloc-prefix configuration settings.
- */
-#ifdef JEMALLOC_MANGLE
-#  ifndef JEMALLOC_NO_DEMANGLE
-#    define JEMALLOC_NO_DEMANGLE
-#  endif
-"""
-
-_MANGLE_MIDDLE = """\
-#endif
-
-/*
- * The {}* macros can be used as stable alternative names for the
- * public jemalloc API if JEMALLOC_NO_DEMANGLE is defined.  This is primarily
- * meant for use in jemalloc itself, but it can be used by application code to
- * provide isolation from the name mangling specified via --with-mangling
- * and/or --with-jemalloc-prefix.
- */
-#ifndef JEMALLOC_NO_DEMANGLE
-"""
-
-_RENAME_HEAD = """\
-/*
- * Name mangling for public symbols is controlled by --with-mangling and
- * --with-jemalloc-prefix.  With default settings the je_ prefix is stripped by
- * these macro definitions.
- */
-#ifndef JEMALLOC_NO_RENAME
-"""
-
-def _mangle(symbols, prefix):
-    return (
-        _MANGLE_HEAD +
-        "".join(["#  define {} {}{}\n".format(name, prefix, name) for name, _ in symbols]) +
-        _MANGLE_MIDDLE.format(prefix) +
-        "".join(["#  undef {}{}\n".format(prefix, name) for name, _ in symbols]) +
-        "#endif\n"
-    )
-
-def _rename(symbols, _symbol_prefix):
-    return _RENAME_HEAD + "".join(["#  define je_{} {}\n".format(name, mangled) for name, mangled in symbols]) + "#endif\n"
-
-def _namespace(symbols, _symbol_prefix):
-    return "".join(["#define je_{} JEMALLOC_N({})\n".format(name, name) for name, _ in symbols])
-
-def _unnamespace(symbols, _symbol_prefix):
-    return "".join(["#undef je_{}\n".format(name) for name, _ in symbols])
-
-_SCRIPTS = {
-    "jemalloc_mangle.sh": _mangle,
-    "jemalloc_rename.sh": _rename,
-    "public_namespace.sh": _namespace,
-    "public_unnamespace.sh": _unnamespace,
-}
-
-def _name_and_mangled(word):
-    # $1 and $2 of `echo ${nm} |tr ':' ' ' |awk ...`
-    fields = [field for field in word.split(":") if field] + ["", ""]
-    return fields[0], fields[1]
+_SCRIPTS = [
+    "jemalloc_mangle.sh",
+    "jemalloc_rename.sh",
+    "public_namespace.sh",
+    "public_unnamespace.sh",
+]
 
 def _public_symbols_header_impl(ctx):
-    # for nm in `cat public_symbols.txt`
-    words = ctx.attr.public_symbols[PublicSymbolsInfo].txt.replace("\t", " ").replace("\n", " ").split(" ")
     output = ctx.actions.declare_file(ctx.attr.out)
-    ctx.actions.write(
-        output = output,
-        content = _SCRIPTS[ctx.attr.script]([_name_and_mangled(word) for word in words if word], ctx.attr.symbol_prefix),
+    args = ctx.actions.args()
+    args.add_all([ctx.attr.script, output, ctx.file.public_symbols])
+    args.add(ctx.attr.symbol_prefix, format = "--symbol-prefix=%s")
+    ctx.actions.run(
+        executable = ctx.executable._generator,
+        arguments = [args],
+        inputs = [ctx.file.public_symbols],
+        outputs = [output],
+        mnemonic = "PublicSymbolsHeader",
     )
     return [DefaultInfo(files = depset([output]))]
 
@@ -131,8 +120,13 @@ public_symbols_header = rule(
     implementation = _public_symbols_header_impl,
     attrs = {
         "out": attr.string(mandatory = True),
-        "public_symbols": attr.label(mandatory = True, providers = [PublicSymbolsInfo]),
-        "script": attr.string(mandatory = True, values = _SCRIPTS.keys()),
+        "public_symbols": attr.label(
+            doc = "public_symbols.txt, as a public_symbols target writes it",
+            allow_single_file = True,
+            mandatory = True,
+        ),
+        "script": attr.string(mandatory = True, values = _SCRIPTS),
         "symbol_prefix": attr.string(doc = "The second argument of jemalloc_mangle.sh."),
+        "_generator": _GENERATOR,
     },
 )

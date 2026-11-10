@@ -3,11 +3,12 @@
 This is a minimal fork of [jemalloc](https://github.com/jemalloc/jemalloc) to maintain a set of overlay files for 
 building jemalloc with [Bazel](https://bazel.build/). 
 
-The upstream jemalloc build performs a number of feature detection steps in the configure script. All of which need to be
-statically declared via platform and compiler constraints. Some of these have been made configurable under
-//settings, but the list is not exhaustive. An attempt has been made to default to logical values assuming the most
-common configurations. But these assumptions cannot satisfy all cases in the wild and may break on some systems. 
-Contributors are encouraged to open MRs to add more configuration options to //settings/platform.
+The upstream jemalloc build performs a number of feature detection steps in the configure script. Here the checks
+that ask the toolchain (functions and their signatures, MADV_* constants, builtins, attributes, atomics, type sizes and
+byte order) are copies of configure.ac's test programs, compiled or linked by rules_cc_autoconf with the target's
+toolchain. configure's host table is expressed as platform selects and transition defaults. What configure learns by
+running a program on the build machine (page size, virtual address bits, huge page size) is set by flags under
+//settings/platform; lg_page and lg_vaddr have per-platform defaults.
 
 ## Usage
 
@@ -34,37 +35,52 @@ See the [examples/BUILD.bazel](examples/BUILD.bazel) file for examples of how to
 - **Library targets:** @jemalloc//:jemalloc is the target to depend on, through deps or the malloc attribute; it
  provides CcInfo and builds no file of its own. Inside, the archives are lib/libjemalloc_core.a and, with the zone
  allocator, lib/libjemalloc_zone.lo; their names are not part of the interface.
-- **//settings/platform:lg_vaddr:** Defaults to the hard-coded cross compilation value of 57 from the configure script.
- If targeting a 32-bit platform, this should be explicitly set.
-- **glibc:** Assumes a modern version. If jemalloc is compiled to be the default allocator on linux, it assumes glibc
- and some publicly exposed symbols can be wrapped: __malloc_hook, __realloc_hook, __free_hook, __memalign_hook.
- However, they are deprecated since glibc 2.34. The jemalloc source likely needs to be updated to reflect this.
+- **//settings/platform:lg_vaddr (--with-lg-vaddr):** Defaults as configure does: 48 on aarch64, 57 on x86_64 (the
+ configure script's cross compilation value; a native configure runs CPUID instead, which gives 48 on a CPU without
+ 5-level paging), and the pointer width on any other CPU whose width @platforms makes clear. Any other CPU, such as
+ ppc, must set it, or the build fails. Set it explicitly to override. The flag defaults to "__auto__", which only
+ jemalloc's own transition resolves, so a select() on the flag or $(LG_VADDR) outside it sees "__auto__". Any value is
+ written into the header as is, without checking that it is a number.
+- **//settings/platform:lg_page (--with-lg-page):** Defaults to 16 (64 KiB) on aarch64 Linux and Android and on ppc64le
+ Linux, so one build runs on kernels with 4K, 16K or 64K pages, at the cost of a coarser page granularity on 4K
+ kernels (configure's cross compilation value is 12, which fails at startup on a 16K or 64K kernel). Darwin defaults
+ to 14 and everything else to 12. Set it explicitly to override.
+- **//settings/platform:lg_hugepage (--with-lg-hugepage):** Defaults to 21 (2 MiB), configure's value when it cannot
+ read the huge page size. It must be at least lg_page, as configure requires, or the build fails; so on aarch64 Linux
+ and Android and ppc64le Linux, where lg_page defaults to 16, a value below 16 needs lg_page set explicitly too.
+- **glibc:** Without a prefix, the __libc_* functions and __posix_memalign are probed and listed (exempt from private
+ renaming) wherever they link, and on Linux the hooks __malloc_hook, __realloc_hook, __free_hook and __memalign_hook
+ where they still link (glibc before 2.34), exactly as configure does. jemalloc defines the hooks, and aliases the
+ __libc_* functions and __posix_memalign, only where the malloc hooks link on glibc; elsewhere, as with configure,
+ these names are listed but not defined.
 
 Platform configurations that have defaults that are applied via transition.
+- //settings/flags:enable_lazy_lock
 - //settings/flags:enable_zone_allocator
 - //settings/flags:jemalloc_prefix
-- //settings/platform:glibc_overrides_support
 - //settings/platform:lg_page
-- //settings/platform:memalign_support
-- //settings/platform:malloc_size_support
-- //settings/platform:usable_size_const
-- //settings/platform:valloc_support
+- //settings/platform:lg_vaddr
+
+The optional public functions (memalign, valloc, malloc_size) are exported exactly where configure would export them:
+where the target's toolchain links them, as the configured headers record.
 
 ## Fidelity with upstream
 
 The upstream build generates several headers with shell, awk and sed scripts, run by configure and make on the host.
-Here Bazel generates them from Starlark rules and a small C++ tool, so a module that depends on `@jemalloc` needs only
-its C and C++ toolchain: no host shell, awk or sed. private_namespace.h comes from running the toolchain's `nm`, which
-the tool can only do on POSIX hosts for now (see Windows under Known Issues).
+Here Bazel generates them with small C++ tools, so a module that depends on `@jemalloc` needs only its C and C++
+toolchain: no host shell, awk or sed. As in configure, the public symbols include optional functions only where the
+configured headers define the matching macro, so the headers built from them are written when the build runs.
+private_namespace.h comes from running the toolchain's `nm`, which the tool can only do on POSIX hosts for now (see
+Windows under Known Issues).
 
 The upstream scripts are kept, not replaced. Each generated header has a `fidelity_test` in
 [tools/fidelity](tools/fidelity) that runs the unmodified upstream script, as configure.ac invokes it, on the
 same inputs and with the same settings, and fails if the outputs differ. The scripts run with hermetic gawk, grep, sed
 and coreutils, which are dev dependencies: they are fetched for this repository's tests and never for consumers. The
 `upstream-oracle` CI job goes further, building the upstream release with configure and make and comparing every
-script-generated header with the Bazel build's.
+script-generated header, and the public and wrapped symbol lists, with the Bazel build's.
 
-When upgrading jemalloc, a failing fidelity test means an upstream script changed and its Starlark counterpart must
+When upgrading jemalloc, a failing fidelity test means an upstream script changed and its Bazel counterpart must
 follow.
 
 ## Validated Platforms
@@ -84,9 +100,8 @@ Profiling (`--config=prof-*`) is tested on Linux only.
     likely fail. Generating private_namespace.h also fails there: the tool that runs `nm` is not implemented on Windows.
 - **FreeBSD:** An effort was made to translate existing autoconf feature detection to Bazel config settings, but no 
     attempt has been made to build on FreeBSD.
-- **Centos 7:** Fails due to the lack of defining `JEMALLOC_MADV_FREE`. Though, the original build does not set it when 
-    `MADV_FREE` is present. Supporting both and being faithful to the configure script would require an additional 
-    platform setting.
+- **CentOS 7:** Untested. Its headers lack MADV_FREE; as with configure, x86 Linux builds then define it themselves
+    (JEMALLOC_DEFINE_MADVISE_FREE, configure.ac:2224-2230).
 - C++ compilation might be broken for LLVM around detecting libstdc++.
 
 ## Contributing
