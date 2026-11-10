@@ -41,13 +41,13 @@ See the [examples/BUILD.bazel](examples/BUILD.bazel) file for examples of how to
  ppc, must set it, or the build fails. Set it explicitly to override. The flag defaults to "__auto__", which only
  jemalloc's own transition resolves, so a select() on the flag or $(LG_VADDR) outside it sees "__auto__". Any value is
  written into the header as is, without checking that it is a number.
-- **//settings/platform:lg_page (--with-lg-page):** Defaults to 16 (64 KiB) on aarch64 Linux and Android, so one build
- runs on kernels with 4K, 16K or 64K pages, at the cost of a coarser page granularity on 4K kernels (configure's cross
- compilation value is 12, which fails at startup on a 16K or 64K kernel). Darwin defaults to 14 and everything else to
- 12. Set it explicitly to override.
+- **//settings/platform:lg_page (--with-lg-page):** Defaults to 16 (64 KiB) on aarch64 Linux and Android and on ppc64le
+ Linux, so one build runs on kernels with 4K, 16K or 64K pages, at the cost of a coarser page granularity on 4K
+ kernels (configure's cross compilation value is 12, which fails at startup on a 16K or 64K kernel). Darwin defaults
+ to 14 and everything else to 12. Set it explicitly to override.
 - **//settings/platform:lg_hugepage (--with-lg-hugepage):** Defaults to 21 (2 MiB), configure's value when it cannot
  read the huge page size. It must be at least lg_page, as configure requires, or the build fails; so on aarch64 Linux
- and Android, where lg_page defaults to 16, a value below 16 needs lg_page set explicitly too.
+ and Android and ppc64le Linux, where lg_page defaults to 16, a value below 16 needs lg_page set explicitly too.
 - **glibc:** Without a prefix, the __libc_* functions and __posix_memalign are probed and listed (exempt from private
  renaming) wherever they link, and on Linux the hooks __malloc_hook, __realloc_hook, __free_hook and __memalign_hook
  where they still link (glibc before 2.34), exactly as configure does. jemalloc defines the hooks, and aliases the

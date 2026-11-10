@@ -19,10 +19,12 @@ PLATFORM = select({
     ]
 } | {"//conditions:default": "unknown"})
 
-# The CPU class the platform defaults read. aarch64 and x86_64 have defaults of their own; any other CPU is classed by
-# its pointer width, and a CPU whose width @platforms leaves ambiguous (ppc) or that is not listed is "unknown".
+# The CPU class the platform defaults read. aarch64, ppc64le and x86_64 have defaults of their own; any other CPU is
+# classed by its pointer width, and a CPU whose width @platforms leaves ambiguous (ppc) or that is not listed is
+# "unknown".
 CPU = select({
     "@platforms//cpu:aarch64": "aarch64",
+    "@platforms//cpu:ppc64le": "ppc64le",
     "@platforms//cpu:x86_64": "x86_64",
 } | {
     cpu: "other_64_bit"
@@ -30,7 +32,6 @@ CPU = select({
         "@platforms//cpu:arm64e",
         "@platforms//cpu:cortex-r82",
         "@platforms//cpu:mips64",
-        "@platforms//cpu:ppc64le",
         "@platforms//cpu:riscv64",
         "@platforms//cpu:s390x",
         "@platforms//cpu:wasm64",
@@ -63,15 +64,23 @@ _PLATFORM_DEFAULTS = {
     "//settings/flags:enable_zone_allocator": {"darwin": "yes", "default": "no"},
     # configure.ac's --with-jemalloc-prefix default: "je_" for the macho and pecoff ABIs, "" otherwise.
     "//settings/flags:jemalloc_prefix": {"darwin": "je_", "windows": "je_", "default": ""},
-    # 64K pages on aarch64 Linux and Android: LG_PAGE must be at least the kernel's page size or pages_boot fails, and
-    # aarch64 kernels use 4K, 16K or 64K pages. configure.ac's cross-compiling answer is 12.
-    "//settings/platform:lg_page": {"android-aarch64": "16", "darwin": "14", "linux-aarch64": "16", "default": "12"},
+    # 64K pages on aarch64 Linux and Android and ppc64le Linux: LG_PAGE must be at least the kernel's page size or
+    # pages_boot fails, and their kernels use 4K, 16K or 64K pages. configure.ac's cross-compiling answer is 12; Debian
+    # and Fedora build their jemalloc packages for these CPUs with --with-lg-page=16.
+    "//settings/platform:lg_page": {
+        "android-aarch64": "16",
+        "darwin": "14",
+        "linux-aarch64": "16",
+        "linux-ppc64le": "16",
+        "default": "12",
+    },
     # configure.ac's LG_VADDR: 48 on aarch64, 57 on x86_64 (its cross-compiling answer; natively it runs CPUID), and the
     # pointer width on any other CPU. A CPU of unknown width has no default, as the value is a fact about the target.
     "//settings/platform:lg_vaddr": {
         "*-aarch64": "48",
         "*-other_32_bit": "32",
         "*-other_64_bit": "64",
+        "*-ppc64le": "64",
         "*-x86_64": "57",
     },
 }
@@ -154,6 +163,7 @@ transition_default_constraints = rule(
                 "aarch64",
                 "other_32_bit",
                 "other_64_bit",
+                "ppc64le",
                 "unknown",
                 "x86_64",
             ],
