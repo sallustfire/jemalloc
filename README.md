@@ -12,7 +12,8 @@ running a program on the build machine (page size, virtual address bits, huge pa
 
 ## Usage
 
-See the [examples/BUILD.bazel](examples/BUILD.bazel) file for examples of how to consume `@jemalloc`.
+See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.bazel) file for examples of how to consume
+`@jemalloc`.
 
 ## Notes
 
@@ -96,7 +97,8 @@ Tested in CI with the latest Bazel 7.x, 8.x and 9.x:
 - Ubuntu 24.04 (aarch64)
 - MacOS 15 & 26 (arm64)
 
-The minimum supported Bazel, 7.4.0, is tested on Ubuntu 24.04 (x86_64) and, for the examples module only, MacOS 15.
+The minimum supported Bazel, 7.4.0, is tested on Ubuntu 24.04 (x86_64) and, for the host toolchain examples only,
+MacOS 15.
 Profiling (`--config=prof-*`) is tested on Linux only.
 
 ## Known Issues
