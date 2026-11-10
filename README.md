@@ -1,7 +1,24 @@
 # Bazel build of jemalloc
 
-This is a minimal fork of [jemalloc](https://github.com/jemalloc/jemalloc) to maintain a set of overlay files for 
-building jemalloc with [Bazel](https://bazel.build/). 
+The [Bazel](https://bazel.build/) build of [jemalloc](https://github.com/jemalloc/jemalloc), published to the
+[Bazel Central Registry](https://registry.bazel.build/modules/jemalloc) as the `jemalloc` module, is maintained at
+https://github.com/sallustfire/jemalloc. Each `bcr-<version>` branch there is upstream's source for that jemalloc
+release plus the Bazel build. Report problems with the Bazel build and send changes to it there; problems in jemalloc
+itself belong upstream.
+
+## How the registry entry is produced
+
+The registry entry does not fetch the repository above. It fetches upstream's release tarball (for 5.3.0,
+`jemalloc-5.3.0.tar.bz2` from jemalloc's GitHub releases) and adds the Bazel build to it:
+
+- **overlay/** holds every committed file the tarball lacks: the BUILD and .bzl files, MODULE.bazel, settings/, tools/,
+  examples/ and this README. The repository's own tooling, listed in `.bcr/fork_only.txt`, stays out.
+- **patches/** holds one patch for each upstream file the repository edits, the difference between the committed file
+  and the tarball's.
+
+`.github/scripts/export_bcr_entry.py` writes the entry into a registry checkout from a committed ref. It writes
+nothing unless the tarball, overlay and patches, applied as Bazel applies them, rebuild that ref byte for byte.
+`.bcr/presubmit.yml` becomes the entry's presubmit.
 
 The upstream jemalloc build performs a number of feature detection steps in the configure script. Here the checks
 that ask the toolchain (functions and their signatures, MADV_* constants, builtins, attributes, atomics, type sizes and
@@ -113,9 +130,16 @@ Profiling (`--config=prof-*`) is tested on Linux only.
 
 ## Contributing
 
-Before contributing new versions or updates to the Bazel Central Registry, these contributions should be made as Merge 
-Requests here:
-  - Fork the repository targeting the existing BCR release branch (e.g `bcr-5.3.0`) for the jemalloc version or create 
-    a new one 
-  - Verify the that all tests pass on the supported platforms e.g. `bazel test //...`
-  - Open a Merge Request
+Send changes as pull requests to https://github.com/sallustfire/jemalloc, against the branch for the jemalloc version,
+such as `bcr-5.3.0`. Support for a new jemalloc release starts as a new `bcr-<version>` branch.
+
+- Leave upstream's files as upstream ships them where you can. Each edit to one ships to the registry as a patch, so
+  edit one only when the Bazel build needs it, and say why in a comment beside the edit.
+- A new file ships in the overlay with no further step. List it in `.bcr/fork_only.txt` only if it is tooling for this
+  repository, such as CI configuration.
+- Run `bazel test //...` at the root and in `examples/host_toolchain` and `examples/hermetic_llvm`. CI runs them on the
+  platforms above and builds the upstream release with configure and make to compare.
+
+A release sets `version` in MODULE.bazel to `<upstream>.bcr.<N>`, runs
+`.github/scripts/export_bcr_entry.py --registry <registry checkout>`, and opens a pull request against the
+[Bazel Central Registry](https://github.com/bazelbuild/bazel-central-registry) with the entry it writes.
