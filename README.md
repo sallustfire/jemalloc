@@ -114,6 +114,20 @@ Profiling (`--config=prof-*`) is tested on Linux only.
     (JEMALLOC_DEFINE_MADVISE_FREE, configure.ac:2224-2230).
 - C++ compilation might be broken for LLVM around detecting libstdc++.
 
+## How the registry entry is produced
+
+The registry entry does not fetch the repository above. It fetches upstream's release tarball (for 5.3.0,
+`jemalloc-5.3.0.tar.bz2` from jemalloc's GitHub releases) and adds the Bazel build to it:
+
+- **overlay/** holds every committed file the tarball lacks: the BUILD and .bzl files, MODULE.bazel, settings/, tools/,
+  examples/ and this README. The repository's own tooling, listed in `.bcr/fork_only.txt`, stays out.
+- **patches/** holds one patch for each upstream file the repository edits, the difference between the committed file
+  and the tarball's.
+
+`.github/scripts/export_bcr_entry.py` writes the entry into a registry checkout from a committed ref. It writes
+nothing unless the tarball, overlay and patches, applied as Bazel applies them, rebuild that ref byte for byte.
+`.bcr/presubmit.yml` becomes the entry's presubmit.
+
 ## Contributing
 
 Send changes as pull requests to https://github.com/sallustfire/jemalloc, against the branch for the jemalloc version,
@@ -129,17 +143,3 @@ such as `bcr-5.3.0`. Support for a new jemalloc release starts as a new `bcr-<ve
 A release sets `version` in MODULE.bazel to `<upstream>.bcr.<N>`, runs
 `.github/scripts/export_bcr_entry.py --registry <registry checkout>`, and opens a pull request against the
 [Bazel Central Registry](https://github.com/bazelbuild/bazel-central-registry) with the entry it writes.
-
-## How the registry entry is produced
-
-The registry entry does not fetch the repository above. It fetches upstream's release tarball (for 5.3.0,
-`jemalloc-5.3.0.tar.bz2` from jemalloc's GitHub releases) and adds the Bazel build to it:
-
-- **overlay/** holds every committed file the tarball lacks: the BUILD and .bzl files, MODULE.bazel, settings/, tools/,
-  examples/ and this README. The repository's own tooling, listed in `.bcr/fork_only.txt`, stays out.
-- **patches/** holds one patch for each upstream file the repository edits, the difference between the committed file
-  and the tarball's.
-
-`.github/scripts/export_bcr_entry.py` writes the entry into a registry checkout from a committed ref. It writes
-nothing unless the tarball, overlay and patches, applied as Bazel applies them, rebuild that ref byte for byte.
-`.bcr/presubmit.yml` becomes the entry's presubmit.
