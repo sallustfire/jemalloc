@@ -174,19 +174,18 @@ jobs:
         if: startsWith(matrix.container, 'alpine')
         run: |
           apk add --no-cache bash build-base bzip2 coreutils curl diffutils gcompat git libstdc++ openjdk21-jdk tar
-          curl --fail --silent --show-error --location -o /usr/local/bin/bazel \
-            https://github.com/bazelbuild/bazelisk/releases/download/v1.27.0/bazelisk-linux-amd64
-          # The digest GitHub publishes for the v1.27.0 release asset bazelisk-linux-amd64.
-          echo "e1508323f347ad1465a887bc5d2bfb91cffc232d11e8e997b623227c6b32fb76  /usr/local/bin/bazel" | sha256sum -c -
-          chmod +x /usr/local/bin/bazel
           echo "startup --server_javabase=/usr/lib/jvm/java-21-openjdk" > /etc/bazel.bazelrc
       - name: Install Debian packages
         if: startsWith(matrix.container, 'debian')
         run: |
           apt-get update
           apt-get install --yes --no-install-recommends build-essential bzip2 ca-certificates curl git
+      - name: Install Bazelisk
+        if: matrix.container != ''
+        run: |
           curl --fail --silent --show-error --location -o /usr/local/bin/bazel \
             https://github.com/bazelbuild/bazelisk/releases/download/v1.27.0/bazelisk-linux-amd64
+          # The digest GitHub publishes for the v1.27.0 release asset bazelisk-linux-amd64.
           echo "e1508323f347ad1465a887bc5d2bfb91cffc232d11e8e997b623227c6b32fb76  /usr/local/bin/bazel" | sha256sum -c -
           chmod +x /usr/local/bin/bazel
       - uses: actions/checkout@v4
