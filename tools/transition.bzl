@@ -65,8 +65,9 @@ _PLATFORM_DEFAULTS = {
     # configure.ac's --with-jemalloc-prefix default: "je_" for the macho and pecoff ABIs, "" otherwise.
     "//settings/flags:jemalloc_prefix": {"darwin": "je_", "windows": "je_", "default": ""},
     # 64K pages on aarch64 Linux and Android and ppc64le Linux: LG_PAGE must be at least the kernel's page size or
-    # pages_boot fails, and their kernels use 4K, 16K or 64K pages. configure.ac's cross-compiling answer is 12; Debian
-    # and Fedora build their jemalloc packages for these CPUs with --with-lg-page=16.
+    # pages_boot fails, and aarch64 kernels use 4K, 16K or 64K pages, ppc64le kernels 4K or 64K. configure.ac's
+    # cross-compiling answer is 12; Debian and Fedora build their jemalloc packages for these CPUs with
+    # --with-lg-page=16.
     "//settings/platform:lg_page": {
         "android-aarch64": "16",
         "darwin": "14",
