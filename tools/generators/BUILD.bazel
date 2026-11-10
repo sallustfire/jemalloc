@@ -29,6 +29,7 @@ cc_binary(
 # or undefined, and lines that must not count as either. Written here so one line can end in CRLF.
 write_file(
     name = "public_symbols_gen_fixture",
+    testonly = True,
     out = "public_symbols_gen_fixture.h",
     content = [
         "/* Fixture for public_symbols_gen list. */",
@@ -89,6 +90,7 @@ _LIST_FIXTURE_SYMBOLS = {
 
 symbol_list(
     name = "public_symbols_gen_list",
+    testonly = True,
     out = "public_symbols_gen_list.txt",
     headers = [":public_symbols_gen_fixture"],
     optional_symbols = _LIST_FIXTURE_SYMBOLS,
