@@ -110,11 +110,6 @@ Profiling (`--config=prof-*`) is tested on Linux only.
   Generating private_namespace.h fails there regardless: the tool that runs `nm` is not implemented on Windows.
 - **FreeBSD:** configure's FreeBSD settings are translated (lazy lock, the vm.overcommit sysctl, -D_BSD_SOURCE for
   probes), but nothing has been built on FreeBSD.
-- **CentOS 7:** Untested, and its GCC 4.8 is too old: the header generators are C++14 and src/jemalloc_cpp.cpp is
-  compiled as C++17 (where configure would instead turn C++ support off), so it needs a newer compiler such as
-  devtoolset's. Its headers also lack MADV_FREE; as with configure, x86 Linux builds then define it themselves
-  (JEMALLOC_DEFINE_MADVISE_FREE, configure.ac:2224-2230). Rocky Linux 8 (glibc 2.28, GCC 8.5) is the oldest Linux
-  tested.
 
 ## How the registry entry is produced
 
