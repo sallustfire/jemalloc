@@ -8,7 +8,7 @@ that ask the toolchain (functions and their signatures, MADV_* constants, builti
 byte order) are copies of configure.ac's test programs, compiled or linked by rules_cc_autoconf with the target's
 toolchain. configure's host table is expressed as platform selects and transition defaults. What configure learns by
 running a program on the build machine (page size, virtual address bits, huge page size) is set by flags under
-//settings/platform, with per-platform defaults.
+//settings/platform; lg_page and lg_vaddr have per-platform defaults.
 
 ## Usage
 
