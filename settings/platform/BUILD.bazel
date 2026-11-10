@@ -5,7 +5,7 @@ load("@bazel_skylib//rules:common_settings.bzl", "int_flag", "string_flag")
 # LG_HUGEPAGE Base 2 log of system huge page size, can be explicitly set --with-lg-hugepage
 # The correct setting depends on the kernel. configure defaults to 21 (2 MiB) when detection fails and
 # there is runtime detection to gracefully handle a misconfigure value
-# It must be at least lg_page, as configure requires; jemalloc_internal_defs.h fails to build otherwise.
+# It must be at least lg_page, as configure requires.
 int_flag(
     name = "lg_hugepage",
     build_setting_default = 21,

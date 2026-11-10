@@ -10,6 +10,7 @@ load("@rules_cc_autoconf//autoconf:checks.bzl", "checks", "macros", "utils")
 load("//tools:cc.bzl", "CONLYOPTS", "CXXOPTS")
 load("//tools:configure_host.bzl", "HOST_CC_DEPS", "HOST_CPPFLAGS", "HOST_LIBS")
 load("//tools:transition.bzl", "CPU", "PLATFORM")
+load(":lg_hugepage.bzl", "checked_lg_hugepage")
 load(":private_namespace.bzl", "jemalloc_private_namespace", "private_namespace", "private_namespace_leak_test")
 load(":public_symbols.bzl", "public_symbols", "public_symbols_header", "symbol_list")
 load(":symbols.bzl", "OPTIONAL_PUBLIC_SYMBOLS", "OPTIONAL_WRAP_SYMBOLS", "PUBLIC_SYMBOLS", "SYM_PREFIX", "WRAP_SYMBOLS")
@@ -206,6 +207,10 @@ jemalloc_private_namespace(
     name = "jemalloc_private_namespace",
 )
 
+checked_lg_hugepage(
+    name = "lg_hugepage",
+)
+
 selects.config_setting_group(
     name = "jet_private_namespace",
     match_all = [
@@ -288,37 +293,12 @@ autoconf(
         checks.AC_BUILD_SETTING(
             name = "je_cv_lg_hugepage",
             define = "LG_HUGEPAGE",
-            target = "//settings/platform:lg_hugepage",
+            target = ":lg_hugepage",
             unquote = True,
         ),
     ],
     cc_deps = HOST_CC_DEPS + HOST_LIBS,
     checks = [
-        # configure.ac's "Huge page size must be at least page size". compile_defines hands the string_flag lg_page to the
-        # probe as a string literal ("12"), so the check is C++ and reads a number or its decimal digits. Any other
-        # failure to compile it, such as a toolchain without C++, also reports this error.
-        checks.AC_TRY_COMPILE(
-            name = "lg_hugepage_at_least_lg_page",
-            code = "\n".join([
-                "constexpr int as_int(int value) { return value; }",
-                "constexpr int as_int(const char *digits, int value = 0) {",
-                "  return *digits == '\\0' ? value : as_int(digits + 1, value * 10 + (*digits - '0'));",
-                "}",
-                "static_assert(as_int(LG_HUGEPAGE) >= as_int(LG_PAGE), \"LG_HUGEPAGE < LG_PAGE\");",
-                "int main() { return 0; }",
-                "",
-            ]),
-            compile_defines = [
-                "LG_HUGEPAGE",
-                "LG_PAGE",
-            ],
-            error = " ".join([
-                "Huge page size must be at least page size: --@jemalloc//settings/platform:lg_hugepage is less than",
-                "--@jemalloc//settings/platform:lg_page, whose default is 16 on aarch64 Linux and Android, 14 on Darwin",
-                "and 12 elsewhere. Raise lg_hugepage or set lg_page.",
-            ]),
-            language = "cpp",
-        ),
         checks.AC_TRY_COMPILE(
             name = "ac_cv_c_compiler_gnu",
             code = utils.AC_LANG_PROGRAM(
