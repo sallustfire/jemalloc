@@ -178,6 +178,12 @@ jobs:
       - name: Install Debian packages
         if: startsWith(matrix.container, 'debian')
         run: |
+          # Debian 11's LTS has ended: deb.debian.org still serves its indexes but no longer the security pool's
+          # packages, so take all three suites from archive.debian.org.
+          printf '%s\n' \
+            'deb http://archive.debian.org/debian bullseye main' \
+            'deb http://archive.debian.org/debian bullseye-updates main' \
+            'deb http://archive.debian.org/debian-security bullseye-security main' > /etc/apt/sources.list
           apt-get update
           apt-get install --yes --no-install-recommends build-essential bzip2 ca-certificates curl git
       - name: Install Bazelisk
