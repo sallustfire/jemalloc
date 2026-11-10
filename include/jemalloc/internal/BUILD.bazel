@@ -728,6 +728,7 @@ autoconf(
         "@platforms//os:ios": [],
         "@platforms//os:macos": [],
         "@platforms//os:tvos": [],
+        "@platforms//os:visionos": [],
         "@platforms//os:watchos": [],
         "@platforms//os:windows": [],
         "//conditions:default": [
@@ -780,6 +781,7 @@ autoconf(
             "@platforms//os:openbsd",
             "@platforms//os:qnx",
             "@platforms//os:tvos",
+            "@platforms//os:visionos",
             "@platforms//os:watchos",
             "@platforms//os:windows",
         ]
@@ -809,6 +811,7 @@ autoconf(
         "@platforms//os:ios": [],
         "@platforms//os:macos": [],
         "@platforms//os:tvos": [],
+        "@platforms//os:visionos": [],
         "@platforms//os:watchos": [],
         "//conditions:default": [
             checks.AC_DEFINE_UNQUOTED(
