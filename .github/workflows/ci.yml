@@ -250,3 +250,22 @@ jobs:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
         working-directory: examples
         run: bazel test //... ${{ matrix.bazel_config }}
+
+  examples-hermetic-llvm:
+    name: Examples (hermetic LLVM, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          repository-cache: true
+      - name: Test
+        env:
+          USE_BAZEL_VERSION: 8.x
+        working-directory: examples/hermetic_llvm
+        run: bazel test //... @jemalloc//include/jemalloc/internal:private_namespace_leak_test --config=bazel8

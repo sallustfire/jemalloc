@@ -35,6 +35,11 @@ See the [examples/BUILD.bazel](examples/BUILD.bazel) file for examples of how to
 - **Library targets:** @jemalloc//:jemalloc is the target to depend on, through deps or the malloc attribute; it
  provides CcInfo and builds no file of its own. Inside, the archives are lib/libjemalloc_core.a and, with the zone
  allocator, lib/libjemalloc_zone.lo; their names are not part of the interface.
+- **//settings/flags:nm (NM):** The nm that lists the library's symbols for private_namespace.h, as configure's NM
+ does. Unset, it is the C++ toolchain's nm (CcToolchainInfo.nm_executable). rules_cc's rule-based toolchains supply
+ that only through a cc_legacy_tool, so with one that declares none, such as the hermetic LLVM toolchain (the `llvm`
+ module), the build fails at that step until this is set to an nm target, for example
+ `--@jemalloc//settings/flags:nm=@llvm//tools:llvm-nm`, as [examples/hermetic_llvm](examples/hermetic_llvm) does.
 - **//settings/platform:lg_vaddr (--with-lg-vaddr):** Defaults as configure does: 48 on aarch64, 57 on x86_64 (the
  configure script's cross compilation value; a native configure runs CPUID instead, which gives 48 on a CPU without
  5-level paging), and the pointer width on any other CPU whose width @platforms makes clear. Any other CPU, such as

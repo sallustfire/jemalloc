@@ -10,6 +10,9 @@ load("//tools:transition.bzl", "platform_constraints_transition")
 # read as jemalloc's.
 _REPO = Label("//:BUILD.bazel").repo_name
 
+# The unset value of //settings/flags:nm.
+_TOOLCHAIN_NM = Label("//settings/flags:toolchain_nm")
+
 def _static_archives(target):
     """The static archives target links, from its CcInfo: every archive the library is made of, whatever its extension.
 
@@ -26,6 +29,29 @@ def _static_archives(target):
                 if archive != None and archive not in archives:
                     archives.append(archive)
     return archives
+
+def _nm(ctx, cc_toolchain):
+    """The nm to run: the //settings/flags:nm target if set, otherwise the toolchain's nm_executable.
+
+    Returns a struct of the nm's path, the tools its action needs and the inputs (the toolchain's files, for its nm).
+    """
+    if ctx.attr._nm.label == _TOOLCHAIN_NM:
+        return struct(path = cc_toolchain.nm_executable, tools = [], inputs = [cc_toolchain.all_files])
+    flag = ctx.attr._nm[DefaultInfo]
+    executable = flag.files_to_run.executable
+    if executable != None:
+        tool = flag.files_to_run
+    else:
+        files = flag.files.to_list()
+        if len(files) != 1:
+            fail("//settings/flags:nm must name one executable, but {} provides {}".format(ctx.attr._nm.label, files))
+        executable = files[0]
+        tool = executable
+
+    # private_namespace_gen runs nm with posix_spawnp, which searches PATH for a name without a slash, as the path of a
+    # file in the main repository's root package is.
+    path = executable.path if "/" in executable.path else "./" + executable.path
+    return struct(path = path, tools = [tool], inputs = [])
 
 def _linker_input_owners(target):
     return [str(linker_input.owner) for linker_input in target[CcInfo].linking_context.linker_inputs.to_list()]
@@ -62,7 +88,8 @@ def _private_namespace_impl(ctx):
         listing_source = listing.short_path
         unfound_reason = "public_symbols, prefix or sym_prefix does not match it"
     else:
-        listing_source = "`{}`".format(cc_toolchain.nm_executable)
+        nm = _nm(ctx, cc_toolchain)
+        listing_source = "`{}`".format(nm.path)
         unfound_reason = "it read no symbol table (for example from LTO bitcode it cannot parse)"
         archives = _static_archives(ctx.attr.input[0])
         if not archives:
@@ -70,9 +97,10 @@ def _private_namespace_impl(ctx):
         listing = ctx.actions.declare_file(ctx.label.name + ".nm")
         ctx.actions.run(
             executable = ctx.executable._generator,
-            arguments = ["nm", cc_toolchain.nm_executable, listing.path, nm_stderr.path] + [archive.path for archive in archives],
-            inputs = depset(archives, transitive = [cc_toolchain.all_files]),
+            arguments = ["nm", nm.path, listing.path, nm_stderr.path] + [archive.path for archive in archives],
+            inputs = depset(archives, transitive = nm.inputs),
             outputs = [listing, nm_stderr],
+            tools = nm.tools,
             mnemonic = "PrivateNamespaceNM",
         )
 
@@ -151,6 +179,12 @@ private_namespace = rule(
         ),
         "_prefix": attr.label(default = "//settings/flags:jemalloc_prefix_resolved"),
         "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
+        "_nm": attr.label(
+            doc = "//settings/flags:nm, an nm to run in place of the toolchain's.",
+            default = "//settings/flags:nm",
+            cfg = "exec",
+            allow_files = True,
+        ),
         "_generator": attr.label(
             default = Label("//tools/generators:private_namespace_gen"),
             cfg = "exec",
@@ -172,13 +206,15 @@ def _private_namespace_leak_test_impl(ctx):
     export_syms = namespace[OutputGroupInfo].export_syms.to_list()[0]
     header = namespace[DefaultInfo].files.to_list()[0]
 
+    nm = _nm(ctx, cc_toolchain)
     listing = ctx.actions.declare_file(ctx.label.name + ".nm")
     nm_stderr = ctx.actions.declare_file(ctx.label.name + ".nm.stderr")
     ctx.actions.run(
         executable = ctx.executable._generator,
-        arguments = ["nm", cc_toolchain.nm_executable, listing.path, nm_stderr.path] + [archive.path for archive in archives],
-        inputs = depset(archives, transitive = [cc_toolchain.all_files]),
+        arguments = ["nm", nm.path, listing.path, nm_stderr.path] + [archive.path for archive in archives],
+        inputs = depset(archives, transitive = nm.inputs),
         outputs = [listing, nm_stderr],
+        tools = nm.tools,
         mnemonic = "PrivateNamespaceLeakNM",
     )
 
@@ -216,6 +252,12 @@ private_namespace_leak_test = rule(
         "settings": attr.label_keyed_string_dict(doc = "Read by the transition; see transition_default_constraints."),
         "sym_prefix": attr.string(doc = "configure's SYM_PREFIX for the target platform.", mandatory = True, values = ["", "_"]),
         "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
+        "_nm": attr.label(
+            doc = "//settings/flags:nm, an nm to run in place of the toolchain's.",
+            default = "//settings/flags:nm",
+            cfg = "exec",
+            allow_files = True,
+        ),
         "_private_namespace": attr.label(default = "//settings/flags:private_namespace"),
         "_checker": attr.label(
             default = Label("//tools/generators:private_namespace_leak_check"),

@@ -1,6 +1,6 @@
 // Generates private_namespace.h from an `nm -a` (or `dumpbin /SYMBOLS`) listing, as upstream's private_symbols.awk
 // and private_namespace.sh do. It adds no shell or awk of its own: nm is run directly, so nm and any interpreter a
-// wrapper nm needs remain the C++ toolchain's dependencies.
+// wrapper nm needs remain the dependencies of whatever supplies nm, the C++ toolchain or //settings/flags:nm.
 //
 //   private_namespace_gen nm NM LISTING STDERR ARCHIVE...
 //   private_namespace_gen header HEADER LISTING STDERR SYM_PREFIX LISTING_SOURCE UNFOUND_REASON [--prefix=PREFIX]

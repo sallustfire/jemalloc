@@ -257,3 +257,16 @@ config_setting(
     name = "prof_libgcc",
     flag_values = {":enable_prof": "libgcc"},
 )
+
+# NM, the nm configure runs as DUMP_SYMS to list the library's symbols for private_namespace.h. Unset, it is the C++
+# toolchain's nm (CcToolchainInfo.nm_executable). rules_cc's rule-based toolchains supply that only through a
+# cc_legacy_tool, so for one that declares none, set this to an nm target, such as @llvm//tools:llvm-nm. A plain file
+# brings no runfiles, so an nm that needs any (shared libraries, an interpreter) must be an executable target.
+label_flag(
+    name = "nm",
+    build_setting_default = ":toolchain_nm",
+    visibility = ["//visibility:public"],
+)
+
+# The unset value of :nm.
+filegroup(name = "toolchain_nm")
