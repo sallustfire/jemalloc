@@ -48,8 +48,8 @@ COPTS = ["-D_REENTRANT"] + select({
     "@rules_cc//cc/compiler:clang-cl": _COPTS_MSVC_COMPATIBLE,
     "//conditions:default": [],
 }) + select({
-    # configure.ac adds it only for the ELF ABI. This select used to have Windows and Darwin arms too, but cquery showed
-    # the flag added on every OS for these compilers in practice, so it still is.
+    # configure.ac adds it only for the ELF ABI (configure.ac:845-849). It is keyed on the compiler alone here, which
+    # keeps the flag these compilers were already given on every OS.
     "@rules_cc//cc/compiler:clang": ["-fvisibility=hidden"],
     "@rules_cc//cc/compiler:clang-cl": ["-fvisibility=hidden"],
     "@rules_cc//cc/compiler:emscripten": ["-fvisibility=hidden"],
