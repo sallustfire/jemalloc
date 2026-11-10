@@ -1514,8 +1514,8 @@ autoconf(
 )
 
 # configure.ac adds -Werror only around these probes (JE_CFLAGS_SAVE/JE_CFLAGS_RESTORE), so a construct the compiler
-# merely warns about counts as unsupported. The flag is set once on this target rather than on each check. msvc-cl gets
-# no flag: cl ignores -Werror with a warning, so configure's probes run without it there.
+# merely warns about counts as unsupported. Each check carries the flag in its own copts: rules_cc_autoconf strips
+# -Werror from the target's copts. cl ignores -Werror with a warning, as it does under configure.
 autoconf(
     name = "jemalloc_internal_defs_warnings_as_errors_checks",
     cc_deps = HOST_CC_DEPS + HOST_LIBS,
@@ -1530,6 +1530,7 @@ autoconf(
                     "               foo = 0;",
                 ],
             ),
+            copts = ["-Werror"],
         ),
         checks.AC_DEFINE_UNQUOTED(
             "JEMALLOC_TLS_MODEL",
@@ -1546,6 +1547,7 @@ autoconf(
                 ],
                 "\tsyscall(SYS_write, 2, \"hello\", 5);",
             ),
+            copts = ["-Werror"],
         ),
         checks.AC_DEFINE_UNQUOTED(
             "JEMALLOC_USE_SYSCALL",
@@ -1566,7 +1568,10 @@ autoconf(
                     "  printf(\"%s\\n\", error);",
                 ],
             ),
-            copts = ["-D_GNU_SOURCE"],
+            copts = [
+                "-D_GNU_SOURCE",
+                "-Werror",
+            ],
         ),
         checks.AC_DEFINE_UNQUOTED(
             "JEMALLOC_STRERROR_R_RETURNS_CHAR_WITH_GNU_SOURCE",
@@ -1574,10 +1579,7 @@ autoconf(
         ),
     ],
     conlyopts = CONLYOPTS,
-    copts = select({
-        "@rules_cc//cc/compiler:msvc-cl": [],
-        "//conditions:default": ["-Werror"],
-    }) + HOST_CPPFLAGS,
+    copts = HOST_CPPFLAGS,
     tags = ["manual"],
 )
 
