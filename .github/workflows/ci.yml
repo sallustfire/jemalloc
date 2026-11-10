@@ -204,7 +204,7 @@ jobs:
         shell: bash
         run: |
           version="$(sed -n '/^ *version = "/{s/^ *version = "\([^"]*\)".*/\1/p;q;}' MODULE.bazel)"
-          upstream="${version%%-bcr.*}"
+          upstream="${version%%.bcr.*}"
           curl --fail --silent --show-error --location -o "${RUNNER_TEMP}/upstream.tar.bz2" \
             "https://github.com/jemalloc/jemalloc/releases/download/${upstream}/jemalloc-${upstream}.tar.bz2"
       - name: Compare generated headers
@@ -217,8 +217,8 @@ jobs:
           # shellcheck disable=SC2086
           .github/scripts/upstream_oracle.sh "${RUNNER_TEMP}/upstream.tar.bz2" ${CONFIGURE_ARGS} -- --config=bazel8 ${BAZEL_ARGS}
 
-  examples:
-    name: Examples (${{ matrix.os }}, Bazel ${{ matrix.bazel_version }})
+  examples-host-toolchain:
+    name: Examples (host toolchain, ${{ matrix.os }}, Bazel ${{ matrix.bazel_version }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -243,12 +243,12 @@ jobs:
       - name: Build
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
-        working-directory: examples
+        working-directory: examples/host_toolchain
         run: bazel build //... ${{ matrix.bazel_config }}
       - name: Test
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
-        working-directory: examples
+        working-directory: examples/host_toolchain
         run: bazel test //... ${{ matrix.bazel_config }}
 
   examples-hermetic-llvm:

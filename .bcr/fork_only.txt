@@ -1,0 +1,11 @@
+# Committed files that stay in the fork. Every other committed file that upstream's tarball lacks ships in the
+# registry entry's overlay/. One path per line; a trailing / covers a whole directory. Keep sorted.
+.bazelrc
+.bazelversion
+.bcr/
+.gitattributes
+.github/
+.gitignore
+MODULE.bazel.lock
+examples/hermetic_llvm/.bazelversion
+examples/host_toolchain/.bazelversion

@@ -151,16 +151,10 @@ cc_library(
     }),
 )
 
-# On macOS jemalloc replaces malloc by registering a malloc zone from src/zone.c's constructor, which nothing references.
-# A static link of an archive drops such an object, so malloc would silently stay on the system allocator. Upstream
-# avoids this only by linking the dylib on macOS, which loads every object; its static libjemalloc.a has the same hole.
-#
-# Only the zone is linked whole. Linking the whole core instead would also force jemalloc_cpp.o's global operator
-# new/delete into every binary, which then fails to link with duplicate symbols when an application defines its own
-# (examples:test_10_macos_custom_operators). The zone still pulls in the core objects it calls, jemalloc.o and its
-# constructor among them, and any operator new or delete overload that a binary calls without defining still pulls in
-# jemalloc_cpp.o, with all of its overloads, as before: an application replacing the operators must replace every
-# overload it calls. This narrows what is linked whole; it does not isolate allocators.
+# src/zone.c registers jemalloc's malloc zone from a constructor that nothing references, so a static link would drop it
+# and leave malloc on the system allocator, as it does with upstream's libjemalloc.a. Only the zone is linked whole:
+# linking the core whole would force jemalloc_cpp.o's operator new and delete into every binary, which then fails to
+# link when the application defines its own.
 cc_library(
     name = "lib/jemalloc_zone",
     srcs = ["src/zone.c"],

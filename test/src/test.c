@@ -181,6 +181,11 @@ p_test_impl(bool do_malloc_init, bool do_reentrant, test_t *t, va_list ap) {
 	    test_status_string(test_status_fail),
 	    test_counts[test_status_fail], test_count);
 
+	/*
+	 * Bazel fails any test that exits nonzero, so a test whose cases all
+	 * skipped exits 0 rather than with test_status_skip, the status
+	 * upstream's test.sh counts as a skip.
+	 */
 	return (ret == test_status_skip) ? test_status_pass : ret;
 }
 

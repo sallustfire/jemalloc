@@ -1,11 +1,11 @@
 module(
-    name = "jemalloc_examples",
+    name = "jemalloc_examples_host_toolchain",
 )
 
 bazel_dep(name = "jemalloc")
 local_path_override(
     module_name = "jemalloc",
-    path = "..",
+    path = "../..",
 )
 
 bazel_dep(name = "platforms", version = "1.0.0", dev_dependency = True)
