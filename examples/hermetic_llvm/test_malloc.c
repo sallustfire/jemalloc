@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#define JEMALLOC_NO_DEMANGLE
 #include <jemalloc/jemalloc.h>
 
 int main(void) {
@@ -12,8 +13,8 @@ int main(void) {
 
     const char *version;
     size_t sz = sizeof(version);
-    if (mallctl("version", &version, &sz, NULL, 0) != 0) {
-        fprintf(stderr, "mallctl(\"version\") failed, so jemalloc is not linked\n");
+    if (je_mallctl("version", &version, &sz, NULL, 0) != 0) {
+        fprintf(stderr, "je_mallctl(\"version\") failed, so jemalloc is not linked\n");
         return 1;
     }
     printf("jemalloc %s\n", version);
