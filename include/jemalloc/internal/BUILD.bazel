@@ -1509,6 +1509,38 @@ autoconf(
             if_false = "3",
             if_true = "4",
         ),
+        # configure.ac runs these two programs (AC_RUN_IFELSE) and answers no when cross-compiling. Here they only
+        # compile and link, which needs no target machine, so a cross build intentionally gets the target toolchain's
+        # answer where configure would leave both undefined.
+        checks.AC_TRY_LINK(
+            name = "je_cv_asm_volatile",
+            code = utils.AC_LANG_PROGRAM(
+                "",
+                [
+                    "      void* ptr;",
+                    "      asm volatile(\"\" : \"+r\"(ptr));",
+                    "      return 0;",
+                ],
+            ),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_ASM_VOLATILE",
+            condition = "je_cv_asm_volatile",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_int128",
+            code = utils.AC_LANG_PROGRAM(
+                "",
+                [
+                    "      __int128 temp = 0;",
+                    "      return temp;",
+                ],
+            ),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_INT128",
+            condition = "je_cv_int128",
+        ),
         checks.AC_TRY_LINK(
             name = "je_cv_pthread_mutex_adaptive_np",
             code = utils.AC_LANG_PROGRAM(

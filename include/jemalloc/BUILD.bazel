@@ -132,6 +132,45 @@ autoconf(
     tags = ["manual"],
 )
 
+# configure.ac adds -Wdeprecated-declarations, not -Werror, only around this probe (JE_CFLAGS_SAVE/JE_CFLAGS_RESTORE),
+# so it passes wherever __has_attribute(deprecated) holds, and the flag is set once on its own target as for
+# -Wimplicit-fallthrough. msvc-cl gets no flag, for the same reason.
+autoconf(
+    name = "jemalloc_defs_deprecated_declarations_checks",
+    cc_deps = HOST_CC_DEPS,
+    checks = [
+        checks.AC_TRY_LINK(
+            name = "je_cv_deprecated",
+            code = utils.AC_LANG_PROGRAM(
+                [
+                    "#if !__has_attribute(deprecated)",
+                    "#error \"deprecated attribute not supported\"",
+                    "#endif",
+                    "struct has_deprecated_field {",
+                    "    int good;",
+                    "    int __attribute__((deprecated(\"Do not use\"))) bad;",
+                    "};",
+                ],
+                [
+                    "struct has_deprecated_field instance;",
+                    "instance.good = 0;",
+                    "instance.bad = 1;",
+                ],
+            ),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_ATTR_DEPRECATED",
+            condition = "je_cv_deprecated",
+        ),
+    ],
+    conlyopts = CONLYOPTS,
+    copts = select({
+        "@rules_cc//cc/compiler:msvc-cl": [],
+        "//conditions:default": ["-Wdeprecated-declarations"],
+    }) + HOST_CPPFLAGS,
+    tags = ["manual"],
+)
+
 # configure.ac adds -Werror only around these probes (JE_CFLAGS_SAVE/JE_CFLAGS_RESTORE), so a construct the compiler
 # merely warns about counts as unsupported. Each check carries the flag in its own copts: rules_cc_autoconf strips
 # -Werror from the target's copts. cl ignores -Werror with a warning, as it does under configure.
@@ -201,6 +240,7 @@ autoconf_hdr(
     ],
     deps = [
         ":jemalloc_defs_checks",
+        ":jemalloc_defs_deprecated_declarations_checks",
         ":jemalloc_defs_implicit_fallthrough_checks",
         ":jemalloc_defs_warnings_as_errors_checks",
     ],
