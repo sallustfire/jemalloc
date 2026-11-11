@@ -164,9 +164,10 @@ def classify(fork, upstream, upstream_modes, fork_only):
         for path in matches:
             # Only root dotfiles with no build effect may keep the fork's edits out of the registry; any other edit to
             # an upstream file ships as a patch, or the fork would test different code than the registry serves. An
-            # unedited upstream file under a fork-only directory (5.3.1's tarball ships .github/workflows/) has no
-            # edits to lose; unedited means the tarball's bytes as the same kind of file, so a symlink or a changed
-            # executable bit is an edit too.
+            # unedited upstream file under a fork-only directory has no edits to lose, and one the fork deletes ships
+            # as the tarball has it (5.3.1's tarball ships upstream's .github/workflows/, which the fork does not
+            # run). Unedited means the tarball's bytes as the same kind of file, so a symlink or a changed executable
+            # bit is an edit too.
             edited = path in upstream and fork[path] != (upstream_modes[path], upstream[path])
             if edited and ("/" in path or not path.startswith(".")):
                 errors.append(f"{FORK_ONLY}: {entry} covers the upstream file {path}, whose edits must ship")
