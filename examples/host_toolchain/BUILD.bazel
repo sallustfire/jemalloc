@@ -97,12 +97,6 @@ cc_test(
     name = "test_8_malloc",
     size = "small",
     srcs = ["test_malloc.c"],
-    # On macOS this links the archive, as a cc_binary does by default, which is where the zone was dropped; elsewhere
-    # the test keeps the default link.
-    linkstatic = select({
-        "@platforms//os:macos": True,
-        "//conditions:default": False,
-    }),
     malloc = "@jemalloc",
     target_compatible_with = _MALLOC_REPLACED,
 )
@@ -112,12 +106,6 @@ cc_test(
     name = "test_9_malloc_config",
     size = "small",
     srcs = ["test_malloc.c"],
-    # On macOS this links the archive, as a cc_binary does by default, which is where the zone was dropped; elsewhere
-    # the test keeps the default link.
-    linkstatic = select({
-        "@platforms//os:macos": True,
-        "//conditions:default": False,
-    }),
     malloc = ":jemalloc_custom",
     target_compatible_with = _MALLOC_REPLACED,
 )
@@ -129,14 +117,12 @@ cc_test(
     name = "test_10_macos_custom_operators",
     size = "small",
     srcs = ["test_custom_operators.cc"],
-    # links the archive, as a cc_binary does by default
-    linkstatic = True,
     malloc = "@jemalloc",
     target_compatible_with = ["@platforms//os:macos"],
 )
 
-# Case 11: A shared jemalloc is a cc_shared_library of @jemalloc, here under upstream's file names. A binary that links it
-# through dynamic_deps allocates from it, through plain malloc as in case 8.
+# Case 11: A shared jemalloc is a cc_shared_library of @jemalloc, here under upstream's file names. A binary that links
+# it through dynamic_deps allocates from it, through plain malloc as in case 8.
 cc_shared_library(
     name = "jemalloc_shared",
     shared_lib_name = select({

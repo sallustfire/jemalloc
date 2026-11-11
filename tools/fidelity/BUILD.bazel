@@ -265,7 +265,7 @@ filegroup(
 
 # The generated headers, with public_symbols.txt and export_syms, the symbol lists configure writes
 filegroup(
-    name = "configured_headers",
+    name = "generated_headers",
     srcs = [
         ":private_namespace_export_syms",
         "//include/jemalloc",
@@ -279,9 +279,4 @@ filegroup(
         "//include/jemalloc/internal:public_unnamespace",
     ],
     tags = ["manual"],
-)
-
-alias(
-    name = "generated_headers",
-    actual = ":configured_headers",
 )

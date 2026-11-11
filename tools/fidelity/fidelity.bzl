@@ -2,7 +2,7 @@
 
 Consumers build the Bazel target, which needs no host tools. This test, run only in this repository, executes the
 unmodified upstream script in a build action and compares the two with skylib's diff_test, so the Starlark port cannot
-drift from the upstream contract. Both sides build through the same platform transition, so a `settings` value reaches
+drift from the upstream contract. Both sides build through the same settings transition, so a `settings` value reaches
 the script's inputs and the target alike.
 """
 
@@ -100,7 +100,7 @@ _upstream_output = rule(
 def fidelity_test(name, generated, srcs = [], script = None, script_args = [], setup = "", settings = {}, size = "small"):
     """Compares `generated` with what upstream's `script` writes to stdout from the same `srcs`.
 
-    Both build through the platform transition with `settings`.
+    Both build through the settings transition with `settings`.
 
     Args:
       name: The diff_test's name; the helper targets are `<name>.upstream` and `<name>.generated`.
