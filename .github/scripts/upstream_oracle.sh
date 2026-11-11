@@ -134,7 +134,55 @@ macros() {
   sed -n -e 's|^#define \([A-Za-z0-9_]*\)\(.*\)$|\1\2|p' -e 's|^/\* #undef \([A-Za-z0-9_]*\) \*/$|\1 (undefined)|p' "$1" |
     sed -e 's/[[:space:]]*$//' -e 's/^\([A-Za-z0-9_]*\)$/\1 (empty)/' | LC_ALL=C sort
 }
-differences="$(diff <(macros "${upstream}/include/${header}") <(macros "${internal_defs}") | sed -n -e 's/^< /upstream: /p' -e 's/^> /bazel:    /p' || true)"
+# configure runs its rdtscp program only on x86_64 and only while detecting LG_VADDR, which --with-lg-vaddr above skips,
+# so its header never defines JEMALLOC_HAVE_RDTSCP here. Upstream's header is compared without the macro. Bazel's
+# header must instead follow its select: the macro is defined exactly where host_cpu is x86_64, as this build is native.
+# On an x86_64 host the oracle also runs configure's program itself, as configure would, with configure's compiler, as a
+# cross-check of the policy that x86_64 has rdtscp. Where the program fails, as on the few x86_64 CPUs without rdtscp
+# or a VM that hides it, the oracle warns that the policy does not hold on this machine, but does not fail.
+host_cpu="$(sed -n "s/^host_cpu='\(.*\)'$/\1/p" "${upstream}/config.log")"
+expected_rdtscp="JEMALLOC_HAVE_RDTSCP (undefined)"
+if [[ "${host_cpu}" == x86_64 ]]; then
+  expected_rdtscp="JEMALLOC_HAVE_RDTSCP (empty)"
+  read -r -a cc <<<"$(sed -n 's/^CC := //p' "${upstream}/Makefile")"
+  # configure runs the program before adding its own flags, so its command has only the caller's: CFLAGS (recorded as
+  # SPECIFIED_CFLAGS), CPPFLAGS, LDFLAGS and LIBS.
+  read -r -a cflags <<<"$(sed -n 's/^SPECIFIED_CFLAGS := //p' "${upstream}/Makefile")"
+  read -r -a cppflags <<<"${CPPFLAGS:-}"
+  read -r -a ldflags <<<"${LDFLAGS:-}"
+  read -r -a libs <<<"${LIBS:-}"
+  cat >"${work}/rdtscp.c" <<'EOF'
+#include <stdint.h>
+int
+main (void)
+{
+
+      unsigned int dx;
+      asm volatile("rdtscp" : "=d"(dx) ::);
+      return 0;
+
+  ;
+  return 0;
+}
+EOF
+  if "${cc[@]}" -o "${work}/rdtscp" "${cflags[@]}" "${cppflags[@]}" "${ldflags[@]}" "${work}/rdtscp.c" "${libs[@]}" &&
+    "${work}/rdtscp"; then
+    echo "configure's rdtscp program runs on this ${host_cpu} machine"
+  else
+    echo "::warning::configure's rdtscp program fails on this ${host_cpu} machine, which lacks rdtscp, so the policy that x86_64 has rdtscp does not hold here"
+  fi
+fi
+actual_rdtscp="$(macros "${internal_defs}" | grep '^JEMALLOC_HAVE_RDTSCP ' || true)"
+if [[ "${actual_rdtscp}" == "${expected_rdtscp}" ]]; then
+  echo "${header}: ${actual_rdtscp}, as expected for ${host_cpu}"
+else
+  echo "::error::${header}: ${actual_rdtscp:-JEMALLOC_HAVE_RDTSCP missing}, but ${host_cpu} expects ${expected_rdtscp}"
+  status=1
+fi
+without_rdtscp() {
+  macros "$1" | grep -v '^JEMALLOC_HAVE_RDTSCP ' || true
+}
+differences="$(diff <(without_rdtscp "${upstream}/include/${header}") <(without_rdtscp "${internal_defs}") | sed -n -e 's/^< /upstream: /p' -e 's/^> /bazel:    /p' || true)"
 if [[ -z "${differences}" ]]; then
   echo "${header}: identical macros"
 else
