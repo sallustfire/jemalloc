@@ -4,7 +4,7 @@ JEMALLOC_PRIVATE_NAMESPACE."""
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolchain")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
-load("//tools:transition.bzl", "platform_constraints_transition")
+load("//tools:transition.bzl", "settings_transition")
 
 # This repository, as the owner of the library's own linker inputs, so that a dependency's archive (libunwind) is not
 # read as jemalloc's.
@@ -255,11 +255,9 @@ private_namespace_leak_test = rule(
         "namespace": attr.label(
             doc = "The private_namespace target that names the exported and private symbols.",
             mandatory = True,
-            cfg = platform_constraints_transition,
+            cfg = settings_transition,
         ),
-        "cpu": attr.string(doc = "Read by the transition; see transition_default_constraints.", mandatory = True),
-        "platform": attr.string(doc = "Read by the transition; see transition_default_constraints.", mandatory = True),
-        "settings": attr.label_keyed_string_dict(doc = "Read by the transition; see transition_default_constraints."),
+        "settings": attr.label_keyed_string_dict(doc = "Read by the transition; see with_settings."),
         "sym_prefix": attr.string(doc = "configure's SYM_PREFIX for the target platform.", mandatory = True, values = ["", "_"]),
         "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
         "_nm": attr.label(

@@ -3,7 +3,7 @@ load("@package_metadata//purl:purl.bzl", "purl")
 load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
-load("//tools:transition.bzl", "CPU", "PLATFORM", "transition_default_constraints")
+load("//tools:transition.bzl", "with_settings")
 
 ####
 # Due to the complexity of the build, the overlay is maintained independently.
@@ -118,11 +118,18 @@ cc_library(
     ] + select({
         "//settings/flags:cxx": ["src/jemalloc_cpp.cpp"],
         "//conditions:default": [],
-    }) + select({
-        # Last, as zone.o is in upstream's C_SYM_OBJS, so that private_namespace.h lists the symbols in upstream's order
-        "//settings/flags:zone_allocator": ["src/zone.c"],
-        "//conditions:default": [],
-    }),
+    }) + select(
+        {
+            # Last, as zone.o is in upstream's C_SYM_OBJS, so that private_namespace.h lists the symbols in upstream's
+            # order
+            "//settings/flags:zone_allocator": ["src/zone.c"],
+            "//settings/flags:zone_allocator_auto": [],
+            "//settings/flags:zone_allocator_no": [],
+        },
+        # Only "yes" off Darwin matches none, as configure.ac's
+        # AC_MSG_ERROR([--enable-zone-allocator is only supported on Darwin])
+        no_match_error = "//settings/flags:enable_zone_allocator=yes is only supported on Darwin",
+    ),
     hdrs = ["//include/jemalloc"],
     conlyopts = CONLYOPTS,
     copts = _LIB_COPTS,
@@ -163,12 +170,9 @@ cc_library(
     }),
 )
 
-transition_default_constraints(
+with_settings(
     name = "jemalloc_with_defaults",
     src = ":lib/jemalloc",
-    cpu = CPU,
-    platform = PLATFORM,
-    settings = {},
 )
 
 # C_UTIL_INTEGRATION_SRCS from the Makefile which are shared with the integration testlib
