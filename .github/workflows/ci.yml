@@ -171,6 +171,57 @@ jobs:
             os: ubuntu-24.04
             configure_args: --with-jemalloc-prefix=je_
             bazel_args: --//settings/flags:jemalloc_prefix=je_
+          # Every configure option this build mirrors as a flag, each away from its default, so that each flag is
+          # checked against the macro configure writes for it. Left out: --with-jemalloc-prefix, which the prefix
+          # entries cover; --enable-prof-libunwind, which needs libunwind; --enable-prof-frameptr, since a profiling
+          # backend takes one value and the prof-frame-pointer job covers it; and --disable-zone-allocator, which is
+          # Darwin's.
+          - name: options
+            os: ubuntu-24.04
+            configure_args: >-
+              --disable-cxx
+              --enable-debug
+              --disable-stats
+              --disable-user-config
+              --enable-experimental-smallocx
+              --enable-prof
+              --disable-dss
+              --disable-fill
+              --enable-experimental-sdt
+              --enable-xmalloc
+              --disable-cache-oblivious
+              --enable-log
+              --enable-force-getenv
+              --enable-uaf-detection
+              --enable-lazy-lock
+              --enable-pageid
+              --with-private-namespace=ci_
+              --with-malloc-conf=background_thread:true
+              --with-lg-quantum=4
+              --with-experimental-sys-process-madvise=440
+              --without-export
+            bazel_args: >-
+              --compilation_mode=dbg
+              --//settings/flags:enable_cxx=False
+              --//settings/flags:enable_stats=False
+              --//settings/flags:enable_user_config=False
+              --//settings/flags:enable_experimental_smallocx=True
+              --//settings/flags:enable_prof=libgcc
+              --//settings/flags:enable_dss=False
+              --//settings/flags:enable_fill=False
+              --//settings/flags:enable_experimental_sdt=True
+              --//settings/flags:enable_xmalloc=True
+              --//settings/flags:enable_cache_oblivious=False
+              --//settings/flags:enable_log=True
+              --//settings/flags:enable_force_getenv=True
+              --//settings/flags:enable_uaf_detection=True
+              --//settings/flags:enable_lazy_lock=yes
+              --//settings/flags:enable_pageid=True
+              --//settings/flags:private_namespace=ci_
+              --//settings/flags:malloc_conf=background_thread:true
+              --//settings/flags:lg_quantum=4
+              --//settings/flags:experimental_sys_process_madvise=440
+              --//settings/flags:without_export=True
           - name: macOS default
             os: macos-15
           - name: Alpine default
