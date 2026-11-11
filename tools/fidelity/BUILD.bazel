@@ -278,5 +278,4 @@ filegroup(
         "//include/jemalloc/internal:public_symbols",
         "//include/jemalloc/internal:public_unnamespace",
     ],
-    tags = ["manual"],
 )

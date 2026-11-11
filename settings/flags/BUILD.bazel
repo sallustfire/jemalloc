@@ -189,7 +189,7 @@ config_setting(
         name = "jemalloc_prefix_is_auto_" + os,
         constraint_values = ["@platforms//os:" + os],
         flag_values = {":jemalloc_prefix": "__auto__"},
-        )
+    )
     for os in JE_PREFIX_OSES
 ]
 
@@ -282,7 +282,7 @@ config_setting(
         name = "enable_zone_allocator_is_{}_{}".format(value, os),
         constraint_values = ["@platforms//os:" + os],
         flag_values = {":enable_zone_allocator": flag_value},
-        )
+    )
     for value, flag_value in [
         ("auto", "__auto__"),
         ("yes", "yes"),
