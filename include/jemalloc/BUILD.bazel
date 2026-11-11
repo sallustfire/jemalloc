@@ -20,7 +20,11 @@ exports_files(
 autoconf(
     name = "jemalloc_defs_checks",
     cc_deps = HOST_CC_DEPS,
-    checks = [
+    # configure.ac's enable_user_config, which --disable-user-config clears.
+    checks = select({
+        "//settings/flags:user_config": [checks.M4_VARIABLE("enable_user_config", "1")],
+        "//conditions:default": [checks.M4_VARIABLE("enable_user_config", "0")],
+    }) + [
         checks.AC_TRY_LINK(
             name = "je_cv_attribute",
             code = utils.AC_LANG_PROGRAM("static __attribute__((unused)) void foo(void){}", ""),
@@ -97,6 +101,17 @@ autoconf(
         ],
         "//conditions:default": [],
     }) + [
+        # configure.ac defines both unless --disable-user-config is given; without them jemalloc ignores MALLOC_CONF
+        # and /etc/malloc.conf.
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_CONFIG_ENV",
+            condition = "enable_user_config",
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_CONFIG_FILE",
+            condition = "enable_user_config",
+        ),
+    ] + [
         # configure.ac skips this probe for MSVC compilers; jemalloc_internal_defs.h reads it for JEMALLOC_RETAIN, which
         # MSVC compilers never get.
         checks.AC_CHECK_SIZEOF("void *"),

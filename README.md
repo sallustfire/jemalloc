@@ -75,6 +75,10 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
  where they still link (glibc before 2.34), exactly as configure does. jemalloc defines the hooks, and aliases the
  __libc_* functions and __posix_memalign, only where the malloc hooks link on glibc; elsewhere, as with configure,
  these names are listed but not defined.
+- **//settings/flags:enable_user_config (--disable-user-config):** On by default, as in the make build: jemalloc reads
+ options from the MALLOC_CONF environment variable and the /etc/malloc.conf link, both renamed by a prefix. Set it to
+ False, or jemalloc()'s user_config to "False", to read neither, leaving the options compiled in through
+ //settings/flags:malloc_conf and an application's own malloc_conf.
 
 Settings whose "__auto__" default jemalloc resolves for the target platform:
 - //settings/flags:enable_lazy_lock

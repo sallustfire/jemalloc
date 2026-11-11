@@ -18,6 +18,19 @@ config_setting(
     flag_values = {":enable_cache_oblivious": "True"},
 )
 
+# JEMALLOC_CONFIG_ENV and JEMALLOC_CONFIG_FILE (--disable-user-config): read the malloc conf from the MALLOC_CONF
+# environment variable and the /etc/malloc.conf link
+bool_flag(
+    name = "enable_user_config",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "user_config",
+    flag_values = {":enable_user_config": "True"},
+)
+
 # JEMALLOC_ENABLE_CXX
 bool_flag(
     name = "enable_cxx",
