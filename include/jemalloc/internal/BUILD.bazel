@@ -1679,7 +1679,7 @@ public_symbols(
 private_namespace(
     name = "private_namespace",
     out = "private_namespace.h",
-    input = "//:lib/jemalloc",
+    input = "//:jemalloc",
     public_symbols = ":public_syms",
     sym_prefix = SYM_PREFIX,
     tags = ["manual"],
@@ -1699,7 +1699,7 @@ private_namespace(
     name = "private_namespace_jet",
     out = "private_namespace_jet.h",
     enable_jet = True,
-    input = "//:lib/jemalloc",
+    input = "//:jemalloc",
     prefix = "jet_",
     public_symbols = ":public_syms",
     sym_prefix = SYM_PREFIX,
