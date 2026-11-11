@@ -8,6 +8,8 @@ PUBLIC_SYMBOLS = [
     "calloc",
     "dallocx",
     "free",
+    "free_sized",
+    "free_aligned_sized",
     "mallctl",
     "mallctlbymib",
     "mallctlnametomib",
@@ -56,6 +58,8 @@ WRAP_SYMBOLS = select(_WRAP_OS)
 OPTIONAL_WRAP_SYMBOLS = {
     "__libc_calloc": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___LIBC_CALLOC"],
     "__libc_free": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___LIBC_FREE"],
+    "__libc_free_sized": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___LIBC_FREE_SIZED"],
+    "__libc_free_aligned_sized": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___LIBC_FREE_ALIGNED_SIZED"],
     "__libc_malloc": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___LIBC_MALLOC"],
     "__libc_memalign": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___LIBC_MEMALIGN"],
     "__libc_realloc": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___LIBC_REALLOC"],
