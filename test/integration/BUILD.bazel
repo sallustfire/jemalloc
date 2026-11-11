@@ -1,5 +1,5 @@
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
-load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
+load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS", "TEST_COPTS")
 load("//tools:test.bzl", "join_conf", "test_name")
 load("//tools:transition.bzl", "with_settings")
 
@@ -123,7 +123,7 @@ with_settings(
     name = test_name(test),
     srcs = [test["src"]],
     conlyopts = CONLYOPTS,
-    copts = COPTS,
+    copts = COPTS + TEST_COPTS,
     cxxopts = CXXOPTS,
     env = {"JE_TEST_MALLOC_CONF": test.get("conf", "")},
     flaky = test.get("flaky", False),
@@ -210,7 +210,7 @@ with_settings(
     name = test_name(test),
     srcs = [test["src"]],
     conlyopts = CONLYOPTS,
-    copts = COPTS,
+    copts = COPTS + TEST_COPTS,
     cxxopts = CXXOPTS,
     env = {"JE_TEST_MALLOC_CONF": test.get("conf", "")},
     local_defines = ["JEMALLOC_INTEGRATION_CPP_TEST"],

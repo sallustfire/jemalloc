@@ -84,3 +84,18 @@ COPTS = ["-D_REENTRANT"] + select({
     "//settings/flags:prof_gcc": ["-fno-omit-frame-pointer"],
     "//conditions:default": [],
 })
+
+# Makefile.in compiles the test programs, though not the test library, with -fno-builtin ($(TESTS_OBJS): CFLAGS and
+# $(TESTS_CPP_OBJS): CPPFLAGS), so the compiler cannot fold or elide the allocation calls a test makes to observe
+# them.
+#
+# Makefile.in applies it to every compiler. cl has no equivalent, so msvc-cl gets nothing; clang-cl takes it through
+# /clang:, which passes a flag to the clang driver unchanged.
+TEST_COPTS = select({
+    "@rules_cc//cc/compiler:clang": ["-fno-builtin"],
+    "@rules_cc//cc/compiler:clang-cl": ["/clang:-fno-builtin"],
+    "@rules_cc//cc/compiler:emscripten": ["-fno-builtin"],
+    "@rules_cc//cc/compiler:gcc": ["-fno-builtin"],
+    "@rules_cc//cc/compiler:mingw-gcc": ["-fno-builtin"],
+    "//conditions:default": [],
+})
