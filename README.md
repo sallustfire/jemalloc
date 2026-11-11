@@ -113,8 +113,8 @@ Profiling (`--config=prof-*`) is tested on Linux only.
 
 ## How the registry entry is produced
 
-The registry entry does not fetch the repository above. It fetches upstream's release tarball (for 5.3.0,
-`jemalloc-5.3.0.tar.bz2` from jemalloc's GitHub releases) and adds the Bazel build to it:
+The registry entry does not fetch the repository above. It fetches upstream's release tarball (for 5.3.1,
+`jemalloc-5.3.1.tar.bz2` from jemalloc's GitHub releases) and adds the Bazel build to it:
 
 - **overlay/** holds every committed file the tarball lacks: the BUILD and .bzl files, MODULE.bazel, settings/, tools/,
   examples/ and this README. The repository's own tooling, listed in `.bcr/fork_only.txt`, stays out.
@@ -128,7 +128,7 @@ nothing unless the tarball, overlay and patches, applied as Bazel applies them, 
 ## Contributing
 
 Send changes as pull requests to https://github.com/sallustfire/jemalloc, against the branch for the jemalloc version,
-such as `bcr-5.3.0`. Support for a new jemalloc release starts as a new `bcr-<version>` branch.
+such as `bcr-5.3.1`. Support for a new jemalloc release starts as a new `bcr-<version>` branch.
 
 - Leave upstream's files as upstream ships them where you can. Each edit to one ships to the registry as a patch, so
   edit one only when the Bazel build needs it, and say why in a comment beside the edit.
@@ -137,6 +137,7 @@ such as `bcr-5.3.0`. Support for a new jemalloc release starts as a new `bcr-<ve
 - Run `bazel test //...` at the root and in `examples/host_toolchain` and `examples/hermetic_llvm`. CI runs them on the
   platforms above and builds the upstream release with configure and make to compare.
 
-A release sets `version` in MODULE.bazel to `<upstream>.bcr.<N>`, runs
+A release sets `version` in MODULE.bazel to `<upstream>` for the first entry of an upstream release, or to
+`<upstream>.bcr.<N>` for a later revision of the Bazel build on the same release, runs
 `.github/scripts/export_bcr_entry.py --registry <registry checkout>`, and opens a pull request against the
 [Bazel Central Registry](https://github.com/bazelbuild/bazel-central-registry) with the entry it writes.

@@ -6,7 +6,7 @@ load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
 
 ####
 # Due to the complexity of the build, the overlay is maintained independently.
-# See https://github.com/sallustfire/jemalloc/tree/bcr-5.3.0?tab=readme-ov-file#bazel-build-of-jemalloc
+# See https://github.com/sallustfire/jemalloc/tree/bcr-5.3.1?tab=readme-ov-file#bazel-build-of-jemalloc
 ####
 
 license(
