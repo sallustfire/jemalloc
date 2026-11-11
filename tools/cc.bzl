@@ -59,6 +59,7 @@ COPTS = ["-D_REENTRANT"] + select({
     "@rules_cc//cc/compiler:clang-cl": ["-fcommon"],
     "//conditions:default": [],
 }) + select({
+    "//settings/flags:prof_frame_pointer": ["-fno-omit-frame-pointer"],
     "//settings/flags:prof_gcc": ["-fno-omit-frame-pointer"],
     "//conditions:default": [],
 }) + select({
