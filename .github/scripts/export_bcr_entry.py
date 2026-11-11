@@ -91,8 +91,9 @@ def read_fork(repo, ref):
 
 
 def read_tarball(data, strip_prefix):
-    """Returns {path: bytes} for the regular files under strip_prefix/ in a tarball."""
-    files = {}
+    """Returns ({path: bytes}, {path: mode}) for the regular files under strip_prefix/ in a tarball, each mode as git
+    records it: 100755 if the owner may execute the file, else 100644."""
+    files, modes = {}, {}
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:*") as archive:
         for member in archive.getmembers():
             if member.isdir():
@@ -104,7 +105,8 @@ def read_tarball(data, strip_prefix):
             if prefix != strip_prefix or any(part in ("", ".", "..") for part in path.split("/")):
                 raise ExportError(f"tarball: {member.name} is not a plain path under {strip_prefix}/")
             files[path] = archive.extractfile(member).read()
-    return files
+            modes[path] = "100755" if member.mode & 0o100 else "100644"
+    return files, modes
 
 
 def module_attribute(module_bazel, attribute):
@@ -129,7 +131,7 @@ def load_fork_only(fork):
     return entries
 
 
-def classify(fork, upstream, fork_only):
+def classify(fork, upstream, upstream_modes, fork_only):
     """Splits the fork into overlay files and fork-only files; the overlay is everything upstream lacks.
 
     Returns (overlay, kept_upstream): the overlay paths, and the upstream files the fork changes for its own use, which
@@ -149,8 +151,12 @@ def classify(fork, upstream, fork_only):
             errors.append(f"{FORK_ONLY}: {entry} matches no committed file")
         for path in matches:
             # Only root dotfiles with no build effect may keep the fork's edits out of the registry; any other edit to
-            # an upstream file ships as a patch, or the fork would test different code than the registry serves.
-            if path in upstream and ("/" in path or not path.startswith(".")):
+            # an upstream file ships as a patch, or the fork would test different code than the registry serves. An
+            # unedited upstream file under a fork-only directory (5.3.1's tarball ships .github/workflows/) has no
+            # edits to lose; unedited means the tarball's bytes as the same kind of file, so a symlink or a changed
+            # executable bit is an edit too.
+            edited = path in upstream and fork[path] != (upstream_modes[path], upstream[path])
+            if edited and ("/" in path or not path.startswith(".")):
                 errors.append(f"{FORK_ONLY}: {entry} covers the upstream file {path}, whose edits must ship")
     if errors:
         raise ExportError("\n  ".join(["fork-only list does not match the trees:"] + errors))
@@ -171,8 +177,22 @@ def check_overlay(fork, overlay):
         raise ExportError("overlay:\n  " + "\n  ".join(errors))
 
 
-def derive_patches(fork, upstream, kept_upstream):
-    """One unified diff per upstream file the fork edits, named after its path, for patch_strip 1."""
+def derive_patches(fork, upstream, upstream_modes, kept_upstream):
+    """One unified diff per upstream file the fork edits, named after its path, for patch_strip 1.
+
+    A diff carries contents only, so an upstream file the fork commits as a symlink or with a changed executable bit
+    stops the export rather than ship as the tarball's kind of file; kept_upstream ships as upstream's anyway.
+    """
+    mismatches = [
+        f"{path}: committed as {fork[path][0]}, but the tarball ships it as {upstream_modes[path]}"
+        for path in sorted(fork)
+        if path in upstream and path not in kept_upstream and fork[path][0] != upstream_modes[path]
+    ]
+    if mismatches:
+        raise ExportError(
+            "upstream files whose kind or executable bit the fork changes, which a patch cannot carry:\n  "
+            + "\n  ".join(mismatches)
+        )
     patches = {}
     with tempfile.TemporaryDirectory() as temporary:
         original, edited = Path(temporary, "original"), Path(temporary, "edited")
@@ -311,13 +331,13 @@ def main():
         with urllib.request.urlopen(url) as response:
             tarball = response.read()
     strip_prefix = f"jemalloc-{upstream_version}"
-    upstream = read_tarball(tarball, strip_prefix)
+    upstream, upstream_modes = read_tarball(tarball, strip_prefix)
 
-    overlay, kept_upstream = classify(fork, upstream, fork_only)
+    overlay, kept_upstream = classify(fork, upstream, upstream_modes, fork_only)
     if "MODULE.bazel" not in overlay:
         raise ExportError("MODULE.bazel is not in the overlay")
     check_overlay(fork, overlay)
-    patches = derive_patches(fork, upstream, kept_upstream)
+    patches = derive_patches(fork, upstream, upstream_modes, kept_upstream)
 
     module_dir = args.registry / "modules" / MODULE_NAME
     if not (module_dir / "metadata.json").is_file():
