@@ -684,6 +684,9 @@ autoconf(
         "//conditions:default": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_MAPS_COALESCE", "")],
     }) + select({
         # configure.ac's host table retains where LG_SIZEOF_PTR is 3, which an MSVC compiler's LG_SIZEOF_PTR_WIN is not.
+        # Since 5.3.1 that includes its *-*-darwin* | *-*-ios* arm. tvOS, visionOS and watchOS triplets reach configure's
+        # default arm, which does not retain; they follow the Darwin arm here, as every Apple OS does elsewhere in this
+        # build.
         os: [
             checks.AC_DEFINE_UNQUOTED(
                 "JEMALLOC_RETAIN",
@@ -692,7 +695,12 @@ autoconf(
         ]
         for os in [
             "@platforms//os:android",
+            "@platforms//os:ios",
             "@platforms//os:linux",
+            "@platforms//os:macos",
+            "@platforms//os:tvos",
+            "@platforms//os:visionos",
+            "@platforms//os:watchos",
             "@platforms//os:windows",
         ]
     } | {
