@@ -119,10 +119,21 @@ The registry entry does not fetch the repository above. It fetches upstream's re
 - **overlay/** holds every committed file the tarball lacks: the BUILD and .bzl files, MODULE.bazel, settings/, tools/,
   examples/ and this README. The repository's own tooling, listed in `.bcr/fork_only.txt`, stays out.
 - **patches/** holds one patch for each upstream file the repository edits, the difference between the committed file
-  and the tarball's.
+  and the tarball's (except root dotfiles listed in `.bcr/fork_only.txt`, which ship as upstream's), and
+  `tarball_removals.patch`, which deletes the tarball files `.bcr/tarball_removals.txt` lists. The exporter generates
+  it from the tarball's own bytes, and each listed file must be one the repository does not commit. 5.3.1's tarball
+  ships a configured build tree by accident; the list deletes its files at paths the build generates.
 
 `.github/scripts/export_bcr_entry.py` writes the entry into a registry checkout from a committed ref. It writes
-nothing unless the tarball, overlay and patches, applied as Bazel applies them, rebuild that ref byte for byte.
+nothing unless the tarball, overlay and patches rebuild the tree that ref defines, byte for byte: the tarball less the
+listed removals, with the ref's content for each upstream file it commits (except root dotfiles listed in
+`.bcr/fork_only.txt`), plus the overlay. It applies the patches with GNU patch, without fuzz, and writes only patches
+within constraints chosen so that Bazel's own patcher applies them the same way: plain ASCII paths, comments that cannot
+read as patch syntax, and deletions only of non-empty text files. The tree it checks is not the ref's own tree. The
+tarball's other files ship though the repository does not commit them (configure, and the rest of 5.3.1's configured
+build tree, such as config.log and the empty config.stamp), the tooling in `.bcr/fork_only.txt` stays out, and a root
+dotfile listed there ships as upstream's. Only contents are compared: upstream files keep the tarball's modes, and the
+export stops if the ref commits one as a symlink or with another executable bit.
 `.bcr/presubmit.yml` becomes the entry's presubmit.
 
 ## Contributing

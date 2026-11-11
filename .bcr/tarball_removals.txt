@@ -1,0 +1,28 @@
+# Files upstream's release tarball ships that the registry entry deletes, by a patch .github/scripts/export_bcr_entry.py
+# generates from the tarball's own bytes and the list in the fork's .bcr/tarball_removals.txt: one path per line,
+# sorted, each a non-empty text file the tarball ships and the fork does not commit.
+#
+# Specific to jemalloc 5.3.1's packaging: its release tarball was packed from a tree configure had already run in, so
+# beside the release files it carries that machine's configured build tree. Of that tree, only the files at a path the
+# Bazel build generates go: the configured headers under include/ and test/include/, where an unsandboxed compile finds
+# the tarball's stale copy before the generated one, and public_symbols.txt. The rest (config.log, config.status, the
+# empty config.stamp, Makefile, jemalloc.pc, bin/, doc/'s XML and XSL, test/test.sh and the private_symbols awk
+# scripts) stays, like configure: nothing in the build generates or reads it. A branch for a release whose tarball is
+# clean, such as 5.4.0, empties or removes this file.
+
+include/jemalloc/internal/jemalloc_internal_defs.h
+include/jemalloc/internal/jemalloc_preamble.h
+include/jemalloc/internal/public_namespace.h
+include/jemalloc/internal/public_symbols.txt
+include/jemalloc/internal/public_unnamespace.h
+include/jemalloc/jemalloc.h
+include/jemalloc/jemalloc_defs.h
+include/jemalloc/jemalloc_macros.h
+include/jemalloc/jemalloc_mangle.h
+include/jemalloc/jemalloc_mangle_jet.h
+include/jemalloc/jemalloc_protos.h
+include/jemalloc/jemalloc_protos_jet.h
+include/jemalloc/jemalloc_rename.h
+include/jemalloc/jemalloc_typedefs.h
+test/include/test/jemalloc_test.h
+test/include/test/jemalloc_test_defs.h
