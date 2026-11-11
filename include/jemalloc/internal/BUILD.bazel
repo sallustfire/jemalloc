@@ -841,6 +841,23 @@ autoconf(
                 "JEMALLOC_OVERRIDE___LIBC_FREE",
                 condition = "ac_cv_func___libc_free",
             ),
+            # configure.ac checks these speculatively, in case glibc adds them under these names.
+            checks.AC_CHECK_FUNC(
+                "__libc_free_sized",
+                code = utils.AC_LANG_FUNC_LINK_TRY("__libc_free_sized"),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_OVERRIDE___LIBC_FREE_SIZED",
+                condition = "ac_cv_func___libc_free_sized",
+            ),
+            checks.AC_CHECK_FUNC(
+                "__libc_free_aligned_sized",
+                code = utils.AC_LANG_FUNC_LINK_TRY("__libc_free_aligned_sized"),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_OVERRIDE___LIBC_FREE_ALIGNED_SIZED",
+                condition = "ac_cv_func___libc_free_aligned_sized",
+            ),
             checks.AC_CHECK_FUNC(
                 "__libc_malloc",
                 code = utils.AC_LANG_FUNC_LINK_TRY("__libc_malloc"),
@@ -954,6 +971,14 @@ autoconf(
             condition = "ac_cv_func_sched_setaffinity",
         ),
         checks.AC_CHECK_FUNC(
+            "pthread_setaffinity_np",
+            code = utils.AC_LANG_FUNC_LINK_TRY("pthread_setaffinity_np"),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_PTHREAD_SETAFFINITY_NP",
+            condition = "ac_cv_func_pthread_setaffinity_np",
+        ),
+        checks.AC_CHECK_FUNC(
             "issetugid",
             code = utils.AC_LANG_FUNC_LINK_TRY("issetugid"),
         ),
@@ -968,6 +993,14 @@ autoconf(
         checks.AC_DEFINE_UNQUOTED(
             "JEMALLOC_HAVE_MEMCNTL",
             condition = "ac_cv_func_memcntl",
+        ),
+        checks.AC_CHECK_FUNC(
+            "prctl",
+            code = utils.AC_LANG_FUNC_LINK_TRY("prctl"),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_PRCTL",
+            condition = "ac_cv_func_prctl",
         ),
     ] + select({
         "@platforms//os:windows": [],
@@ -1030,6 +1063,20 @@ autoconf(
             checks.AC_DEFINE_UNQUOTED(
                 "JEMALLOC_HAVE_PTHREAD_GETNAME_NP",
                 condition = "je_cv_pthread_getname_np",
+            ),
+            checks.AC_TRY_LINK(
+                name = "je_cv_pthread_set_name_np",
+                code = utils.AC_LANG_PROGRAM(
+                    [
+                        "#include <pthread.h>",
+                        "#include <pthread_np.h>",
+                    ],
+                    "  pthread_set_name_np(pthread_self(), \"set_name_test\");",
+                ),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_HAVE_PTHREAD_SET_NAME_NP",
+                condition = "je_cv_pthread_set_name_np",
             ),
             checks.AC_TRY_LINK(
                 name = "je_cv_pthread_get_name_np",
@@ -1115,6 +1162,17 @@ autoconf(
         checks.AC_DEFINE_UNQUOTED(
             "JEMALLOC_HAVE_CLOCK_REALTIME",
             condition = "je_cv_clock_realtime",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_clock_gettime_nsec_np",
+            code = utils.AC_LANG_PROGRAM(
+                "#include <time.h>",
+                "\tclock_gettime_nsec_np(CLOCK_UPTIME_RAW);",
+            ),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_CLOCK_GETTIME_NSEC_NP",
+            condition = "je_cv_clock_gettime_nsec_np",
         ),
         checks.AC_TRY_LINK(
             name = "je_cv_madvise",
@@ -1211,6 +1269,34 @@ autoconf(
         checks.AC_DEFINE_UNQUOTED(
             "JEMALLOC_MADVISE_NOCORE",
             condition = "je_cv_madv_nocore",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_madv_collapse",
+            code = utils.AC_LANG_PROGRAM(
+                "#include <sys/mman.h>",
+                "\tmadvise((void *)0, 0, MADV_COLLAPSE);",
+            ),
+            requires = ["je_cv_madvise"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_MADVISE_COLLAPSE",
+            condition = "je_cv_madv_collapse",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_process_madvise",
+            code = utils.AC_LANG_PROGRAM(
+                [
+                    "#include <sys/pidfd.h>",
+                    "#include <sys/syscall.h>",
+                    "#include <unistd.h>",
+                ],
+                "\tsyscall(SYS_process_madvise, PIDFD_SELF, (void *)0, 0, 0, 0);",
+            ),
+            requires = ["je_cv_madvise"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_PROCESS_MADVISE",
+            condition = "je_cv_process_madvise",
         ),
         checks.AC_TRY_LINK(
             name = "je_cv_posix_madvise",
@@ -1438,6 +1524,17 @@ autoconf(
         checks.AC_DEFINE_UNQUOTED(
             "JEMALLOC_HAVE_PTHREAD_MUTEX_ADAPTIVE_NP",
             condition = "je_cv_pthread_mutex_adaptive_np",
+        ),
+        checks.AC_TRY_LINK(
+            name = "je_cv_gettid",
+            code = utils.AC_LANG_PROGRAM(
+                "#include <unistd.h>",
+                "  int tid = gettid();",
+            ),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_GETTID",
+            condition = "je_cv_gettid",
         ),
         checks.AC_TRY_LINK(
             name = "je_cv_vm_make_tag",
