@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [bcr-5.3.0]
+    branches: [bcr-5.3.1]
   pull_request:
-    branches: [bcr-5.3.0]
+    branches: [bcr-5.3.1]
   workflow_dispatch:
 
 permissions:
