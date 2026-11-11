@@ -1709,6 +1709,31 @@ autoconf(
                 "-Werror",
             ],
         ),
+        # Where strerror_r does not return char *, configure.ac links the headers alone and stops if even that fails,
+        # rather than assume the XSI strerror_r.
+        checks.AC_TRY_LINK(
+            name = "je_cv_strerror_r_header_pass",
+            code = utils.AC_LANG_PROGRAM(
+                [
+                    "#include <errno.h>",
+                    "#include <stdio.h>",
+                    "#include <stdlib.h>",
+                    "#include <string.h>",
+                ],
+                "",
+            ),
+            copts = [
+                "-D_GNU_SOURCE",
+                "-Werror",
+            ],
+            requires = ["!je_cv_strerror_r_returns_char_with_gnu_source"],
+        ),
+        checks.AC_TRY_COMPILE(
+            name = "strerror_r_return_type_known",
+            code = utils.AC_LANG_PROGRAM("", ""),
+            error = "cannot determine return type of strerror_r",
+            requires = ["je_cv_strerror_r_returns_char_with_gnu_source || je_cv_strerror_r_header_pass"],
+        ),
         checks.AC_DEFINE_UNQUOTED(
             "JEMALLOC_STRERROR_R_RETURNS_CHAR_WITH_GNU_SOURCE",
             condition = "je_cv_strerror_r_returns_char_with_gnu_source",
