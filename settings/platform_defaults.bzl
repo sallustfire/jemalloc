@@ -33,12 +33,20 @@ def _resolved_setting_impl(ctx):
 _resolved_setting = rule(
     implementation = _resolved_setting_impl,
     attrs = {
-        "cpu": attr.string(mandatory = True),
+        "cpu": attr.string(
+            doc = "The target's CPU class, a defaults key's <cpu>",
+            mandatory = True,
+            values = ["aarch64", "other_32_bit", "other_64_bit", "ppc64le", "unknown", "x86_64"],
+        ),
         "defaults": attr.string_dict(
             doc = "Values for __auto__, keyed by \"<platform>-<cpu>\", \"<platform>\", \"*-<cpu>\" or \"default\".",
         ),
         "make_variable": attr.string(),
-        "platform": attr.string(mandatory = True),
+        "platform": attr.string(
+            doc = "The target's platform as configure.ac's host table names it, a defaults key's <platform>",
+            mandatory = True,
+            values = ["android", "darwin", "freebsd", "linux", "unknown", "windows"],
+        ),
         "setting": attr.label(mandatory = True, providers = [BuildSettingInfo]),
         "upper": attr.bool(doc = "Uppercase the value, as configure's `tr \"a-z\" \"A-Z\"`."),
     },

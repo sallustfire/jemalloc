@@ -48,8 +48,8 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
  configure script's cross compilation value; a native configure runs CPUID instead, which gives 48 on a CPU without
  5-level paging), and the pointer width on any other CPU whose width @platforms makes clear. Any other CPU, such as
  ppc, must set it, or the build fails. Set it explicitly to override. The flag defaults to "__auto__", which jemalloc
- resolves for the target platform, so a select() on the flag or $(LG_VADDR) sees "__auto__". Any value is written into
- the header as is, without checking that it is a number.
+ resolves for the target platform, so a select() on the flag sees "__auto__". Any value is written into the header as
+ is, without checking that it is a number.
 - **//settings/platform:lg_page (--with-lg-page):** Defaults to 16 (64 KiB) on aarch64 Linux and Android and on ppc64le
  Linux, so one build runs on kernels with 4K, 16K or 64K pages, at the cost of a coarser page granularity on 4K
  kernels (configure's cross compilation value is 12, which fails at startup on a 16K or 64K kernel). Darwin defaults

@@ -73,13 +73,13 @@ string_flag(
 )
 
 config_setting(
-    name = "lazy_lock_yes",
+    name = "enable_lazy_lock_is_yes",
     flag_values = {":enable_lazy_lock": "yes"},
 )
 
 # configure.ac's default enables lazy locking on FreeBSD only
 config_setting(
-    name = "lazy_lock_auto_freebsd",
+    name = "enable_lazy_lock_is_auto_freebsd",
     constraint_values = ["@platforms//os:freebsd"],
     flag_values = {":enable_lazy_lock": "__auto__"},
 )
@@ -87,13 +87,13 @@ config_setting(
 selects.config_setting_group(
     name = "lazy_lock",
     match_any = [
-        ":lazy_lock_auto_freebsd",
-        ":lazy_lock_yes",
+        ":enable_lazy_lock_is_auto_freebsd",
+        ":enable_lazy_lock_is_yes",
     ],
 )
 
 config_setting(
-    name = "lazy_lock_yes_windows",
+    name = "enable_lazy_lock_is_yes_windows",
     constraint_values = ["@platforms//os:windows"],
     flag_values = {":enable_lazy_lock": "yes"},
 )
@@ -159,7 +159,7 @@ string_flag(
 resolved_setting(
     name = "jemalloc_prefix_resolved",
     defaults = select({
-        ":jemalloc_prefix_auto_je": {"default": "je_"},
+        ":jemalloc_prefix_is_auto_je": {"default": "je_"},
         "//conditions:default": {"default": ""},
     }),
     make_variable = "JEMALLOC_PREFIX",
@@ -175,42 +175,41 @@ resolved_setting(
 )
 
 config_setting(
-    name = "jemalloc_prefix_none",
+    name = "jemalloc_prefix_is_empty",
     flag_values = {":jemalloc_prefix": ""},
 )
 
 config_setting(
-    name = "jemalloc_prefix_auto",
+    name = "jemalloc_prefix_is_auto",
     flag_values = {":jemalloc_prefix": "__auto__"},
 )
 
 [
     config_setting(
-        name = "jemalloc_prefix_auto_" + os,
+        name = "jemalloc_prefix_is_auto_" + os,
         constraint_values = ["@platforms//os:" + os],
         flag_values = {":jemalloc_prefix": "__auto__"},
-    )
+        )
     for os in JE_PREFIX_OSES
 ]
 
 # __auto__ where configure's default prefix is je_: the macho and pecoff ABIs. It matches as the per-OS setting it
-# resolves to, which specializes :jemalloc_prefix_auto.
+# resolves to, which specializes :jemalloc_prefix_is_auto.
 selects.config_setting_group(
-    name = "jemalloc_prefix_auto_je",
-    match_any = [":jemalloc_prefix_auto_" + os for os in JE_PREFIX_OSES],
+    name = "jemalloc_prefix_is_auto_je",
+    match_any = [":jemalloc_prefix_is_auto_" + os for os in JE_PREFIX_OSES],
 )
 
-# JEMALLOC_PREFIX is empty: "", or __auto__ outside :jemalloc_prefix_auto_je. The negation has no config_setting, so this
-# resolves, as selects.config_setting_group does, to a setting that matches where it holds and to
-# :jemalloc_prefix_none, which cannot match there, where it does not. :jemalloc_prefix_auto_je specializes
-# :jemalloc_prefix_auto.
+# JEMALLOC_PREFIX is empty: "", or __auto__ outside :jemalloc_prefix_is_auto_je. The negation has no config_setting, so
+# this resolves, as selects.config_setting_group does, to a setting that matches where it holds and to
+# :jemalloc_prefix_is_empty, which cannot match there, where it does not. :jemalloc_prefix_is_auto_je specializes
+# :jemalloc_prefix_is_auto.
 alias(
     name = "no_jemalloc_prefix",
     actual = select({
-        ":jemalloc_prefix_auto": ":jemalloc_prefix_auto",
-        ":jemalloc_prefix_auto_je": ":jemalloc_prefix_none",
-        ":jemalloc_prefix_none": ":jemalloc_prefix_none",
-        "//conditions:default": ":jemalloc_prefix_none",
+        ":jemalloc_prefix_is_auto": ":jemalloc_prefix_is_auto",
+        ":jemalloc_prefix_is_auto_je": ":jemalloc_prefix_is_empty",
+        "//conditions:default": ":jemalloc_prefix_is_empty",
     }),
 )
 
@@ -269,21 +268,21 @@ string_flag(
 )
 
 config_setting(
-    name = "zone_allocator_no",
+    name = "enable_zone_allocator_is_no",
     flag_values = {":enable_zone_allocator": "no"},
 )
 
 config_setting(
-    name = "zone_allocator_auto",
+    name = "enable_zone_allocator_is_auto",
     flag_values = {":enable_zone_allocator": "__auto__"},
 )
 
 [
     config_setting(
-        name = "zone_allocator_{}_{}".format(value, os),
+        name = "enable_zone_allocator_is_{}_{}".format(value, os),
         constraint_values = ["@platforms//os:" + os],
         flag_values = {":enable_zone_allocator": flag_value},
-    )
+        )
     for value, flag_value in [
         ("auto", "__auto__"),
         ("yes", "yes"),
@@ -291,12 +290,12 @@ config_setting(
     for os in DARWIN_OSES
 ]
 
-# The zone allocator is on: "yes" or configure's default on Darwin. It matches as the per-OS setting it resolves to, which
-# specializes :zone_allocator_auto.
+# The zone allocator is on: "yes" or configure's default on Darwin. It matches as the per-OS setting it resolves to,
+# which specializes :enable_zone_allocator_is_auto.
 selects.config_setting_group(
     name = "zone_allocator",
     match_any = [
-        ":zone_allocator_{}_{}".format(value, os)
+        ":enable_zone_allocator_is_{}_{}".format(value, os)
         for value in [
             "auto",
             "yes",

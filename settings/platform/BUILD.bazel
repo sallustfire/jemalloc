@@ -18,7 +18,6 @@ int_flag(
 string_flag(
     name = "lg_page",
     build_setting_default = "__auto__",
-    make_variable = "LG_PAGE",
     visibility = ["//visibility:public"],
 )
 
@@ -26,7 +25,6 @@ string_flag(
 string_flag(
     name = "lg_vaddr",
     build_setting_default = "__auto__",
-    make_variable = "LG_VADDR",
     visibility = ["//visibility:public"],
 )
 
@@ -42,6 +40,7 @@ resolved_setting(
         "linux-ppc64le": "16",
         "default": "12",
     },
+    make_variable = "LG_PAGE",
     setting = ":lg_page",
     visibility = ["//:__subpackages__"],
 )
@@ -57,6 +56,7 @@ resolved_setting(
         "*-ppc64le": "64",
         "*-x86_64": "57",
     },
+    make_variable = "LG_VADDR",
     setting = ":lg_vaddr",
     visibility = ["//:__subpackages__"],
 )
