@@ -40,7 +40,6 @@ alias(
     visibility = ["//visibility:public"],
 )
 
-# Shared by the core library and the zone, which upstream compiles as one set of objects
 _LIB_COPTS = ["-Iinclude/jemalloc/internal"] + COPTS
 
 _LIB_LOCAL_DEFINES = select({
@@ -51,9 +50,8 @@ _LIB_LOCAL_DEFINES = select({
     "//conditions:default": [],
 })
 
-# Everything but the zone. An implementation detail of lib/jemalloc, which every consumer and test links instead.
 cc_library(
-    name = "lib/jemalloc_core",
+    name = "lib/jemalloc",
     srcs = [
         "src/arena.c",
         "src/background_thread.c",
@@ -120,6 +118,10 @@ cc_library(
     ] + select({
         "//settings/flags:cxx": ["src/jemalloc_cpp.cpp"],
         "//conditions:default": [],
+    }) + select({
+        # Last, as zone.o is in upstream's C_SYM_OBJS, so that private_namespace.h lists the symbols in upstream's order
+        "//settings/flags:zone_allocator": ["src/zone.c"],
+        "//conditions:default": [],
     }),
     hdrs = ["//include/jemalloc"],
     conlyopts = CONLYOPTS,
@@ -137,10 +139,20 @@ cc_library(
     }) + select({
         "//settings/flags:prof": ["-lm"],
         "//conditions:default": [],
+    }) + select({
+        # src/zone.c registers jemalloc's malloc zone from a constructor that nothing references, so a static link
+        # would drop it and leave malloc on the system allocator, as it does with upstream's libjemalloc.a. -u makes the
+        # link take zone.o from the archive, and zone.o the rest of jemalloc, without forcing in other objects such as
+        # jemalloc_cpp.o's operator new and delete.
+        "//settings/flags:zone_allocator": ["-Wl,-u,_$(JEMALLOC_INTERNAL_PREFIX)zone_register"],
+        "//conditions:default": [],
     }),
+    # -u names a hidden symbol, which only a static link of the archive can resolve
+    linkstatic = True,
     local_defines = _LIB_LOCAL_DEFINES,
     tags = ["manual"],
-    visibility = ["//visibility:private"],
+    toolchains = ["//include/jemalloc/internal:jemalloc_private_namespace"],
+    visibility = ["//:__subpackages__"],
     deps = ["//include/jemalloc/internal"] + select({
         "@rules_cc//cc/compiler:clang-cl": ["//include/msvc_compat"],
         "@rules_cc//cc/compiler:msvc-cl": ["//include/msvc_compat"],
@@ -148,46 +160,6 @@ cc_library(
     }) + select({
         "//settings/flags:prof_libunwind": ["@libunwind"],
         "//conditions:default": [],
-    }),
-)
-
-# src/zone.c registers jemalloc's malloc zone from a constructor that nothing references, so a static link would drop it
-# and leave malloc on the system allocator, as it does with upstream's libjemalloc.a. Only the zone is linked whole:
-# linking the core whole would force jemalloc_cpp.o's operator new and delete into every binary, which then fails to
-# link when the application defines its own.
-cc_library(
-    name = "lib/jemalloc_zone",
-    srcs = ["src/zone.c"],
-    conlyopts = CONLYOPTS,
-    copts = _LIB_COPTS,
-    cxxopts = CXXOPTS,
-    includes = ["include"],
-    local_defines = _LIB_LOCAL_DEFINES,
-    tags = ["manual"],
-    # zone.c is darwin-only and stops with #error without the zone allocator, which only the platform transition
-    # resolves; build it through lib/jemalloc.
-    target_compatible_with = select({
-        "//settings/flags:zone_allocator": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
-    visibility = ["//visibility:private"],
-    deps = [
-        ":lib/jemalloc_core",
-        "//include/jemalloc/internal",
-    ],
-    alwayslink = True,
-)
-
-# The library every consumer and test links. Whether it includes the zone is an implementation detail: it does where
-# the zone allocator is on, as upstream compiles src/zone.c into the library only then.
-cc_library(
-    name = "lib/jemalloc",
-    tags = ["manual"],
-    visibility = ["//:__subpackages__"],
-    # lib/jemalloc_zone depends on the core, so either branch links the core
-    deps = select({
-        "//settings/flags:zone_allocator": [":lib/jemalloc_zone"],
-        "//conditions:default": [":lib/jemalloc_core"],
     }),
 )
 

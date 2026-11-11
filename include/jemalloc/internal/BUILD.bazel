@@ -205,6 +205,7 @@ expand_template(
 
 jemalloc_private_namespace(
     name = "jemalloc_private_namespace",
+    visibility = ["//:__pkg__"],
 )
 
 checked_lg_hugepage(
