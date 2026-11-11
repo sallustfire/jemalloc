@@ -79,6 +79,31 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
  options from the MALLOC_CONF environment variable and the /etc/malloc.conf link, both renamed by a prefix. Set it to
  False, or jemalloc()'s user_config to "False", to read neither, leaving the options compiled in through
  //settings/flags:malloc_conf and an application's own malloc_conf.
+- **//settings/flags:enable_dss (--disable-dss):** On by default: as in the make build, jemalloc can allocate from the
+ data segment with sbrk(2) wherever the target links sbrk and does not deprecate it (every Apple OS does). Set it to
+ False, or jemalloc()'s dss to "False", to never call sbrk, as when something else in the process owns the data
+ segment.
+- **//settings/flags:enable_pageid (--enable-pageid):** Off by default. On, jemalloc names its anonymous mappings
+ (jemalloc_pg, or jemalloc_pg_overcommit) in /proc/<pid>/maps, where the target has prctl; Linux 5.17 or later with
+ CONFIG_ANON_VMA_NAME applies the names, and other kernels ignore them. jemalloc()'s pageid sets it per target.
+- **//settings/flags:enable_force_getenv (--enable-force-getenv):** Off by default, so jemalloc reads MALLOC_CONF with
+ secure_getenv, or ignores it in a setuid or setgid process where only issetugid is available. On, it always reads it
+ with getenv, including in privileged processes. jemalloc()'s force_getenv sets it per target.
+- **//settings/flags:enable_experimental_sdt (--enable-experimental-sdt):** Off by default. On, jemalloc emits USDT
+ probes: systemtap's, where the toolchain links configure's <sys/sdt.h> program (a nested function, so GCC only), or
+ else jemalloc's own on Linux x86_64, aarch64 and 32-bit Arm and on Android aarch64 and x86_64. As with configure, any
+ other Linux or Android CPU gets no probes and no error, and any other platform fails the build. jemalloc()'s
+ experimental_sdt sets it per target.
+- **//settings/flags:experimental_sys_process_madvise (--with-experimental-sys-process-madvise):** Empty by default.
+ jemalloc uses process_madvise (for batched purging, which opt.process_madvise_max_batch enables) where the C library's
+ headers declare SYS_process_madvise and PIDFD_SELF. Set it to the system call number, for example 440, to use it on a
+ Linux target whose headers lack them, as configure does wherever its probe fails and madvise links. The value is
+ written into the header as is. Unlike configure, the build also writes EXPERIMENTAL_SYS_PROCESS_MADVISE_NR where the
+ probe passes or madvise is missing, where nothing reads it.
+- **--enable-tsan, --enable-ubsan and --with-cxx-stdlib:** configure's sanitizer options only add -fsanitize=thread
+ or -fsanitize=undefined to the compile and link flags, and --with-cxx-stdlib only chooses -lstdc++ or -lc++. Here the
+ C and C++ toolchain owns both, so there are no flags for them: enable a sanitizer through the toolchain's features or
+ --copt and --linkopt, and choose the C++ standard library with the C++ toolchain.
 
 Settings whose "__auto__" default jemalloc resolves for the target platform:
 - //settings/flags:enable_lazy_lock

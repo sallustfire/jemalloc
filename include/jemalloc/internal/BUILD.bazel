@@ -238,6 +238,36 @@ selects.config_setting_group(
     ],
 )
 
+# configure.ac's --enable-experimental-sdt falls back to jemalloc's own USDT probes, when <sys/sdt.h> does not link, on
+# these ELF hosts: *-*-linux-android* on aarch64 and x86_64, and any other *-*-linux* on x86_64, aarch64 and arm*.
+_EXPERIMENTAL_SDT_CUSTOM_PLATFORMS = [
+    ("android", "aarch64"),
+    ("android", "x86_64"),
+    ("linux", "aarch32"),
+    ("linux", "aarch64"),
+    ("linux", "armv6-m"),
+    ("linux", "armv7"),
+    ("linux", "armv7-m"),
+    ("linux", "armv7e-m"),
+    ("linux", "armv7e-mf"),
+    ("linux", "armv7k"),
+    ("linux", "armv8-m"),
+    ("linux", "x86_64"),
+]
+
+[
+    config_setting(
+        name = "experimental_sdt_custom_{}_{}".format(os, cpu),
+        constraint_values = [
+            "@platforms//cpu:" + cpu,
+            "@platforms//os:" + os,
+        ],
+        flag_values = {"//settings/flags:enable_experimental_sdt": "True"},
+        visibility = ["//visibility:private"],
+    )
+    for os, cpu in _EXPERIMENTAL_SDT_CUSTOM_PLATFORMS
+]
+
 config_setting(
     name = "android_x86_32",
     constraint_values = [
@@ -609,6 +639,51 @@ autoconf(
         "//settings/flags:cxx": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_ENABLE_CXX", "")],
         "//conditions:default": [],
     }) + select({
+        # configure.ac's enable_experimental_sdt.
+        "//settings/flags:experimental_sdt": [checks.M4_VARIABLE("enable_experimental_sdt", "1")],
+        "//conditions:default": [checks.M4_VARIABLE("enable_experimental_sdt", "0")],
+    }) + [
+        checks.AC_TRY_LINK(
+            name = "je_cv_stap_sdt",
+            # configure.ac's program: foo is a nested function, a GNU C extension, so this links only with GCC.
+            code = utils.AC_LANG_PROGRAM(
+                "#include <sys/sdt.h>",
+                "void foo(int i, void *p) { STAP_PROBE2(jemalloc, test, i, p); }",
+            ),
+            requires = ["enable_experimental_sdt"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_EXPERIMENTAL_USDT_STAP",
+            condition = "je_cv_stap_sdt",
+        ),
+    ] + select({
+        ":experimental_sdt_custom_{}_{}".format(os, cpu): [
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_EXPERIMENTAL_USDT_CUSTOM",
+                condition = "!je_cv_stap_sdt",
+            ),
+        ]
+        for os, cpu in _EXPERIMENTAL_SDT_CUSTOM_PLATFORMS
+    } | {
+        # configure.ac's Linux and Android cases have no arm for any other CPU, so without <sys/sdt.h> they define
+        # neither macro and go on.
+        "@platforms//os:android": [],
+        "@platforms//os:linux": [],
+        "//conditions:default": [
+            checks.AC_TRY_COMPILE(
+                name = "experimental_sdt_supported",
+                code = utils.AC_LANG_PROGRAM("", ""),
+                error = "Unsupported sdt on this platform",
+                requires = ["!enable_experimental_sdt || je_cv_stap_sdt"],
+            ),
+        ],
+    }) + select({
+        "//settings/flags:force_getenv": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_FORCE_GETENV", "")],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:pageid": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PAGEID", "")],
+        "//conditions:default": [],
+    }) + select({
         "//settings/flags:lazy_lock": [
             checks.AC_TRY_COMPILE(
                 name = "lazy_lock_dlsym",
@@ -813,7 +888,11 @@ autoconf(
             "JEMALLOC_TLS",
             condition = "enable_tls",
         ),
-    ]}) + [
+    ]}) + select({
+        # configure.ac's enable_dss, which --disable-dss clears.
+        "//settings/flags:dss": [checks.M4_VARIABLE("enable_dss", "1")],
+        "//conditions:default": [checks.M4_VARIABLE("enable_dss", "0")],
+    }) + [
         checks.AC_CHECK_FUNC(
             "sbrk",
             code = utils.AC_LANG_FUNC_LINK_TRY("sbrk"),
@@ -828,7 +907,7 @@ autoconf(
         "//conditions:default": [
             checks.AC_DEFINE_UNQUOTED(
                 "JEMALLOC_DSS",
-                condition = "ac_cv_func_sbrk",
+                condition = "ac_cv_func_sbrk && enable_dss",
             ),
         ],
     }) + select({
@@ -1313,10 +1392,22 @@ autoconf(
             ),
             requires = ["je_cv_madvise"],
         ),
-        checks.AC_DEFINE_UNQUOTED(
-            "JEMALLOC_HAVE_PROCESS_MADVISE",
-            condition = "je_cv_process_madvise",
-        ),
+    ] + select({
+        "//settings/flags:no_experimental_sys_process_madvise": [
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_HAVE_PROCESS_MADVISE",
+                condition = "je_cv_process_madvise",
+            ),
+        ],
+        # configure.ac's --with-experimental-sys-process-madvise forces process_madvise where the probe fails but madvise
+        # links. :jemalloc_internal_defs_experimental_sys_process_madvise writes the number.
+        "//conditions:default": [
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_HAVE_PROCESS_MADVISE",
+                condition = "je_cv_process_madvise || je_cv_madvise",
+            ),
+        ],
+    }) + [
         checks.AC_TRY_LINK(
             name = "je_cv_posix_madvise",
             code = utils.AC_LANG_PROGRAM(
@@ -1826,6 +1917,22 @@ autoconf(
     tags = ["manual"],
 )
 
+# configure.ac writes EXPERIMENTAL_SYS_PROCESS_MADVISE_NR only where the process_madvise probe fails and madvise links.
+# A build setting's define cannot depend on a check, so this writes it wherever the flag is set. Elsewhere it is unused:
+# src/pages.c reads it only under JEMALLOC_HAVE_PROCESS_MADVISE and without SYS_process_madvise, which the probe needs.
+autoconf(
+    name = "jemalloc_internal_defs_experimental_sys_process_madvise",
+    build_settings = [
+        checks.AC_BUILD_SETTING(
+            name = "je_cv_sys_pmadv_nr",
+            define = "EXPERIMENTAL_SYS_PROCESS_MADVISE_NR",
+            target = "//settings/flags:experimental_sys_process_madvise",
+            unquote = True,
+        ),
+    ],
+    tags = ["manual"],
+)
+
 autoconf_hdr(
     name = "jemalloc_internal_defs",
     out = "jemalloc_internal_defs.h",
@@ -1846,7 +1953,10 @@ autoconf_hdr(
         "@platforms//cpu:x86_32": [":jemalloc_internal_defs_x86_spinwait_checks"],
         "@platforms//cpu:x86_64": [":jemalloc_internal_defs_x86_spinwait_checks"],
         "//conditions:default": [],
-    }) + [":jemalloc_internal_defs_rdtscp"],
+    }) + [":jemalloc_internal_defs_rdtscp"] + select({
+        "//settings/flags:no_experimental_sys_process_madvise": [],
+        "//conditions:default": [":jemalloc_internal_defs_experimental_sys_process_madvise"],
+    }),
 )
 
 symbol_list(

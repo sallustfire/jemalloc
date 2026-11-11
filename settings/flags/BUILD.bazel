@@ -49,6 +49,18 @@ config_setting(
     values = {"compilation_mode": "dbg"},
 )
 
+# JEMALLOC_DSS (--disable-dss): allocate from the data segment with sbrk(2) where the target has it
+bool_flag(
+    name = "enable_dss",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "dss",
+    flag_values = {":enable_dss": "True"},
+)
+
 # JEMALLOC_EXPERIMENTAL_SMALLOCX_API
 bool_flag(
     name = "enable_experimental_smallocx",
@@ -61,6 +73,19 @@ config_setting(
     flag_values = {":enable_experimental_smallocx": "True"},
 )
 
+# JEMALLOC_EXPERIMENTAL_USDT_STAP or JEMALLOC_EXPERIMENTAL_USDT_CUSTOM (--enable-experimental-sdt): USDT probes for
+# systemtap, bpftrace and similar tracers
+bool_flag(
+    name = "enable_experimental_sdt",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "experimental_sdt",
+    flag_values = {":enable_experimental_sdt": "True"},
+)
+
 # JEMALLOC_FILL (support for junk/zero filling)
 bool_flag(
     name = "enable_fill",
@@ -71,6 +96,18 @@ bool_flag(
 config_setting(
     name = "fill",
     flag_values = {":enable_fill": "True"},
+)
+
+# JEMALLOC_FORCE_GETENV (--enable-force-getenv): read MALLOC_CONF with getenv rather than secure_getenv
+bool_flag(
+    name = "enable_force_getenv",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "force_getenv",
+    flag_values = {":enable_force_getenv": "True"},
 )
 
 # JEMALLOC_LAZY_LOCK
@@ -121,6 +158,18 @@ bool_flag(
 config_setting(
     name = "log",
     flag_values = {":enable_log": "True"},
+)
+
+# JEMALLOC_PAGEID (--enable-pageid): name jemalloc's anonymous mappings with prctl(PR_SET_VMA_ANON_NAME)
+bool_flag(
+    name = "enable_pageid",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "pageid",
+    flag_values = {":enable_pageid": "True"},
 )
 
 # JEMALLOC_STATS
@@ -254,6 +303,19 @@ string_flag(
     build_setting_default = "",
     make_variable = "PRIVATE_NAMESPACE",
     visibility = ["//visibility:public"],
+)
+
+# EXPERIMENTAL_SYS_PROCESS_MADVISE_NR (--with-experimental-sys-process-madvise): the process_madvise system call number,
+# written into the header as is, for C libraries whose headers lack SYS_process_madvise. Empty for none.
+string_flag(
+    name = "experimental_sys_process_madvise",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "no_experimental_sys_process_madvise",
+    flag_values = {":experimental_sys_process_madvise": ""},
 )
 
 # JEMALLOC_EXPORT via --without-export which disables the export of the jemalloc API
