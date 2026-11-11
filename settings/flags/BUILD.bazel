@@ -20,6 +20,20 @@ config_setting(
     flag_values = {":enable_cache_oblivious": "True"},
 )
 
+# JEMALLOC_CONFIG_ENV and JEMALLOC_CONFIG_FILE (--disable-user-config): read the malloc conf from the MALLOC_CONF
+# environment variable and the /etc/malloc.conf link
+bool_flag(
+    name = "enable_user_config",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+    scope = "target",
+)
+
+config_setting(
+    name = "user_config",
+    flag_values = {":enable_user_config": "True"},
+)
+
 # JEMALLOC_ENABLE_CXX. jemalloc 5.3 cannot build its C++ support with cl or clang-cl: jemalloc_cpp.cpp throws with
 # libstdc++'s and libc++'s std::__throw_bad_alloc, which the MSVC STL lacks, and the internal headers it includes use C
 # compound literals, which cl rejects in C++. 5.4.0 drops both constructs (jemalloc/jemalloc 1a15fe33 and 70d4102f).
