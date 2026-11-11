@@ -4,7 +4,6 @@ JEMALLOC_PRIVATE_NAMESPACE."""
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolchain")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
-load("//tools:transition.bzl", "settings_transition")
 
 # This repository, as the owner of the library's own linker inputs, so that a dependency's archive (libunwind) is not
 # read as jemalloc's.
@@ -13,10 +12,13 @@ _REPO = Label("//:BUILD.bazel").repo_name
 # The unset value of //settings/flags:nm.
 _TOOLCHAIN_NM = Label("//settings/flags:toolchain_nm")
 
+# The private namespace of private_namespace_jet.h, under JEMALLOC_JET
+JET_PREFIX = "jet_"
+
 def _static_archives(target):
-    """The static archives target links, from its CcInfo: every archive of this repository's, whatever its extension."""
+    """The static archives of this repository's linker inputs in target's CcInfo."""
     archives = []
-    for linker_input in reversed(target[CcInfo].linking_context.linker_inputs.to_list()):
+    for linker_input in target[CcInfo].linking_context.linker_inputs.to_list():
         if linker_input.owner.repo_name != _REPO:
             continue
         for library in linker_input.libraries:
@@ -60,7 +62,7 @@ def _jemalloc_private_namespace_impl(ctx):
     if ctx.attr._no_private_namespace[BuildSettingInfo].value:
         internal_prefix = ""
     elif ctx.attr._jet[BuildSettingInfo].value:
-        internal_prefix = "jet_"
+        internal_prefix = JET_PREFIX
     else:
         internal_prefix = value
     return [
@@ -212,7 +214,7 @@ def _private_namespace_leak_test_impl(ctx):
     archives = _static_archives(ctx.attr.library)
     if not archives:
         fail("expected a static archive from {}; its linker inputs are owned by {}".format(ctx.attr.library.label, _linker_input_owners(ctx.attr.library)))
-    namespace = ctx.attr.namespace[0]
+    namespace = ctx.attr.namespace
     export_syms = namespace[OutputGroupInfo].export_syms.to_list()[0]
     header = namespace[DefaultInfo].files.to_list()[0]
 
@@ -255,9 +257,7 @@ private_namespace_leak_test = rule(
         "namespace": attr.label(
             doc = "The private_namespace target that names the exported and private symbols.",
             mandatory = True,
-            cfg = settings_transition,
         ),
-        "settings": attr.label_keyed_string_dict(doc = "Read by the transition; see with_settings."),
         "sym_prefix": attr.string(doc = "configure's SYM_PREFIX for the target platform.", mandatory = True, values = ["", "_"]),
         "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
         "_nm": attr.label(

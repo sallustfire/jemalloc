@@ -33,16 +33,6 @@ exports_files(
     visibility = ["//tools/fidelity:__pkg__"],
 )
 
-_LIB_COPTS = ["-Iinclude/jemalloc/internal"] + COPTS
-
-_LIB_LOCAL_DEFINES = select({
-    "//settings:jet": ["JEMALLOC_JET"],
-    "//conditions:default": [],
-}) + select({
-    "//settings:no_private_namespace": ["JEMALLOC_NO_PRIVATE_NAMESPACE"],
-    "//conditions:default": [],
-})
-
 cc_library(
     name = "jemalloc",
     srcs = [
@@ -116,8 +106,8 @@ cc_library(
             # Last, as zone.o is in upstream's C_SYM_OBJS, so that private_namespace.h lists the symbols in upstream's
             # order
             "//settings/flags:zone_allocator": ["src/zone.c"],
-            "//settings/flags:zone_allocator_auto": [],
-            "//settings/flags:zone_allocator_no": [],
+            "//settings/flags:enable_zone_allocator_is_auto": [],
+            "//settings/flags:enable_zone_allocator_is_no": [],
         },
         # Only "yes" off Darwin matches none, as configure.ac's
         # AC_MSG_ERROR([--enable-zone-allocator is only supported on Darwin])
@@ -125,7 +115,7 @@ cc_library(
     ),
     hdrs = ["//include/jemalloc"],
     conlyopts = CONLYOPTS,
-    copts = _LIB_COPTS,
+    copts = ["-Iinclude/jemalloc/internal"] + COPTS,
     cxxopts = CXXOPTS,
     includes = ["include"],
     linkopts = select({
@@ -147,9 +137,16 @@ cc_library(
         "//settings/flags:zone_allocator": ["-Wl,-u,_$(JEMALLOC_INTERNAL_PREFIX)zone_register"],
         "//conditions:default": [],
     }),
-    # -u names a hidden symbol, which only a static link of the archive can resolve
+    # One archive in every link, as upstream builds one library. On Darwin, -u names a hidden symbol, which only a
+    # static link of the archive resolves.
     linkstatic = True,
-    local_defines = _LIB_LOCAL_DEFINES,
+    local_defines = select({
+        "//settings:jet": ["JEMALLOC_JET"],
+        "//conditions:default": [],
+    }) + select({
+        "//settings:no_private_namespace": ["JEMALLOC_NO_PRIVATE_NAMESPACE"],
+        "//conditions:default": [],
+    }),
     toolchains = ["//include/jemalloc/internal:jemalloc_private_namespace"],
     visibility = ["//visibility:public"],
     deps = ["//include/jemalloc/internal"] + select({

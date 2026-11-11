@@ -10,7 +10,7 @@ load("@rules_cc_autoconf//autoconf:checks.bzl", "checks", "macros", "utils")
 load("//tools:cc.bzl", "CONLYOPTS", "CXXOPTS")
 load("//tools:configure_host.bzl", "HOST_CC_DEPS", "HOST_CPPFLAGS", "HOST_LIBS")
 load(":lg_hugepage.bzl", "checked_lg_hugepage")
-load(":private_namespace.bzl", "jemalloc_private_namespace", "private_namespace", "private_namespace_leak_test")
+load(":private_namespace.bzl", "JET_PREFIX", "jemalloc_private_namespace", "private_namespace", "private_namespace_leak_test")
 load(":public_symbols.bzl", "public_symbols", "public_symbols_header", "symbol_list")
 load(":symbols.bzl", "OPTIONAL_PUBLIC_SYMBOLS", "OPTIONAL_WRAP_SYMBOLS", "PUBLIC_SYMBOLS", "SYM_PREFIX", "WRAP_SYMBOLS")
 
@@ -610,7 +610,7 @@ autoconf(
             checks.AC_DEFINE_UNQUOTED("JEMALLOC_LAZY_LOCK", ""),
         ],
         # configure.ac forces lazy locking off for the pecoff ABI. This specializes the setting :lazy_lock resolves to.
-        "//settings/flags:lazy_lock_yes_windows": [],
+        "//settings/flags:enable_lazy_lock_is_yes_windows": [],
         "//conditions:default": [],
     }) + select({
         cpu: [
@@ -1700,7 +1700,7 @@ private_namespace(
     out = "private_namespace_jet.h",
     enable_jet = True,
     input = "//:jemalloc",
-    prefix = "jet_",
+    prefix = JET_PREFIX,
     public_symbols = ":public_syms",
     sym_prefix = SYM_PREFIX,
     tags = ["manual"],
