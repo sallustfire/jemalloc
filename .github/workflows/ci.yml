@@ -137,6 +137,26 @@ jobs:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
         run: bazel test //... --config=prof-gcc ${{ matrix.bazel_config }}
 
+  # A single nominal run: upstream removes --enable-prof-frameptr in 5.4.0 (c597d737), so delete this job, the
+  # prof-frame-pointer config in .bazelrc and enable_prof=frame_pointer with it.
+  prof-frame-pointer:
+    name: Prof frame pointer (ubuntu-24.04, Bazel 9.x)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          repository-cache: true
+      - name: Build
+        env:
+          USE_BAZEL_VERSION: "9.x"
+        run: bazel build //... --config=prof-frame-pointer --config=bazel9
+      - name: Test
+        env:
+          USE_BAZEL_VERSION: "9.x"
+        run: bazel test //... --config=prof-frame-pointer --config=bazel9
+
   upstream-oracle:
     name: Upstream oracle (${{ matrix.name }})
     runs-on: ${{ matrix.os }}

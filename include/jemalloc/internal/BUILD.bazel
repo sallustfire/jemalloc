@@ -269,6 +269,13 @@ _EXPERIMENTAL_SDT_CUSTOM_PLATFORMS = [
 ]
 
 config_setting(
+    name = "linux_prof_frame_pointer",
+    constraint_values = ["@platforms//os:linux"],
+    flag_values = {"//settings/flags:enable_prof": "frame_pointer"},
+    visibility = ["//visibility:private"],
+)
+
+config_setting(
     name = "android_x86_32",
     constraint_values = [
         "@platforms//cpu:x86_32",
@@ -603,21 +610,35 @@ autoconf(
     }) + select({
         "//settings/flags:experimental_smallocx_api": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_EXPERIMENTAL_SMALLOCX_API", "")],
         "//conditions:default": [],
-    }) + select({
-        "//settings/flags:prof_gcc": [
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_GCC", ""),
-        ],
-        "//settings/flags:prof_libgcc": [
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_LIBGCC", ""),
-        ],
-        "//settings/flags:prof_libunwind": [
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
-            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_LIBUNWIND", ""),
-        ],
-        "//conditions:default": [],
-    }) + select({
+    }) + select(
+        {
+            # configure.ac offers --enable-prof-frameptr only on Linux and uses it only with a GCC-compatible compiler.
+            ":linux_prof_frame_pointer": [
+                checks.AC_TRY_COMPILE(
+                    name = "prof_frame_pointer_gcc",
+                    code = utils.AC_LANG_PROGRAM("", ""),
+                    error = "//settings/flags:enable_prof=frame_pointer (--enable-prof-frameptr) needs a GCC-compatible compiler",
+                    requires = ["ac_cv_c_compiler_gnu"],
+                ),
+                checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
+                checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_FRAME_POINTER", ""),
+            ],
+            "//settings/flags:prof_gcc": [
+                checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
+                checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_GCC", ""),
+            ],
+            "//settings/flags:prof_libgcc": [
+                checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
+                checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_LIBGCC", ""),
+            ],
+            "//settings/flags:prof_libunwind": [
+                checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
+                checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_LIBUNWIND", ""),
+            ],
+            "//settings/flags:no_prof": [],
+        },
+        no_match_error = "//settings/flags:enable_prof=frame_pointer (--enable-prof-frameptr) is only supported on Linux",
+    ) + select({
         "//settings/flags:fill": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_FILL", "")],
         "//conditions:default": [],
     }) + select({

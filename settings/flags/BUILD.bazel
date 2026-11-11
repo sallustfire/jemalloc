@@ -384,6 +384,7 @@ string_flag(
     name = "enable_prof",
     build_setting_default = "no",
     values = [
+        "frame_pointer",
         "gcc",
         "libgcc",
         "libunwind",
@@ -395,6 +396,7 @@ string_flag(
 selects.config_setting_group(
     name = "prof",
     match_any = [
+        ":prof_frame_pointer",
         ":prof_gcc",
         ":prof_libgcc",
         ":prof_libunwind",
@@ -404,6 +406,12 @@ selects.config_setting_group(
 config_setting(
     name = "no_prof",
     flag_values = {":enable_prof": "no"},
+)
+
+# JEMALLOC_PROF_FRAME_POINTER (--enable-prof-frameptr)
+config_setting(
+    name = "prof_frame_pointer",
+    flag_values = {":enable_prof": "frame_pointer"},
 )
 
 # JEMALLOC_PROF_GCC

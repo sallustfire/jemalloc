@@ -9,3 +9,6 @@ common:prof-libgcc --//settings/flags:enable_prof=libgcc
 
 common:prof-gcc --//settings/flags:enable_xmalloc
 common:prof-gcc --//settings/flags:enable_prof=gcc
+
+common:prof-frame-pointer --//settings/flags:enable_xmalloc
+common:prof-frame-pointer --//settings/flags:enable_prof=frame_pointer
