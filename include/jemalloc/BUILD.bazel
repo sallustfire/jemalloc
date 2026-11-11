@@ -45,6 +45,14 @@ autoconf(
             "JEMALLOC_OVERRIDE_VALLOC",
             condition = "ac_cv_func_valloc",
         ),
+        checks.AC_CHECK_FUNC(
+            "pvalloc",
+            code = utils.AC_LANG_FUNC_LINK_TRY("pvalloc"),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_OVERRIDE_PVALLOC",
+            condition = "ac_cv_func_pvalloc",
+        ),
     ] + macros.AC_CHECK_HEADERS(["malloc.h"]) + [
         checks.AC_TRY_COMPILE(
             name = "malloc_usable_size_const_argument",

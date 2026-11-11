@@ -121,7 +121,23 @@ cc_test(
     target_compatible_with = ["@platforms//os:macos"],
 )
 
-# Case 11: A shared jemalloc is a cc_shared_library of @jemalloc, here under upstream's file names. A binary that links
+# Case 11: Where the C library has pvalloc, plain pvalloc reaches jemalloc too, so free can release its memory. Only
+# an empty prefix makes jemalloc's pvalloc the plain one, so the test builds jemalloc without a prefix rather than under
+# whatever prefix the build is configured with.
+jemalloc(
+    name = "jemalloc_unprefixed",
+    jemalloc_prefix = "",
+)
+
+cc_test(
+    name = "test_11_pvalloc",
+    size = "small",
+    srcs = ["test_pvalloc.c"],
+    malloc = ":jemalloc_unprefixed",
+    target_compatible_with = _MALLOC_REPLACED,
+)
+
+# Case 12: A shared jemalloc is a cc_shared_library of @jemalloc, here under upstream's file names. A binary that links
 # it through dynamic_deps allocates from it, through plain malloc as in case 8.
 cc_shared_library(
     name = "jemalloc_shared",
@@ -134,7 +150,7 @@ cc_shared_library(
 )
 
 cc_test(
-    name = "test_11_shared",
+    name = "test_12_shared",
     size = "small",
     srcs = ["test_malloc.c"],
     dynamic_deps = [":jemalloc_shared"],
@@ -142,7 +158,7 @@ cc_test(
     deps = ["@jemalloc"],
 )
 
-# Case 12: The same through a jemalloc() build, named as upstream names a build with --with-install-suffix=_custom
+# Case 13: The same through a jemalloc() build, named as upstream names a build with --with-install-suffix=_custom
 cc_shared_library(
     name = "jemalloc_custom_shared",
     shared_lib_name = select({
@@ -154,7 +170,7 @@ cc_shared_library(
 )
 
 cc_test(
-    name = "test_12_shared_config",
+    name = "test_13_shared_config",
     size = "small",
     srcs = ["test_malloc.c"],
     dynamic_deps = [":jemalloc_custom_shared"],

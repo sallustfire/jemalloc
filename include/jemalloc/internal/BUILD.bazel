@@ -891,6 +891,14 @@ autoconf(
                 condition = "ac_cv_func___libc_valloc",
             ),
             checks.AC_CHECK_FUNC(
+                "__libc_pvalloc",
+                code = utils.AC_LANG_FUNC_LINK_TRY("__libc_pvalloc"),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_OVERRIDE___LIBC_PVALLOC",
+                condition = "ac_cv_func___libc_pvalloc",
+            ),
+            checks.AC_CHECK_FUNC(
                 "__posix_memalign",
                 code = utils.AC_LANG_FUNC_LINK_TRY("__posix_memalign"),
             ),
