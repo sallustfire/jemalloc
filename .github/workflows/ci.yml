@@ -252,12 +252,22 @@ jobs:
         run: bazel test //... ${{ matrix.bazel_config }}
 
   examples-hermetic-llvm:
-    name: Examples (hermetic LLVM, ${{ matrix.os }})
+    name: Examples (hermetic LLVM, ${{ matrix.os }}, Bazel ${{ matrix.bazel_version }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, macos-15]
+        bazel_version: ["8.x", "9.x", "rolling"]
+        include:
+          - bazel_version: "8.x"
+            bazel_config: "--config=bazel8"
+          - bazel_version: "9.x"
+            bazel_config: "--config=bazel9"
+          # Rolling resets --@jemalloc//settings/flags:nm to its default when building tools unless the flag is
+          # propagated, and the default fails on a toolchain without nm_executable.
+          - bazel_version: "rolling"
+            bazel_config: "--experimental_propagate_custom_flag=@jemalloc//settings/flags:nm"
     steps:
       - uses: actions/checkout@v4
       - uses: bazel-contrib/setup-bazel@0.14.0
@@ -266,6 +276,6 @@ jobs:
           repository-cache: true
       - name: Test
         env:
-          USE_BAZEL_VERSION: 8.x
+          USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
         working-directory: examples/hermetic_llvm
-        run: bazel test //... @jemalloc//include/jemalloc/internal:private_namespace_leak_test --config=bazel8
+        run: bazel test //... @jemalloc//include/jemalloc/internal:private_namespace_leak_test ${{ matrix.bazel_config }}
