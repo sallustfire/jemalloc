@@ -48,13 +48,21 @@ COPTS = ["-D_REENTRANT"] + select({
     "@rules_cc//cc/compiler:clang-cl": _COPTS_MSVC_COMPATIBLE,
     "//conditions:default": [],
 }) + select({
-    # configure.ac adds it only when GCC=yes and the ABI is ELF (configure.ac:846-849). It is keyed on the compiler
-    # alone here, so these compilers also get it on Mach-O and PE targets.
+    # -fvisibility=hidden goes to compilers that take GCC's command line, for object formats that honour symbol
+    # visibility (ELF, Mach-O, wasm). On PE/COFF, exports come from dllexport or .def files, so the compilers that
+    # target only PE/COFF get nothing. The select keys on the compiler alone, so a GCC-style clang targeting Windows
+    # still gets the flag, where it marks symbols hidden to no effect.
+    # clang-cl takes MSVC's command line and ignores a bare -fvisibility=hidden ("unknown argument ignored in
+    # clang-cl", clang 23.1.2); it does not define __GNUC__, so configure's GCC=yes would be false for it, and it
+    # targets PE/COFF. mingw-gcc targets PE/COFF too: configure.ac sets abi="pecoff" for *-*-mingw* and *-*-cygwin*
+    # (configure.ac:854-855).
+    #
+    # configure.ac adds the flag only when GCC=yes and the ABI is ELF (configure.ac:971-974). This build also adds it
+    # on Mach-O, deliberately: Mach-O honours visibility, and configure leaves it off there only because its test
+    # checks for ELF.
     "@rules_cc//cc/compiler:clang": ["-fvisibility=hidden"],
-    "@rules_cc//cc/compiler:clang-cl": ["-fvisibility=hidden"],
     "@rules_cc//cc/compiler:emscripten": ["-fvisibility=hidden"],
     "@rules_cc//cc/compiler:gcc": ["-fvisibility=hidden"],
-    "@rules_cc//cc/compiler:mingw-gcc": ["-fvisibility=hidden"],
     "//conditions:default": [],
 }) + select({
     "@platforms//os:android": [
@@ -72,6 +80,22 @@ COPTS = ["-D_REENTRANT"] + select({
     "@platforms//os:macos": ["-DPIC"],
     "//conditions:default": [],
 }) + select({
+    "//settings/flags:prof_frame_pointer": ["-fno-omit-frame-pointer"],
     "//settings/flags:prof_gcc": ["-fno-omit-frame-pointer"],
+    "//conditions:default": [],
+})
+
+# Makefile.in compiles the test programs, though not the test library, with -fno-builtin ($(TESTS_OBJS): CFLAGS and
+# $(TESTS_CPP_OBJS): CPPFLAGS), so the compiler cannot fold or elide the allocation calls a test makes to observe
+# them.
+#
+# Makefile.in applies it to every compiler. cl has no equivalent, so msvc-cl gets nothing; clang-cl takes it through
+# /clang:, which passes a flag to the clang driver unchanged.
+TEST_COPTS = select({
+    "@rules_cc//cc/compiler:clang": ["-fno-builtin"],
+    "@rules_cc//cc/compiler:clang-cl": ["/clang:-fno-builtin"],
+    "@rules_cc//cc/compiler:emscripten": ["-fno-builtin"],
+    "@rules_cc//cc/compiler:gcc": ["-fno-builtin"],
+    "@rules_cc//cc/compiler:mingw-gcc": ["-fno-builtin"],
     "//conditions:default": [],
 })

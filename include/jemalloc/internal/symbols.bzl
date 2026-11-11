@@ -8,6 +8,8 @@ PUBLIC_SYMBOLS = [
     "calloc",
     "dallocx",
     "free",
+    "free_sized",
+    "free_aligned_sized",
     "mallctl",
     "mallctlbymib",
     "mallctlnametomib",
@@ -34,6 +36,7 @@ PUBLIC_SYMBOLS = [
 OPTIONAL_PUBLIC_SYMBOLS = {
     "memalign": ["jemalloc_defs.h", "JEMALLOC_OVERRIDE_MEMALIGN"],
     "valloc": ["jemalloc_defs.h", "JEMALLOC_OVERRIDE_VALLOC"],
+    "pvalloc": ["jemalloc_defs.h", "JEMALLOC_OVERRIDE_PVALLOC"],
     "malloc_size": ["jemalloc_internal_defs.h", "JEMALLOC_HAVE_MALLOC_SIZE"],
 }
 
@@ -56,10 +59,13 @@ WRAP_SYMBOLS = select(_WRAP_OS)
 OPTIONAL_WRAP_SYMBOLS = {
     "__libc_calloc": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___LIBC_CALLOC"],
     "__libc_free": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___LIBC_FREE"],
+    "__libc_free_sized": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___LIBC_FREE_SIZED"],
+    "__libc_free_aligned_sized": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___LIBC_FREE_ALIGNED_SIZED"],
     "__libc_malloc": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___LIBC_MALLOC"],
     "__libc_memalign": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___LIBC_MEMALIGN"],
     "__libc_realloc": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___LIBC_REALLOC"],
     "__libc_valloc": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___LIBC_VALLOC"],
+    "__libc_pvalloc": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___LIBC_PVALLOC"],
     "__posix_memalign": ["jemalloc_internal_defs.h", "JEMALLOC_OVERRIDE___POSIX_MEMALIGN"],
     "pthread_create": ["jemalloc_internal_defs.h", "JEMALLOC_HAVE_PTHREAD"],
     "_malloc_thread_cleanup": ["jemalloc_internal_defs.h", "JEMALLOC_MALLOC_THREAD_CLEANUP"],

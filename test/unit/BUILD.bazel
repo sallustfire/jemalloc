@@ -2,7 +2,7 @@ load("@package_metadata//licenses/rules:license.bzl", "license")
 load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
-load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
+load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS", "TEST_COPTS")
 load("//tools:test.bzl", "join_conf", "test_name")
 load("//tools:transition.bzl", "with_settings")
 
@@ -44,20 +44,29 @@ UNIT_TESTS = [
     {"src": "atomic.c"},
     {"src": "background_thread.c"},
     {"src": "background_thread_enable.c"},
+    {"src": "background_thread_init.c"},
     {"src": "base.c"},
     {
         "src": "batch_alloc.c",
         "conf": "tcache_gc_incr_bytes:2147483648",
     },
+    {"src": "bin.c"},
     {
         "src": "binshard.c",
-        "conf": "narenas:1,bin_shards:1-160:16|129-512:4|256-256:8",
+        "conf": "narenas:1,bin_shards:1-160:16|129-512:4|256-256:8|513-8070450532247928832:1",
     },
     {"src": "bitmap.c"},
     {"src": "bit_util.c"},
     {"src": "buf_writer.c"},
     {"src": "cache_bin.c"},
     {"src": "ckh.c"},
+    {"src": "conf.c"},
+    # conf_init_0 asserts the default dirty_decay_ms, so like upstream it runs with no MALLOC_CONF; conf_init_1 and
+    # conf_init_confirm set the malloc_conf global themselves.
+    {"src": "conf_init_0.c"},
+    {"src": "conf_init_1.c"},
+    {"src": "conf_init_confirm.c"},
+    {"src": "conf_parse.c"},
     {"src": "counter.c"},
     {"src": "decay.c"},
     {"src": "div.c"},
@@ -78,10 +87,29 @@ UNIT_TESTS = [
         "src": ":smhasher_test_sources",
     },
     {"src": "hook.c"},
-    {"src": "hpa.c"},
+    {
+        "src": "hpa.c",
+        "conf": "process_madvise_max_batch:0,experimental_hpa_start_huge_if_thp_always:false",
+    },
+    {
+        "src": "hpa_sec_integration.c",
+        "conf": "process_madvise_max_batch:0,experimental_hpa_start_huge_if_thp_always:false",
+    },
+    {
+        "src": "hpa_thp_always.c",
+        "conf": "process_madvise_max_batch:0,experimental_hpa_start_huge_if_thp_always:true",
+    },
+    {
+        "src": "hpa_vectorized_madvise.c",
+        "conf": "process_madvise_max_batch:2,experimental_hpa_start_huge_if_thp_always:false",
+    },
+    {
+        "src": "hpa_vectorized_madvise_large_batch.c",
+        "conf": "process_madvise_max_batch:64",
+    },
     {
         "src": "hpa_background_thread.c",
-        "conf": "hpa_dirty_mult:0,hpa_min_purge_interval_ms:50,hpa_sec_nshards:0",
+        "conf": "hpa_dirty_mult:0,hpa_min_purge_interval_ms:50,hpa_sec_nshards:0,experimental_hpa_start_huge_if_thp_always:false",
     },
     {"src": "hpdata.c"},
     {"src": "huge.c"},
@@ -103,6 +131,8 @@ UNIT_TESTS = [
         "deps": [":junk_c"],
         "conf": "abort:false,zero:false,junk:free",
     },
+    {"src": "json_stats.c"},
+    {"src": "large_ralloc.c"},
     {"src": "log.c"},
     {"src": "mallctl.c"},
     {
@@ -115,6 +145,7 @@ UNIT_TESTS = [
     {"src": "mq.c"},
     {"src": "mtx.c"},
     {"src": "nstime.c"},
+    {"src": "ncached_max.c"},
     {"src": "oversize_threshold.c"},
     {"src": "pa.c"},
     {
@@ -135,11 +166,11 @@ UNIT_TESTS = [
     },
     {
         "src": "prof_gdump.c",
-        "prof_conf": "prof:true,prof_active:false,prof_gdump:true",
+        "prof_conf": "prof:true,prof_active:false,prof_gdump:true,lg_prof_sample:0",
     },
     {
         "src": "prof_hook.c",
-        "prof_conf": "prof:true,prof_active:true,lg_prof_sample:0",
+        "prof_conf": "prof:true,prof_active:true,lg_prof_sample:0,prof_bt_max:200",
     },
     {
         "src": "prof_idump.c",
@@ -156,11 +187,15 @@ UNIT_TESTS = [
     },
     {
         "src": "prof_recent.c",
-        "prof_conf": "prof:true,prof_active:true,lg_prof_sample:0,prof_recent_alloc_max:3",
+        "prof_conf": "prof:true,prof_active:true,lg_prof_sample:0,prof_recent_alloc_max:3,prof_sys_thread_name:true",
     },
     {
         "src": "prof_reset.c",
         "prof_conf": "prof:true,prof_active:false,lg_prof_sample:0,prof_recent_alloc_max:0",
+    },
+    {
+        "src": "prof_small.c",
+        "prof_conf": "prof:true,lg_prof_sample:0",
     },
     {
         "src": "prof_stats.c",
@@ -199,16 +234,20 @@ UNIT_TESTS = [
         "src": "size_check.c",
         "prof_conf": "prof:false",
     },
-    {"src": "size_classes.c"},
+    {
+        "src": "size_classes.c",
+        "conf": "disable_large_size_classes:true",
+    },
     {"src": "slab.c"},
     {"src": "smoothstep.c"},
     {"src": "spin.c"},
     {"src": "stats.c"},
     {"src": "stats_print.c"},
     {"src": "sz.c"},
+    {"src": "tcache_init.c"},
     {
         "src": "tcache_max.c",
-        "conf": "tcache_max:1024",
+        "conf": "tcache_max:1024,tcache_gc_incr_bytes:939524096",
     },
     {"src": "test_hooks.c"},
     {
@@ -277,7 +316,7 @@ with_settings(
     name = test_name(test),
     srcs = [test["src"]],
     conlyopts = CONLYOPTS,
-    copts = COPTS,
+    copts = COPTS + TEST_COPTS,
     cxxopts = CXXOPTS,
     env = select({
         "//settings/flags:prof": {"JE_TEST_MALLOC_CONF": join_conf(
@@ -295,7 +334,7 @@ cc_test(
     name = "arena_reset_prof",
     srcs = ["arena_reset_prof.c"],
     conlyopts = CONLYOPTS,
-    copts = COPTS,
+    copts = COPTS + TEST_COPTS,
     cxxopts = CXXOPTS,
     env = {"JE_TEST_MALLOC_CONF": "prof:true,lg_prof_sample:0"},
     linkstatic = True,
@@ -314,7 +353,7 @@ cc_test(
     name = "batch_alloc_prof",
     srcs = ["batch_alloc_prof.c"],
     conlyopts = CONLYOPTS,
-    copts = COPTS,
+    copts = COPTS + TEST_COPTS,
     cxxopts = CXXOPTS,
     env = {"JE_TEST_MALLOC_CONF": "prof:true,lg_prof_sample:14"},
     linkstatic = True,

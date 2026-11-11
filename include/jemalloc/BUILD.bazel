@@ -20,7 +20,11 @@ exports_files(
 autoconf(
     name = "jemalloc_defs_checks",
     cc_deps = HOST_CC_DEPS,
-    checks = [
+    # configure.ac's enable_user_config, which --disable-user-config clears.
+    checks = select({
+        "//settings/flags:user_config": [checks.M4_VARIABLE("enable_user_config", "1")],
+        "//conditions:default": [checks.M4_VARIABLE("enable_user_config", "0")],
+    }) + [
         checks.AC_TRY_LINK(
             name = "je_cv_attribute",
             code = utils.AC_LANG_PROGRAM("static __attribute__((unused)) void foo(void){}", ""),
@@ -45,6 +49,14 @@ autoconf(
             "JEMALLOC_OVERRIDE_VALLOC",
             condition = "ac_cv_func_valloc",
         ),
+        checks.AC_CHECK_FUNC(
+            "pvalloc",
+            code = utils.AC_LANG_FUNC_LINK_TRY("pvalloc"),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_OVERRIDE_PVALLOC",
+            condition = "ac_cv_func_pvalloc",
+        ),
     ] + macros.AC_CHECK_HEADERS(["malloc.h"]) + [
         checks.AC_TRY_COMPILE(
             name = "malloc_usable_size_const_argument",
@@ -65,9 +77,41 @@ autoconf(
             if_true = "const",
         ),
     ] + select({
-        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_USE_CXX_THROW", "")],
+        # configure.ac's host table sets glibc=1 and defines JEMALLOC_USE_CXX_THROW for *-*-linux* but not for
+        # *-*-linux-musl* (nor Android, a separate OS here). @platforms has no libc constraint, so ask the C library:
+        # glibc's <features.h> defines __GLIBC__ (uClibc's does too), musl's defines no identifying macro at all, and
+        # jemalloc_macros.h tells musl from glibc by the same __GLIBC__ test. Named after configure's host-table
+        # variable, which has no cache variable.
+        "@platforms//os:linux": [
+            checks.AC_TRY_COMPILE(
+                name = "glibc",
+                code = utils.AC_LANG_PROGRAM(
+                    "#include <features.h>",
+                    [
+                        "#ifndef __GLIBC__",
+                        "  choke me",
+                        "#endif",
+                    ],
+                ),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_USE_CXX_THROW",
+                condition = "glibc",
+            ),
+        ],
         "//conditions:default": [],
     }) + [
+        # configure.ac defines both unless --disable-user-config is given; without them jemalloc ignores MALLOC_CONF
+        # and /etc/malloc.conf.
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_CONFIG_ENV",
+            condition = "enable_user_config",
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_CONFIG_FILE",
+            condition = "enable_user_config",
+        ),
+    ] + [
         # configure.ac skips this probe for MSVC compilers; jemalloc_internal_defs.h reads it for JEMALLOC_RETAIN, which
         # MSVC compilers never get.
         checks.AC_CHECK_SIZEOF("void *"),
@@ -128,6 +172,45 @@ autoconf(
     copts = select({
         "@rules_cc//cc/compiler:msvc-cl": [],
         "//conditions:default": ["-Wimplicit-fallthrough"],
+    }) + HOST_CPPFLAGS,
+    tags = ["manual"],
+)
+
+# configure.ac adds -Wdeprecated-declarations, not -Werror, only around this probe (JE_CFLAGS_SAVE/JE_CFLAGS_RESTORE),
+# so it passes wherever __has_attribute(deprecated) holds, and the flag is set once on its own target as for
+# -Wimplicit-fallthrough. msvc-cl gets no flag, for the same reason.
+autoconf(
+    name = "jemalloc_defs_deprecated_declarations_checks",
+    cc_deps = HOST_CC_DEPS,
+    checks = [
+        checks.AC_TRY_LINK(
+            name = "je_cv_deprecated",
+            code = utils.AC_LANG_PROGRAM(
+                [
+                    "#if !__has_attribute(deprecated)",
+                    "#error \"deprecated attribute not supported\"",
+                    "#endif",
+                    "struct has_deprecated_field {",
+                    "    int good;",
+                    "    int __attribute__((deprecated(\"Do not use\"))) bad;",
+                    "};",
+                ],
+                [
+                    "struct has_deprecated_field instance;",
+                    "instance.good = 0;",
+                    "instance.bad = 1;",
+                ],
+            ),
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_ATTR_DEPRECATED",
+            condition = "je_cv_deprecated",
+        ),
+    ],
+    conlyopts = CONLYOPTS,
+    copts = select({
+        "@rules_cc//cc/compiler:msvc-cl": [],
+        "//conditions:default": ["-Wdeprecated-declarations"],
     }) + HOST_CPPFLAGS,
     tags = ["manual"],
 )
@@ -201,6 +284,7 @@ autoconf_hdr(
     ],
     deps = [
         ":jemalloc_defs_checks",
+        ":jemalloc_defs_deprecated_declarations_checks",
         ":jemalloc_defs_implicit_fallthrough_checks",
         ":jemalloc_defs_warnings_as_errors_checks",
     ],

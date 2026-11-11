@@ -10,8 +10,9 @@ The upstream jemalloc build performs a number of feature detection steps in the 
 that ask the toolchain (functions and their signatures, MADV_* constants, builtins, attributes, atomics, type sizes and
 byte order) are copies of configure.ac's test programs, compiled or linked by rules_cc_autoconf with the target's
 toolchain. configure's host table is expressed as platform selects. What configure learns by running a program on the
-build machine (page size, virtual address bits, huge page size) is set by flags under //settings/platform; lg_page and
-lg_vaddr have per-platform defaults.
+build machine (page size, virtual address bits, huge page size) is set by flags under //settings/platform, and lg_page
+and lg_vaddr have per-platform defaults. Whether the CPU has rdtscp, which configure also learns by running a program,
+is a platform select; see JEMALLOC_HAVE_RDTSCP below.
 
 ## Usage
 
@@ -57,11 +58,60 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
 - **//settings/platform:lg_hugepage (--with-lg-hugepage):** Defaults to 21 (2 MiB), configure's value when it cannot
  read the huge page size. It must be at least lg_page, as configure requires, or the build fails; so on aarch64 Linux
  and Android and ppc64le Linux, where lg_page defaults to 16, a value below 16 needs lg_page set explicitly too.
+- **JEMALLOC_HAVE_RDTSCP (no configure option):** Whether the target CPU has the rdtscp instruction. It is defined on
+ every x86_64 target and on no other CPU, with no flag to change it. configure instead runs a program on the build
+ machine, only on x86_64 and, in 5.3.1, only while it detects LG_VADDR, so --with-lg-vaddr leaves it out (5.4.0's
+ ChangeLog fixes that coupling as a bug: "Fix rdtscp detection with --with-lg-vaddr"); a cross build gets "no". Whether
+ the CPU has rdtscp is a fact about the target that a build cannot observe, and configure's answer is right only when
+ build and target match. Nearly all x86_64 CPUs have rdtscp; the exceptions are Intel's before Nehalem, AMD K8 before
+ revision F, and the Bonnell and Saltwell Atoms. So where configure, cross building, leaves the macro undefined and
+ this build defines it, the difference is intended. malloc_getcpu reads it only after _WIN32 and sched_getcpu, so it
+ matters only on x86_64 Apple targets (Intel macOS) with percpu_arena enabled: those deployments require a CPU with
+ rdtscp, and without the macro malloc_getcpu would reach not_reached(). The pre-Nehalem exceptions include the Core 2
+ and Xeon CPUs of Intel Macs sold until 2011, which run macOS no later than 10.13; percpu_arena on one of those
+ reaches an illegal instruction instead.
 - **glibc:** Without a prefix, the __libc_* functions and __posix_memalign are probed and listed (exempt from private
  renaming) wherever they link, and on Linux the hooks __malloc_hook, __realloc_hook, __free_hook and __memalign_hook
  where they still link (glibc before 2.34), exactly as configure does. jemalloc defines the hooks, and aliases the
  __libc_* functions and __posix_memalign, only where the malloc hooks link on glibc; elsewhere, as with configure,
  these names are listed but not defined.
+- **//settings/flags:enable_user_config (--disable-user-config):** On by default, as in the make build: jemalloc reads
+ options from the MALLOC_CONF environment variable and the /etc/malloc.conf link, both renamed by a prefix. Set it to
+ False, or jemalloc()'s user_config to "False", to read neither, leaving the options compiled in through
+ //settings/flags:malloc_conf and an application's own malloc_conf.
+- **//settings/flags:enable_dss (--disable-dss):** On by default: as in the make build, jemalloc can allocate from the
+ data segment with sbrk(2) wherever the target links sbrk and does not deprecate it (every Apple OS does). Set it to
+ False, or jemalloc()'s dss to "False", to never call sbrk, as when something else in the process owns the data
+ segment.
+- **//settings/flags:enable_pageid (--enable-pageid):** Off by default. On, jemalloc names its anonymous mappings
+ (jemalloc_pg, or jemalloc_pg_overcommit) in /proc/<pid>/maps, where the target has prctl; Linux 5.17 or later with
+ CONFIG_ANON_VMA_NAME applies the names, and other kernels ignore them. jemalloc()'s pageid sets it per target.
+- **//settings/flags:enable_force_getenv (--enable-force-getenv):** Off by default, so jemalloc reads MALLOC_CONF with
+ secure_getenv, or ignores it in a setuid or setgid process where only issetugid is available. On, it always reads it
+ with getenv, including in privileged processes. jemalloc()'s force_getenv sets it per target.
+- **//settings/flags:enable_experimental_sdt (--enable-experimental-sdt):** Off by default. On, jemalloc emits USDT
+ probes: systemtap's, where the toolchain links configure's <sys/sdt.h> program (a nested function, so GCC only), or
+ else jemalloc's own on Linux x86_64, aarch64 and 32-bit Arm and on Android aarch64 and x86_64. As with configure, any
+ other Linux or Android CPU gets no probes and no error, and any other platform fails the build. jemalloc()'s
+ experimental_sdt sets it per target.
+- **//settings/flags:experimental_sys_process_madvise (--with-experimental-sys-process-madvise):** Empty by default.
+ jemalloc uses process_madvise (for batched purging, which opt.process_madvise_max_batch enables) where the C library's
+ headers declare SYS_process_madvise and PIDFD_SELF. Set it to the system call number, for example 440, to use it on a
+ Linux target whose headers lack them, as configure does wherever its probe fails and madvise links. The value is
+ written into the header as is. Unlike configure, the build also writes EXPERIMENTAL_SYS_PROCESS_MADVISE_NR where the
+ probe passes or madvise is missing, where nothing reads it.
+- **//settings/flags:enable_prof (--enable-prof):** "no" by default. "libunwind", "libgcc" and "gcc" choose configure's
+ backtrace methods; "frame_pointer" is --enable-prof-frameptr. With it, jemalloc compiles with -fno-omit-frame-pointer
+ and walks frame pointers within the thread's stack, as /proc/<pid>/task/<tid>/maps gives it, and falls back to
+ backtrace(3) from <execinfo.h> for a thread whose walk leaves that range, or for every thread where gettid does not
+ link; musl has no <execinfo.h>, so it does not build there, as with configure. Code built without frame pointers,
+ as many C libraries are, cuts such backtraces short or garbles them; the walk follows only frame pointers inside the
+ stack range, which avoids the wild reads prof-gcc's walk makes, though it is not a proof against faults. configure offers frame_pointer only on Linux with a GCC-compatible
+ compiler and silently picks another method elsewhere; here any other platform or compiler fails the build.
+- **--enable-tsan, --enable-ubsan and --with-cxx-stdlib:** configure's sanitizer options only add -fsanitize=thread
+ or -fsanitize=undefined to the compile and link flags, and --with-cxx-stdlib only chooses -lstdc++ or -lc++. Here the
+ C and C++ toolchain owns both, so there are no flags for them: enable a sanitizer through the toolchain's features or
+ --copt and --linkopt, and choose the C++ standard library with the C++ toolchain.
 
 Settings whose "__auto__" default jemalloc resolves for the target platform:
 - //settings/flags:enable_lazy_lock
@@ -113,22 +163,33 @@ Profiling (`--config=prof-*`) is tested on Linux only.
 
 ## How the registry entry is produced
 
-The registry entry does not fetch the repository above. It fetches upstream's release tarball (for 5.3.0,
-`jemalloc-5.3.0.tar.bz2` from jemalloc's GitHub releases) and adds the Bazel build to it:
+The registry entry does not fetch the repository above. It fetches upstream's release tarball (for 5.3.1,
+`jemalloc-5.3.1.tar.bz2` from jemalloc's GitHub releases) and adds the Bazel build to it:
 
 - **overlay/** holds every committed file the tarball lacks: the BUILD and .bzl files, MODULE.bazel, settings/, tools/,
   examples/ and this README. The repository's own tooling, listed in `.bcr/fork_only.txt`, stays out.
 - **patches/** holds one patch for each upstream file the repository edits, the difference between the committed file
-  and the tarball's.
+  and the tarball's (except root dotfiles listed in `.bcr/fork_only.txt`, which ship as upstream's), and
+  `tarball_removals.patch`, which deletes the tarball files `.bcr/tarball_removals.txt` lists. The exporter generates
+  it from the tarball's own bytes, and each listed file must be one the repository does not commit. 5.3.1's tarball
+  ships a configured build tree by accident; the list deletes its files at paths the build generates.
 
 `.github/scripts/export_bcr_entry.py` writes the entry into a registry checkout from a committed ref. It writes
-nothing unless the tarball, overlay and patches, applied as Bazel applies them, rebuild that ref byte for byte.
+nothing unless the tarball, overlay and patches rebuild the tree that ref defines, byte for byte: the tarball less the
+listed removals, with the ref's content for each upstream file it commits (except root dotfiles listed in
+`.bcr/fork_only.txt`), plus the overlay. It applies the patches with GNU patch, without fuzz, and writes only patches
+within constraints chosen so that Bazel's own patcher applies them the same way: plain ASCII paths, comments that cannot
+read as patch syntax, and deletions only of non-empty text files. The tree it checks is not the ref's own tree. The
+tarball's other files ship though the repository does not commit them (configure, and the rest of 5.3.1's configured
+build tree, such as config.log and the empty config.stamp), the tooling in `.bcr/fork_only.txt` stays out, and a root
+dotfile listed there ships as upstream's. Only contents are compared: upstream files keep the tarball's modes, and the
+export stops if the ref commits one as a symlink or with another executable bit.
 `.bcr/presubmit.yml` becomes the entry's presubmit.
 
 ## Contributing
 
 Send changes as pull requests to https://github.com/sallustfire/jemalloc, against the branch for the jemalloc version,
-such as `bcr-5.3.0`. Support for a new jemalloc release starts as a new `bcr-<version>` branch.
+such as `bcr-5.3.1`. Support for a new jemalloc release starts as a new `bcr-<version>` branch.
 
 - Leave upstream's files as upstream ships them where you can. Each edit to one ships to the registry as a patch, so
   edit one only when the Bazel build needs it, and say why in a comment beside the edit.
@@ -137,6 +198,7 @@ such as `bcr-5.3.0`. Support for a new jemalloc release starts as a new `bcr-<ve
 - Run `bazel test //...` at the root and in `examples/host_toolchain` and `examples/hermetic_llvm`. CI runs them on the
   platforms above and builds the upstream release with configure and make to compare.
 
-A release sets `version` in MODULE.bazel to `<upstream>.bcr.<N>`, runs
+A release sets `version` in MODULE.bazel to `<upstream>` for the first entry of an upstream release, or to
+`<upstream>.bcr.<N>` for a later revision of the Bazel build on the same release, runs
 `.github/scripts/export_bcr_entry.py --registry <registry checkout>`, and opens a pull request against the
 [Bazel Central Registry](https://github.com/bazelbuild/bazel-central-registry) with the entry it writes.

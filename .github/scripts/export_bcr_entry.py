@@ -3,8 +3,18 @@
 
 The entry fetches upstream's release tarball. Every committed file the tarball lacks ships in overlay/, except the
 fork's own tooling listed in .bcr/fork_only.txt, and every committed edit to an upstream file ships as a patch in
-patches/. The entry is written only if the tarball, then the overlay, then the patches, as Bazel applies them, rebuild
-the fork byte for byte.
+patches/, beside one generated from .bcr/tarball_removals.txt that deletes tarball files the fork leaves out.
+
+The entry is written only if the tarball, then the overlay, then the patches rebuild the distribution tree the fork
+defines, file for file and byte for byte: the tarball less the listed removals, with the fork's content for every
+upstream file it commits outside .bcr/fork_only.txt, plus the overlay. The check applies the patches with GNU patch,
+without fuzz; the patches are held to constraints chosen so that Bazel's patcher applies them the same way (plain
+ASCII paths, # description lines, deletions only of non-empty text files). That tree is not the fork's committed tree:
+- tarball files the fork neither commits nor lists for removal ship as upstream's: configure, and the rest of 5.3.1's
+  configured build tree, such as config.log and the empty config.stamp;
+- the fork's tooling in .bcr/fork_only.txt stays out, and a root dotfile listed there ships as upstream's;
+- only contents are compared: upstream files keep the tarball's modes, and overlay files are plain 100644 files. The
+  export stops instead if the fork commits a shipped upstream file as a symlink or with another executable bit.
 
 usage: export_bcr_entry.py --registry BCR_DIR [--ref REF] [--tarball PATH] [--replace]
 """
@@ -27,6 +37,8 @@ MODULE_NAME = "jemalloc"
 UPSTREAM_URL = "https://github.com/jemalloc/jemalloc/releases/download/{upstream}/jemalloc-{upstream}.tar.bz2"
 FORK_ONLY = ".bcr/fork_only.txt"
 PRESUBMIT = ".bcr/presubmit.yml"
+REMOVALS = ".bcr/tarball_removals.txt"
+REMOVAL_PATCH = "tarball_removals.patch"
 
 
 class ExportError(Exception):
@@ -91,8 +103,9 @@ def read_fork(repo, ref):
 
 
 def read_tarball(data, strip_prefix):
-    """Returns {path: bytes} for the regular files under strip_prefix/ in a tarball."""
-    files = {}
+    """Returns ({path: bytes}, {path: mode}) for the regular files under strip_prefix/ in a tarball, each mode as git
+    records it: 100755 if the owner may execute the file, else 100644."""
+    files, modes = {}, {}
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:*") as archive:
         for member in archive.getmembers():
             if member.isdir():
@@ -104,7 +117,8 @@ def read_tarball(data, strip_prefix):
             if prefix != strip_prefix or any(part in ("", ".", "..") for part in path.split("/")):
                 raise ExportError(f"tarball: {member.name} is not a plain path under {strip_prefix}/")
             files[path] = archive.extractfile(member).read()
-    return files
+            modes[path] = "100755" if member.mode & 0o100 else "100644"
+    return files, modes
 
 
 def module_attribute(module_bazel, attribute):
@@ -129,7 +143,7 @@ def load_fork_only(fork):
     return entries
 
 
-def classify(fork, upstream, fork_only):
+def classify(fork, upstream, upstream_modes, fork_only):
     """Splits the fork into overlay files and fork-only files; the overlay is everything upstream lacks.
 
     Returns (overlay, kept_upstream): the overlay paths, and the upstream files the fork changes for its own use, which
@@ -149,8 +163,13 @@ def classify(fork, upstream, fork_only):
             errors.append(f"{FORK_ONLY}: {entry} matches no committed file")
         for path in matches:
             # Only root dotfiles with no build effect may keep the fork's edits out of the registry; any other edit to
-            # an upstream file ships as a patch, or the fork would test different code than the registry serves.
-            if path in upstream and ("/" in path or not path.startswith(".")):
+            # an upstream file ships as a patch, or the fork would test different code than the registry serves. An
+            # unedited upstream file under a fork-only directory has no edits to lose, and one the fork deletes ships
+            # as the tarball has it (5.3.1's tarball ships upstream's .github/workflows/, which the fork does not
+            # run). Unedited means the tarball's bytes as the same kind of file, so a symlink or a changed executable
+            # bit is an edit too.
+            edited = path in upstream and fork[path] != (upstream_modes[path], upstream[path])
+            if edited and ("/" in path or not path.startswith(".")):
                 errors.append(f"{FORK_ONLY}: {entry} covers the upstream file {path}, whose edits must ship")
     if errors:
         raise ExportError("\n  ".join(["fork-only list does not match the trees:"] + errors))
@@ -171,14 +190,41 @@ def check_overlay(fork, overlay):
         raise ExportError("overlay:\n  " + "\n  ".join(errors))
 
 
-def derive_patches(fork, upstream, kept_upstream):
-    """One unified diff per upstream file the fork edits, named after its path, for patch_strip 1."""
+def patchable(path):
+    """Whether path may be named in a patch header: plain components of ASCII letters, digits and ._+- only.
+
+    Bazel's patcher reads a header's path up to a tab and trims it with String.trim(), which drops spaces and control
+    characters at either end, and git quotes a name holding unusual bytes; either would make a patcher touch a file
+    other than the one named. Every path in 5.3.1's tarball fits.
+    """
+    return all(re.fullmatch(r"[A-Za-z0-9._+-]+", part) and part not in (".", "..") for part in path.split("/"))
+
+
+def derive_patches(fork, upstream, upstream_modes, kept_upstream):
+    """One unified diff per upstream file the fork edits, named after its path, for patch_strip 1.
+
+    A diff carries contents only, so an upstream file the fork commits as a symlink or with a changed executable bit
+    stops the export rather than ship as the tarball's kind of file; kept_upstream ships as upstream's anyway.
+    """
+    mismatches = [
+        f"{path}: committed as {fork[path][0]}, but the tarball ships it as {upstream_modes[path]}"
+        for path in sorted(fork)
+        if path in upstream and path not in kept_upstream and fork[path][0] != upstream_modes[path]
+    ]
+    if mismatches:
+        raise ExportError(
+            "upstream files whose kind or executable bit the fork changes, which a patch cannot carry:\n  "
+            + "\n  ".join(mismatches)
+        )
     patches = {}
     with tempfile.TemporaryDirectory() as temporary:
         original, edited = Path(temporary, "original"), Path(temporary, "edited")
         for path in sorted(fork):
             if path not in upstream or path in kept_upstream or fork[path][1] == upstream[path]:
                 continue
+            if not patchable(path):
+                raise ExportError(f"{path!r}: an edited upstream file's path must hold only ASCII letters, digits and "
+                                  "._+- between slashes")
             if b"\0" in fork[path][1] or b"\0" in upstream[path]:
                 raise ExportError(f"{path}: edits to binary upstream files cannot ship as patches")
             original.write_bytes(upstream[path])
@@ -195,6 +241,76 @@ def derive_patches(fork, upstream, kept_upstream):
                 raise ExportError(f"{path}: another edited upstream file also maps to patches/{name}")
             patches[name] = result.stdout
     return patches
+
+
+def removal_patch(fork, upstream, upstream_modes):
+    """The patch that deletes the tarball files REMOVALS lists, generated from the tarball's own bytes.
+
+    A file the tarball ships and the fork leaves out ships as upstream's: absent from the fork, it has no committed
+    content to derive a patch from. REMOVALS lists such files to delete instead, one path per line; its # lines become
+    the patch's description, copied with their leading #, so no description line can read as patch syntax to either
+    patcher: Bazel's takes any line starting with @@ and holding a second @@ for a hunk header, with or without the
+    space after the first. Each path must be patchable(), and its deletion is then the full-content diff git writes for
+    it (git diff --full-index), so it matches the tarball's file exactly. Each is held to what Bazel's patcher can
+    delete: a non-empty UTF-8 text file ending in a newline, without NUL or CR. read_tarball admits only regular files,
+    so none is a symlink.
+
+    Returns (patch bytes, or None when nothing is listed; the listed paths).
+    """
+    if REMOVALS not in fork:
+        return None, []
+    description, paths, errors = [], [], []
+    # Split on \n alone and refuse \r, which Bazel's patcher also ends a line at, so each description line the patch
+    # holds is exactly one # line of REMOVALS.
+    for line in fork[REMOVALS][1].decode().split("\n"):
+        if "\r" in line:
+            errors.append(f"{REMOVALS}: the line {line!r} holds a CR")
+        elif line.startswith("#"):
+            description.append(line)
+        elif line.strip():
+            paths.append(line)
+    if paths != sorted(paths):
+        errors.append(f"{REMOVALS}: paths must be sorted")
+    chunks = ["".join(line + "\n" for line in description).encode() + b"\n"] if description else []
+    seen = set()
+    for path in paths:
+        problem = None
+        if path in seen:
+            problem = "is listed twice"
+        elif not patchable(path):
+            problem = "is not a plain path of ASCII letters, digits and ._+- between slashes"
+        elif path not in upstream:
+            problem = "is not in the tarball"
+        elif path in fork:
+            problem = "is committed by the fork"
+        elif not upstream[path]:
+            problem = "is empty, and Bazel's patcher cannot delete an empty file"
+        elif b"\0" in upstream[path] or b"\r" in upstream[path]:
+            problem = "holds NUL or CR bytes, which a text patch cannot delete exactly"
+        elif not upstream[path].endswith(b"\n"):
+            problem = "does not end in a newline"
+        else:
+            try:
+                upstream[path].decode()
+            except UnicodeDecodeError:
+                problem = "is not UTF-8 text"
+        seen.add(path)
+        if problem:
+            # repr shows the characters that make a path unpatchable.
+            errors.append(f"{REMOVALS}: {path if patchable(path) else repr(path)} {problem}")
+            continue
+        data = upstream[path]
+        lines = data[:-1].split(b"\n")
+        blob = hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+        old_range = "1" if len(lines) == 1 else f"1,{len(lines)}"
+        chunks.append(
+            f"diff --git a/{path} b/{path}\ndeleted file mode {upstream_modes[path]}\nindex {blob}..{'0' * 40}\n"
+            f"--- a/{path}\n+++ /dev/null\n@@ -{old_range} +0,0 @@\n".encode()
+        )
+        chunks.extend(b"-" + line + b"\n" for line in lines)
+    if errors:
+        raise ExportError("tarball removals:\n  " + "\n  ".join(errors))
+    return (b"".join(chunks) if paths else None), paths
 
 
 def write_entry(entry, fork, overlay, patches, tarball_url, tarball_integrity, strip_prefix):
@@ -221,7 +337,9 @@ def write_entry(entry, fork, overlay, patches, tarball_url, tarball_integrity, s
 
 
 def rebuild_from_entry(entry, upstream, work):
-    """Rebuilds the source tree as Bazel does: tarball, then overlay files, then patches, each checked by source.json."""
+    """Rebuilds the source tree in Bazel's order: tarball, then overlay files, then patches, each checked by
+    source.json. GNU patch stands in for Bazel's patcher; the patches' constraints make both apply them the same way.
+    """
     source = json.loads((entry / "source.json").read_text())
     tree = work / "tree"
     for path, data in upstream.items():
@@ -249,9 +367,10 @@ def rebuild_from_entry(entry, upstream, work):
     return {str(path.relative_to(tree)): path.read_bytes() for path in tree.rglob("*") if path.is_file()}
 
 
-def expected_tree(fork, upstream, overlay, kept_upstream):
-    """What consumers get: the tarball, the overlay, and every fork edit to an upstream file except kept_upstream's."""
-    tree = dict(upstream)
+def expected_tree(fork, upstream, overlay, kept_upstream, deleted):
+    """The distribution tree the entry must rebuild: the tarball less deleted, the overlay, and every fork edit to an
+    upstream file except kept_upstream's."""
+    tree = {path: data for path, data in upstream.items() if path not in deleted}
     for path in overlay:
         tree[path] = fork[path][1]
     for path, (_, data) in fork.items():
@@ -311,13 +430,19 @@ def main():
         with urllib.request.urlopen(url) as response:
             tarball = response.read()
     strip_prefix = f"jemalloc-{upstream_version}"
-    upstream = read_tarball(tarball, strip_prefix)
+    upstream, upstream_modes = read_tarball(tarball, strip_prefix)
 
-    overlay, kept_upstream = classify(fork, upstream, fork_only)
+    overlay, kept_upstream = classify(fork, upstream, upstream_modes, fork_only)
     if "MODULE.bazel" not in overlay:
         raise ExportError("MODULE.bazel is not in the overlay")
     check_overlay(fork, overlay)
-    patches = derive_patches(fork, upstream, kept_upstream)
+    patches = derive_patches(fork, upstream, upstream_modes, kept_upstream)
+    removal, deleted = removal_patch(fork, upstream, upstream_modes)
+    if removal:
+        if REMOVAL_PATCH in patches:
+            raise ExportError(f"patches/{REMOVAL_PATCH} is both the patch derived for an edited upstream file and "
+                              f"the one generated from {REMOVALS}")
+        patches[REMOVAL_PATCH] = removal
 
     module_dir = args.registry / "modules" / MODULE_NAME
     if not (module_dir / "metadata.json").is_file():
@@ -335,15 +460,17 @@ def main():
         write_entry(staged, fork, overlay, patches, url, integrity(tarball), strip_prefix)
 
         rebuilt = rebuild_from_entry(staged, upstream, work)
-        expected = expected_tree(fork, upstream, overlay, kept_upstream)
+        expected = expected_tree(fork, upstream, overlay, kept_upstream, deleted)
         differences = sorted(
             [f"missing from the entry: {path}" for path in expected.keys() - rebuilt.keys()]
-            + [f"not in the fork: {path}" for path in rebuilt.keys() - expected.keys()]
-            + [f"differs from the fork: {path}" for path in expected.keys() & rebuilt.keys()
+            + [f"not expected: {path}" for path in rebuilt.keys() - expected.keys()]
+            + [f"differs from the expected content: {path}" for path in expected.keys() & rebuilt.keys()
                if expected[path] != rebuilt[path]]
         )
         if differences:
-            raise ExportError("the entry does not rebuild the fork:\n  " + "\n  ".join(differences))
+            raise ExportError(
+                "the entry does not rebuild the expected distribution tree:\n  " + "\n  ".join(differences)
+            )
         if (staged / "MODULE.bazel").read_bytes() != (staged / "overlay" / "MODULE.bazel").read_bytes():
             raise ExportError("entry: MODULE.bazel differs from overlay/MODULE.bazel")
 
