@@ -228,8 +228,8 @@ selects.config_setting_group(
     ],
 )
 
-# configure.ac checks for the glibc hooks only on its glibc host, Linux other than Android, and defines them only without
-# a jemalloc prefix.
+# configure.ac checks for the glibc hooks only on its glibc host, Linux other than Android and musl, and defines them only
+# without a jemalloc prefix. musl has no constraint, so the hook checks themselves require the glibc check.
 selects.config_setting_group(
     name = "override_glibc_allocator",
     match_all = [
@@ -909,7 +909,8 @@ autoconf(
         ],
         "//conditions:default": [],
     }) + select({
-        # configure.ac checks the hooks only for its glibc host, which is Linux other than Android.
+        # configure.ac checks the hooks only for its glibc host, which is Linux other than Android and musl; the glibc
+        # check in //include/jemalloc:jemalloc_defs_checks tells musl apart.
         ":override_glibc_allocator": [
             checks.AC_TRY_LINK(
                 name = "je_cv_glibc_malloc_hook",
@@ -928,6 +929,7 @@ autoconf(
                         "    if (__free_hook && ptr) __free_hook(ptr);",
                     ],
                 ),
+                requires = ["glibc"],
             ),
             checks.AC_DEFINE_UNQUOTED(
                 "JEMALLOC_GLIBC_MALLOC_HOOK",
@@ -946,6 +948,7 @@ autoconf(
                         "    if (__memalign_hook) ptr = __memalign_hook(16, 7);",
                     ],
                 ),
+                requires = ["glibc"],
             ),
             checks.AC_DEFINE_UNQUOTED(
                 "JEMALLOC_GLIBC_MEMALIGN_HOOK",

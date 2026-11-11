@@ -73,7 +73,28 @@ autoconf(
             if_true = "const",
         ),
     ] + select({
-        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_USE_CXX_THROW", "")],
+        # configure.ac's host table sets glibc=1 and defines JEMALLOC_USE_CXX_THROW for *-*-linux* but not for
+        # *-*-linux-musl* (nor Android, a separate OS here). @platforms has no libc constraint, so ask the C library:
+        # glibc's <features.h> defines __GLIBC__ (uClibc's does too), musl's defines no identifying macro at all, and
+        # jemalloc_macros.h tells musl from glibc by the same __GLIBC__ test. Named after configure's host-table
+        # variable, which has no cache variable.
+        "@platforms//os:linux": [
+            checks.AC_TRY_COMPILE(
+                name = "glibc",
+                code = utils.AC_LANG_PROGRAM(
+                    "#include <features.h>",
+                    [
+                        "#ifndef __GLIBC__",
+                        "  choke me",
+                        "#endif",
+                    ],
+                ),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_USE_CXX_THROW",
+                condition = "glibc",
+            ),
+        ],
         "//conditions:default": [],
     }) + [
         # configure.ac skips this probe for MSVC compilers; jemalloc_internal_defs.h reads it for JEMALLOC_RETAIN, which
