@@ -1769,6 +1769,26 @@ autoconf(
     tags = ["manual"],
 )
 
+# JEMALLOC_HAVE_RDTSCP is defined on x86_64 and nowhere else. configure.ac runs its rdtscp program (je_cv_rdtscp) on
+# the build machine, only on x86_64 and, in 5.3.1, only while it detects LG_VADDR; 5.4.0's ChangeLog calls that coupling
+# a bug ("Fix rdtscp detection with --with-lg-vaddr"). A cross build gets "no". Whether the CPU has rdtscp is a fact
+# about the target, which a build cannot observe, so configure's answer is right only when build and target match.
+# Nearly all x86_64 CPUs have the instruction; the exceptions are Intel's before Nehalem, AMD K8 before revision F, and
+# the Bonnell and Saltwell Atoms. So this build defines the macro for every x86_64 target, and where configure, cross
+# building, says no, the divergence is intended. malloc_getcpu reads it only after _WIN32 and
+# JEMALLOC_HAVE_SCHED_GETCPU, which leaves only x86_64 Apple targets (Intel macOS) with percpu_arena enabled: those
+# deployments require a CPU with rdtscp, and without the macro malloc_getcpu would reach not_reached(). The pre-Nehalem
+# exceptions include the Core 2 and Xeon CPUs of Intel Macs sold until 2011, which run macOS no later than 10.13;
+# percpu_arena on one of those reaches an illegal instruction instead.
+autoconf(
+    name = "jemalloc_internal_defs_rdtscp",
+    checks = select({
+        "@platforms//cpu:x86_64": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_RDTSCP", "")],
+        "//conditions:default": [],
+    }),
+    tags = ["manual"],
+)
+
 autoconf(
     name = "jemalloc_internal_defs_lg_vaddr",
     build_settings = [
@@ -1815,7 +1835,7 @@ autoconf_hdr(
         "@platforms//cpu:x86_32": [":jemalloc_internal_defs_x86_spinwait_checks"],
         "@platforms//cpu:x86_64": [":jemalloc_internal_defs_x86_spinwait_checks"],
         "//conditions:default": [],
-    }),
+    }) + [":jemalloc_internal_defs_rdtscp"],
 )
 
 symbol_list(
