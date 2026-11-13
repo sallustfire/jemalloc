@@ -321,6 +321,11 @@ config_setting(
     flag_values = {":enable_xmalloc": "True"},
 )
 
+config_setting(
+    name = "xmalloc_disabled",
+    flag_values = {":enable_xmalloc": "False"},
+)
+
 # --with-jemalloc-prefix. __auto__ takes configure's default for the target platform, as :jemalloc_prefix_resolved and
 # :no_jemalloc_prefix resolve it. C reserves identifiers that begin with two underscores (C11 7.1.3), so no real
 # prefix is __auto__.

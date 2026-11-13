@@ -143,6 +143,58 @@ INTEGRATION_CPP_TESTS = [
     deps = [":testlib_cpp"],
 ) for test in INTEGRATION_CPP_TESTS]
 
+# Makefile.in:376-381 adds infallible_new.cpp with --enable-cxx-infallible-new and failing_new.cpp without it, both only
+# where the C++ toolchain has exceptions. Both build without exceptions too, branching on JEMALLOC_HAVE_CXX_EXCEPTIONS:
+# failing_new reports a skip, and infallible_new runs its assertions without its try/catch.
+#
+# Their .sh files set xmalloc:false only where enable_xmalloc is 1, so that jemalloc returns null to operator new rather
+# than aborting. test.sh.in never passes enable_xmalloc to them, so that guard is inactive upstream, and it puts the
+# per-test conf before the global MALLOC_CONF, so a global xmalloc:true would win anyway. This build honours the
+# scripts' intent and sets xmalloc:false under //settings/flags:enable_xmalloc.
+cc_test(
+    name = "cpp_failing_new",
+    src = "cpp/failing_new.cpp",
+    env = select({
+        "//settings/flags:xmalloc": {"JE_TEST_MALLOC_CONF": "xmalloc:false"},
+        "//conditions:default": {"JE_TEST_MALLOC_CONF": ""},
+    }),
+    local_defines = ["JEMALLOC_INTEGRATION_CPP_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:cxx": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:cxx_infallible_new": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:xmalloc_disabled": [],
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [":testlib_cpp"],
+)
+
+cc_test(
+    name = "cpp_infallible_new",
+    src = "cpp/infallible_new.cpp",
+    env = select({
+        "//settings/flags:xmalloc": {"JE_TEST_MALLOC_CONF": "xmalloc:false"},
+        "//conditions:default": {"JE_TEST_MALLOC_CONF": ""},
+    }),
+    local_defines = ["JEMALLOC_INTEGRATION_CPP_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:cxx": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:cxx_infallible_new": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:xmalloc_disabled": [],
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [":testlib_cpp"],
+)
+
 # Makefile.in:743, check_integration_decay.
 [cc_test(
     name = test_name(test, "decay_minus_one"),
@@ -210,6 +262,48 @@ cc_test(
     deps = [":testlib_cpp"],
 ) for test in INTEGRATION_CPP_TESTS]
 
+cc_test(
+    name = "cpp_failing_new_decay_minus_one",
+    src = "cpp/failing_new.cpp",
+    env = select({
+        "//settings/flags:xmalloc": {"JE_TEST_MALLOC_CONF": "xmalloc:false,dirty_decay_ms:-1,muzzy_decay_ms:-1"},
+        "//conditions:default": {"JE_TEST_MALLOC_CONF": "dirty_decay_ms:-1,muzzy_decay_ms:-1"},
+    }),
+    local_defines = ["JEMALLOC_INTEGRATION_CPP_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:cxx": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:cxx_infallible_new": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [":testlib_cpp"],
+)
+
+cc_test(
+    name = "cpp_infallible_new_decay_minus_one",
+    src = "cpp/infallible_new.cpp",
+    env = select({
+        "//settings/flags:xmalloc": {"JE_TEST_MALLOC_CONF": "xmalloc:false,dirty_decay_ms:-1,muzzy_decay_ms:-1"},
+        "//conditions:default": {"JE_TEST_MALLOC_CONF": "dirty_decay_ms:-1,muzzy_decay_ms:-1"},
+    }),
+    local_defines = ["JEMALLOC_INTEGRATION_CPP_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:cxx": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:cxx_infallible_new": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [":testlib_cpp"],
+)
+
 # Makefile.in:744, check_integration_decay.
 [cc_test(
     name = test_name(test, "decay_zero"),
@@ -276,6 +370,48 @@ cc_test(
     }),
     deps = [":testlib_cpp"],
 ) for test in INTEGRATION_CPP_TESTS]
+
+cc_test(
+    name = "cpp_failing_new_decay_zero",
+    src = "cpp/failing_new.cpp",
+    env = select({
+        "//settings/flags:xmalloc": {"JE_TEST_MALLOC_CONF": "xmalloc:false,dirty_decay_ms:0,muzzy_decay_ms:0"},
+        "//conditions:default": {"JE_TEST_MALLOC_CONF": "dirty_decay_ms:0,muzzy_decay_ms:0"},
+    }),
+    local_defines = ["JEMALLOC_INTEGRATION_CPP_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:cxx": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:cxx_infallible_new": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [":testlib_cpp"],
+)
+
+cc_test(
+    name = "cpp_infallible_new_decay_zero",
+    src = "cpp/infallible_new.cpp",
+    env = select({
+        "//settings/flags:xmalloc": {"JE_TEST_MALLOC_CONF": "xmalloc:false,dirty_decay_ms:0,muzzy_decay_ms:0"},
+        "//conditions:default": {"JE_TEST_MALLOC_CONF": "dirty_decay_ms:0,muzzy_decay_ms:0"},
+    }),
+    local_defines = ["JEMALLOC_INTEGRATION_CPP_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:cxx": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:cxx_infallible_new": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [":testlib_cpp"],
+)
 
 # Makefile.in:739, check_integration_prof.
 [cc_test(
@@ -356,6 +492,54 @@ cc_test(
     deps = [":testlib_cpp"],
 ) for test in INTEGRATION_CPP_TESTS]
 
+cc_test(
+    name = "cpp_failing_new_prof",
+    src = "cpp/failing_new.cpp",
+    env = select({
+        "//settings/flags:xmalloc": {"JE_TEST_MALLOC_CONF": "xmalloc:false,prof:true"},
+        "//conditions:default": {"JE_TEST_MALLOC_CONF": "prof:true"},
+    }),
+    local_defines = ["JEMALLOC_INTEGRATION_CPP_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:cxx": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:prof": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:cxx_infallible_new": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [":testlib_cpp"],
+)
+
+cc_test(
+    name = "cpp_infallible_new_prof",
+    src = "cpp/infallible_new.cpp",
+    env = select({
+        "//settings/flags:xmalloc": {"JE_TEST_MALLOC_CONF": "xmalloc:false,prof:true"},
+        "//conditions:default": {"JE_TEST_MALLOC_CONF": "prof:true"},
+    }),
+    local_defines = ["JEMALLOC_INTEGRATION_CPP_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:cxx": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:prof": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:cxx_infallible_new": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [":testlib_cpp"],
+)
+
 # Makefile.in:740, check_integration_prof.
 [cc_test(
     name = test_name(test, "prof_active_false"),
@@ -434,3 +618,51 @@ cc_test(
     }),
     deps = [":testlib_cpp"],
 ) for test in INTEGRATION_CPP_TESTS]
+
+cc_test(
+    name = "cpp_failing_new_prof_active_false",
+    src = "cpp/failing_new.cpp",
+    env = select({
+        "//settings/flags:xmalloc": {"JE_TEST_MALLOC_CONF": "xmalloc:false,prof:true,prof_active:false"},
+        "//conditions:default": {"JE_TEST_MALLOC_CONF": "prof:true,prof_active:false"},
+    }),
+    local_defines = ["JEMALLOC_INTEGRATION_CPP_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:cxx": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:prof": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:cxx_infallible_new": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [":testlib_cpp"],
+)
+
+cc_test(
+    name = "cpp_infallible_new_prof_active_false",
+    src = "cpp/infallible_new.cpp",
+    env = select({
+        "//settings/flags:xmalloc": {"JE_TEST_MALLOC_CONF": "xmalloc:false,prof:true,prof_active:false"},
+        "//conditions:default": {"JE_TEST_MALLOC_CONF": "prof:true,prof_active:false"},
+    }),
+    local_defines = ["JEMALLOC_INTEGRATION_CPP_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:cxx": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:prof": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:cxx_infallible_new": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [":testlib_cpp"],
+)
