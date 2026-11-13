@@ -102,9 +102,10 @@ INTEGRATION_PROF_TESTS = [
 
 # The harness settings every integration test library pins. A test also pins its subject, the feature it exists to
 # test, when that is a portable compile-time option with no platform or toolchain dependence (:testlib_smallocx). Every
-# other setting follows the user's flags: whole-suite axes (the compilation mode with its debug, safety and size checks;
-# stats) are left to whole-suite configurations such as CI's --config runs rather than pinned per test, and
-# platform-dependent subjects (the prof backend, cxx) to those configurations and target_compatible_with.
+# other setting follows the user's flags: whole-suite axes (the compilation mode, and with it debug, safety and size
+# checks, which no integration test has as its subject; stats) are left to whole-suite configurations such as CI's
+# --config runs rather than pinned per test, and platform-dependent subjects (the prof backend, cxx) to those
+# configurations and target_compatible_with.
 TESTLIB_SETTINGS = {
     "//settings:with_test": "integration",
     # This needs to be pinned for testing. The MALLOC_CONF ENV depends on it. The make build allows for it to be

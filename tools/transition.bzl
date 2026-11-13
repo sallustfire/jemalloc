@@ -7,11 +7,14 @@ _BOOL_SETTINGS = [
     "//settings/flags:enable_experimental_smallocx",
     "//settings/flags:enable_fill",
     "//settings/flags:enable_log",
+    "//settings/flags:enable_opt_safety_checks",
+    "//settings/flags:enable_opt_size_checks",
     "//settings/flags:enable_uaf_detection",
 ]
 
 _SETTINGS = _BOOL_SETTINGS + [
     "//settings:with_test",
+    "//settings/flags:enable_debug",
     "//settings/flags:enable_lazy_lock",
     "//settings/flags:enable_zone_allocator",
     "//settings/flags:jemalloc_prefix",

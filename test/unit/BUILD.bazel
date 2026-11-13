@@ -61,7 +61,13 @@ UNIT_TESTS = [
     {"src": "counter.c"},
     {"src": "decay.c"},
     {"src": "div.c"},
-    {"src": "double_free.c"},
+    # Safety checks (--enable-opt-safety-checks, off by default) are this test's subject; both cases in
+    # test/unit/double_free.c skip unless config_opt_safety_checks and also skip under config_debug, whose assertions
+    # fire before the check (double_free.c:25-30), so it links a library built with the checks and without debug.
+    {
+        "src": "double_free.c",
+        "testlib": ":testlib_opt_safety_checks_without_debug",
+    },
     {"src": "edata_cache.c"},
     {"src": "emitter.c"},
     {"src": "extent_quantize.c"},
@@ -165,9 +171,13 @@ UNIT_TESTS = [
         "src": "prof_log.c",
         "prof_conf": "prof:true,prof_active:true,lg_prof_sample:0",
     },
+    # Debug (--enable-debug) is this test's subject alongside prof; its write-error cases skip unless config_debug
+    # (prof_mdump.c:99, prof_mdump.c:168), so it links a library built with it. Prof stays a platform-dependent axis:
+    # without it every case skips.
     {
         "src": "prof_mdump.c",
         "prof_conf": "prof:true,lg_prof_sample:0",
+        "testlib": ":testlib_debug",
     },
     {
         "src": "prof_recent.c",
@@ -199,9 +209,13 @@ UNIT_TESTS = [
     {"src": "rb.c"},
     {"src": "retained.c"},
     {"src": "rtree.c"},
+    # Safety checks (--enable-opt-safety-checks, off by default) are this test's subject; its overflow cases skip
+    # unless config_opt_safety_checks (e.g. safety_check.c:25), so it links a library built with them. They also skip
+    # without prof (safety_check.c:24), which stays a platform-dependent axis.
     {
         "src": "safety_check.c",
         "prof_conf": "prof:true,prof_active:true,lg_prof_sample:0",
+        "testlib": ":testlib_opt_safety_checks",
     },
     {"src": "sc.c"},
     {"src": "sec.c"},
@@ -210,9 +224,13 @@ UNIT_TESTS = [
         "name": "sfmt",
         "src": ":sfmt_test_sources",
     },
+    # Size checks (--enable-opt-size-checks, off by default) are this test's subject; every case in
+    # test/unit/size_check.c skips unless config_opt_size_checks (e.g. size_check.c:35), so it links a library built
+    # with them.
     {
         "src": "size_check.c",
         "prof_conf": "prof:false",
+        "testlib": ":testlib_opt_size_checks",
     },
     {"src": "size_classes.c"},
     {"src": "slab.c"},
@@ -242,7 +260,12 @@ UNIT_TESTS = [
         "src": "uaf.c",
         "testlib": ":testlib_uaf_detection",
     },
-    {"src": "witness.c"},
+    # Debug (--enable-debug) is this test's subject: witnesses exist only under config_debug, and every case in
+    # test/unit/witness.c skips without it (e.g. witness.c:60), so it links a library built with it.
+    {
+        "src": "witness.c",
+        "testlib": ":testlib_debug",
+    },
     # Fill is this test's subject; test/unit/zero.sh:3 sets its conf only if enable_fill, so it links a library built
     # with it.
     {
@@ -269,11 +292,12 @@ UNIT_TESTS = [
 ]
 
 # The harness settings every unit test library pins. A test also pins its subject, the feature it exists to test, when
-# that is a portable compile-time option with no platform or toolchain dependence (:testlib_fill, :testlib_log,
-# :testlib_uaf_detection). Every other setting follows the user's flags: whole-suite axes (the compilation mode with
-# its debug, safety and size checks; stats) are left to whole-suite configurations such as CI's --config runs rather
-# than pinned per test, and platform-dependent subjects (the prof backend) to those configurations and
-# target_compatible_with.
+# that is a portable compile-time option with no platform or toolchain dependence (:testlib_debug, :testlib_fill,
+# :testlib_log, :testlib_opt_safety_checks, :testlib_opt_safety_checks_without_debug, :testlib_opt_size_checks,
+# :testlib_uaf_detection). Every other setting follows the user's flags: whole-suite axes (the compilation mode, and
+# with it debug, safety and size checks for tests whose subject they are not; stats) are left to whole-suite
+# configurations such as CI's --config runs rather than pinned per test, and platform-dependent subjects (the prof
+# backend) to those configurations and target_compatible_with.
 TESTLIB_SETTINGS = {
     "//settings:enable_jet": "True",
     "//settings:with_test": "unit",
@@ -292,6 +316,13 @@ with_settings(
 )
 
 with_settings(
+    name = "testlib_debug",
+    testonly = True,
+    src = "//test:testlib",
+    settings = TESTLIB_SETTINGS | {"//settings/flags:enable_debug": "yes"},
+)
+
+with_settings(
     name = "testlib_fill",
     testonly = True,
     src = "//test:testlib",
@@ -303,6 +334,30 @@ with_settings(
     testonly = True,
     src = "//test:testlib",
     settings = TESTLIB_SETTINGS | {"//settings/flags:enable_log": "True"},
+)
+
+with_settings(
+    name = "testlib_opt_safety_checks",
+    testonly = True,
+    src = "//test:testlib",
+    settings = TESTLIB_SETTINGS | {"//settings/flags:enable_opt_safety_checks": "True"},
+)
+
+with_settings(
+    name = "testlib_opt_safety_checks_without_debug",
+    testonly = True,
+    src = "//test:testlib",
+    settings = TESTLIB_SETTINGS | {
+        "//settings/flags:enable_debug": "no",
+        "//settings/flags:enable_opt_safety_checks": "True",
+    },
+)
+
+with_settings(
+    name = "testlib_opt_size_checks",
+    testonly = True,
+    src = "//test:testlib",
+    settings = TESTLIB_SETTINGS | {"//settings/flags:enable_opt_size_checks": "True"},
 )
 
 with_settings(
