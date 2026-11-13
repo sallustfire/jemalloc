@@ -66,10 +66,14 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
 - **//settings/platform:lg_page (--with-lg-page):** Defaults to 16 (64 KiB) on aarch64 Linux and Android and on ppc64le
  Linux, so one build runs on kernels with 4K, 16K or 64K pages, at the cost of a coarser page granularity on 4K
  kernels (configure's cross compilation value is 12, which fails at startup on a 16K or 64K kernel). Darwin defaults
- to 14 and everything else to 12. Set it explicitly to override.
+ to 14 and everything else to 12. Set it explicitly to override. It must be at least 8 (256-byte pages), as configure
+ requires, or the build fails. It is a string flag, written into the header as given; like configure's `test`, the
+ checks read it as an integer when it is an optional sign and decimal digits, with or without surrounding spaces or
+ tabs, and any other value passes through unchecked.
 - **//settings/platform:lg_hugepage (--with-lg-hugepage):** Defaults to 21 (2 MiB), configure's value when it cannot
- read the huge page size. It must be at least lg_page, as configure requires, or the build fails; so on aarch64 Linux
- and Android and ppc64le Linux, where lg_page defaults to 16, a value below 16 needs lg_page set explicitly too.
+ read the huge page size. It is an integer flag. It must be greater than lg_page, as configure requires, or the build
+ fails; so on aarch64 Linux and Android and ppc64le Linux, where lg_page defaults to 16, a value of 16 or below needs
+ lg_page set explicitly too. The comparison is skipped when lg_page does not read as an integer.
 - **JEMALLOC_HAVE_RDTSCP (no configure option):** Defined on x86_64 Apple targets and nowhere else, with no flag to
  change it. There percpu_arena needs it: malloc_getcpu reads it only where neither _WIN32 nor sched_getcpu applies,
  and without it percpu_arena reaches not_reached(). A native configure on an Intel Mac whose CPU has rdtscp defines

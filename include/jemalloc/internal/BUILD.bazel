@@ -10,6 +10,7 @@ load("@rules_cc_autoconf//autoconf:checks.bzl", "checks", "macros", "utils")
 load("//tools:cc.bzl", "CONLYOPTS", "CXXOPTS", "C_FEATURES")
 load("//tools:configure_host.bzl", "HOST_CC_DEPS", "HOST_CPPFLAGS", "HOST_LIBS")
 load(":lg_hugepage.bzl", "checked_lg_hugepage")
+load(":lg_page.bzl", "checked_lg_page")
 load(":private_namespace.bzl", "JET_PREFIX", "jemalloc_private_namespace", "private_namespace", "private_namespace_leak_test")
 load(":public_symbols.bzl", "public_symbols", "public_symbols_header", "symbol_list")
 load(":symbols.bzl", "OPTIONAL_PUBLIC_SYMBOLS", "OPTIONAL_WRAP_SYMBOLS", "PUBLIC_SYMBOLS", "SYM_PREFIX", "WRAP_SYMBOLS")
@@ -264,6 +265,10 @@ checked_lg_hugepage(
     name = "lg_hugepage",
 )
 
+checked_lg_page(
+    name = "lg_page",
+)
+
 selects.config_setting_group(
     name = "jet_private_namespace",
     match_all = [
@@ -366,7 +371,7 @@ autoconf(
         checks.AC_BUILD_SETTING(
             name = "LG_PAGE",
             define = "LG_PAGE",
-            target = "//settings/platform:lg_page_resolved",
+            target = ":lg_page",
             unquote = True,
         ),
         checks.AC_BUILD_SETTING(
