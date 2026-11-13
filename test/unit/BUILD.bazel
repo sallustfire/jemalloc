@@ -112,7 +112,13 @@ UNIT_TESTS = [
         "conf": "abort:false,zero:false,junk:free",
         "testlib": ":testlib_fill",
     },
-    {"src": "log.c"},
+    # Logging (--enable-log, off by default) is this test's subject; every behavioural case in test/unit/log.c starts
+    # with test_skip_if(!config_log) (e.g. log.c:37), so it links a library built with it. test_log_only_format_string
+    # only checks that LOG compiles.
+    {
+        "src": "log.c",
+        "testlib": ":testlib_log",
+    },
     {"src": "mallctl.c"},
     {
         "src": "malloc_conf_2.c",
@@ -226,7 +232,16 @@ UNIT_TESTS = [
     },
     {"src": "ticker.c"},
     {"src": "tsd.c"},
-    {"src": "uaf.c"},
+    # Use-after-free detection (--enable-uaf-detection, off by default) is this test's subject; every case in
+    # test/unit/uaf.c skips unless uaf_detection_enabled(), which needs config_uaf_detection (uaf.c:35), so it links a
+    # library built with it. config_uaf_detection is also true under JEMALLOC_DEBUG, so this adds coverage in non-debug
+    # builds. It is portable: configure.ac gates the option on nothing, lg_san_uaf_align is clipped to LG_PAGE and the
+    # pointer width, and the junking in san.h is pointer-width-aware with no OS calls. uaf.c sets its own
+    # lg_san_uaf_align through malloc_conf (TEST_SAN_UAF_ALIGN_ENABLE).
+    {
+        "src": "uaf.c",
+        "testlib": ":testlib_uaf_detection",
+    },
     {"src": "witness.c"},
     # Fill is this test's subject; test/unit/zero.sh:3 sets its conf only if enable_fill, so it links a library built
     # with it.
@@ -253,7 +268,12 @@ UNIT_TESTS = [
     },
 ]
 
-# Every setting not pinned here follows the user's flags; a test pins only its subject on top of these.
+# The harness settings every unit test library pins. A test also pins its subject, the feature it exists to test, when
+# that is a portable compile-time option with no platform or toolchain dependence (:testlib_fill, :testlib_log,
+# :testlib_uaf_detection). Every other setting follows the user's flags: whole-suite axes (the compilation mode with
+# its debug, safety and size checks; stats) are left to whole-suite configurations such as CI's --config runs rather
+# than pinned per test, and platform-dependent subjects (the prof backend) to those configurations and
+# target_compatible_with.
 TESTLIB_SETTINGS = {
     "//settings:enable_jet": "True",
     "//settings:with_test": "unit",
@@ -276,6 +296,20 @@ with_settings(
     testonly = True,
     src = "//test:testlib",
     settings = TESTLIB_SETTINGS | {"//settings/flags:enable_fill": "True"},
+)
+
+with_settings(
+    name = "testlib_log",
+    testonly = True,
+    src = "//test:testlib",
+    settings = TESTLIB_SETTINGS | {"//settings/flags:enable_log": "True"},
+)
+
+with_settings(
+    name = "testlib_uaf_detection",
+    testonly = True,
+    src = "//test:testlib",
+    settings = TESTLIB_SETTINGS | {"//settings/flags:enable_uaf_detection": "True"},
 )
 
 # Handle C source inclusions
