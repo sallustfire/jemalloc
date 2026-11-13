@@ -169,8 +169,8 @@ only. The host toolchain examples build a jemalloc() target with debug on every 
     when asked for. Upstream's 5.4.0 removes both obstacles.
   - With cl and clang-cl, `@jemalloc` is a static library only: its API is declared with an empty `JEMALLOC_EXPORT`,
     so a DLL made from it with `cc_shared_library` exports none of it.
-- **FreeBSD:** configure's FreeBSD settings are translated (lazy lock, the vm.overcommit sysctl, -D_BSD_SOURCE for
-  probes), but nothing has been built on FreeBSD.
+- **FreeBSD:** configure's FreeBSD settings are translated (lazy lock, -D_BSD_SOURCE for probes), but nothing has
+  been built on FreeBSD.
 
 ## How the registry entry is produced
 

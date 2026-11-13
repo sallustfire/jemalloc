@@ -795,13 +795,6 @@ autoconf(
         "@platforms//os:qnx": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAS_ALLOCA_H", "")],
         "//conditions:default": [],
     }) + select({
-        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROC_SYS_VM_OVERCOMMIT_MEMORY", "")],
-        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROC_SYS_VM_OVERCOMMIT_MEMORY", "")],
-        "//conditions:default": [],
-    }) + select({
-        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_SYSCTL_VM_OVERCOMMIT", "")],
-        "//conditions:default": [],
-    }) + select({
         "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_THREADED_INIT", "")],
         "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_THREADED_INIT", "")],
         "//conditions:default": [],
