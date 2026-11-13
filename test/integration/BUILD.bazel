@@ -3,17 +3,20 @@ load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
 load("//tools:test.bzl", "join_conf", "test_name")
 load("//tools:transition.bzl", "with_settings")
 
+# fill_conf is the part of a test's MALLOC_CONF that upstream's .sh script sets only if enable_fill
+# (e.g. test/integration/extent.sh:3). Fill is not these tests' subject, so their library follows the user's fill flag
+# and fill_conf is joined only under //settings/flags:fill.
 INTEGRATION_TESTS = [
     {"src": "aligned_alloc.c"},
     {"src": "allocated.c"},
     {
         "src": "extent.c",
-        "conf": "junk:false",
+        "fill_conf": "junk:false",
     },
     {"src": "malloc.c"},
     {
         "src": "mallocx.c",
-        "conf": "junk:false",
+        "fill_conf": "junk:false",
     },
     {"src": "MALLOCX_ARENA.c"},
     {"src": "overflow.c"},
@@ -28,12 +31,12 @@ INTEGRATION_TESTS = [
     {"src": "thread_tcache_enabled.c"},
     {
         "src": "xallocx.c",
-        "conf": "junk:false",
+        "fill_conf": "junk:false",
     },
     # Makefile.in adds this test only with --enable-experimental-smallocx, so it links a library built with it.
     {
         "src": "smallocx.c",
-        "conf": "junk:false",
+        "fill_conf": "junk:false",
         "testlib": ":testlib_smallocx",
     },
 ]
@@ -49,6 +52,7 @@ INTEGRATION_DECAY_TESTS = [
             test.get("conf"),
             config["conf"],
         ),
+        "fill_conf": test.get("fill_conf"),
         "testlib": test.get("testlib", ":testlib"),
     }
     for config in [
@@ -75,6 +79,7 @@ INTEGRATION_PROF_TESTS = [
             test.get("conf"),
             config["conf"],
         ),
+        "fill_conf": test.get("fill_conf"),
         "flaky": test["src"] == "extent.c",
         "target_compatible_with": select({
             "//settings/flags:prof": [],
@@ -95,9 +100,13 @@ INTEGRATION_PROF_TESTS = [
     for test in INTEGRATION_TESTS
 ]
 
+# The harness settings every integration test library pins. A test also pins its subject, the feature it exists to
+# test, when that is a portable compile-time option with no platform or toolchain dependence (:testlib_smallocx). Every
+# other setting follows the user's flags: whole-suite axes (the compilation mode with its debug, safety and size checks;
+# stats) are left to whole-suite configurations such as CI's --config runs rather than pinned per test, and
+# platform-dependent subjects (the prof backend, cxx) to those configurations and target_compatible_with.
 TESTLIB_SETTINGS = {
     "//settings:with_test": "integration",
-    "//settings/flags:enable_fill": "True",
     # This needs to be pinned for testing. The MALLOC_CONF ENV depends on it. The make build allows for it to be
     # set dynamically via templating and generates a test harness around it. By requiring a value that cannot be
     # set internally by accident, this exercises the same functionality.
@@ -125,7 +134,13 @@ with_settings(
     conlyopts = CONLYOPTS,
     copts = COPTS,
     cxxopts = CXXOPTS,
-    env = {"JE_TEST_MALLOC_CONF": test.get("conf", "")},
+    env = select({
+        "//settings/flags:fill": {"JE_TEST_MALLOC_CONF": join_conf(
+            test.get("fill_conf"),
+            test.get("conf"),
+        ) or ""},
+        "//conditions:default": {"JE_TEST_MALLOC_CONF": test.get("conf", "")},
+    }),
     flaky = test.get("flaky", False),
     local_defines = ["JEMALLOC_INTEGRATION_TEST"],
     target_compatible_with = test.get("target_compatible_with", []),
