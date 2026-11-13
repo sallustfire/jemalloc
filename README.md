@@ -12,7 +12,9 @@ byte order) are copies of configure.ac's test programs, compiled or linked by ru
 toolchain. configure's host table is expressed as platform selects. What configure learns by running a program on the
 build machine (page size, virtual address bits, huge page size) is set by flags under //settings/platform, and lg_page
 and lg_vaddr have per-platform defaults. Whether the CPU has rdtscp, which configure also learns by running a program,
-is a platform select; see JEMALLOC_HAVE_RDTSCP below.
+is a platform select; see JEMALLOC_HAVE_RDTSCP below. Where configure runs a program to confirm that the running kernel
+supports an interface the C library provides, the check only links it for the target and assumes that support; see
+JEMALLOC_HAVE_PTHREAD_COND_TIMEDWAIT_MONOTONIC below.
 
 ## Usage
 
@@ -74,6 +76,14 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
  it; a cross build or --with-lg-vaddr leaves it undefined, as this build does on every other target, where leaving it
  out has no effect. On an x86_64 CPU without rdtscp (Intel's before Nehalem, AMD K8 before revision F, the Bonnell and
  Saltwell Atoms), percpu_arena, which is off by default, reaches an illegal instruction instead.
+- **JEMALLOC_HAVE_PTHREAD_COND_TIMEDWAIT_MONOTONIC (no configure option):** Whether the background thread's condition
+ variable waits on CLOCK_MONOTONIC, so a change to the wall clock does not move its deadlines. configure runs a program
+ that sets the clock with pthread_condattr_setclock and checks that each call succeeds, which confirms that the running
+ kernel accepts CLOCK_MONOTONIC; a cross build gets "no". Here a check links the same program for the target instead,
+ which shows only that the C library provides the functions and the constant. That the kernel accepts CLOCK_MONOTONIC is
+ an assumption this build makes about the target, true on the kernels glibc, musl, Bionic and FreeBSD's libc support,
+ not something the link observes. So where configure, cross building, leaves the macro undefined and this build defines
+ it, the difference is intended. Darwin has no pthread_condattr_setclock, so it is undefined there.
 - **glibc:** Without a prefix, the __libc_* functions and __posix_memalign are probed and listed (exempt from private
  renaming) wherever they link, and on Linux the hooks __malloc_hook, __realloc_hook, __free_hook and __memalign_hook
  where they still link (glibc before 2.34), exactly as configure does. jemalloc defines the hooks, and aliases the

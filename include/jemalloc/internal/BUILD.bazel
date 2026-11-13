@@ -1255,6 +1255,48 @@ autoconf(
                 "JEMALLOC_HAVE_PTHREAD_GET_NAME_NP",
                 condition = "je_cv_pthread_get_name_np",
             ),
+            # configure.ac runs this program on the build machine, checking that each call succeeds, which confirms that
+            # the running kernel accepts CLOCK_MONOTONIC, and says no when it fails or when cross compiling. This link
+            # check shows only that the target's C library provides pthread_condattr_setclock and CLOCK_MONOTONIC. That
+            # the kernel accepts the clock is an assumption this build makes about the target, true on the kernels
+            # glibc, musl, FreeBSD's libc and Android's Bionic support, not something the link observes. So where
+            # configure, cross compiling, leaves the macro undefined and this build defines it, the difference is
+            # intended. Darwin has no pthread_condattr_setclock, so it fails there as it does under configure.
+            checks.AC_TRY_LINK(
+                name = "je_cv_pthread_cond_timedwait_monotonic",
+                code = utils.AC_LANG_PROGRAM(
+                    [
+                        "#include <pthread.h>",
+                        "#include <time.h>",
+                    ],
+                    [
+                        "  pthread_condattr_t attr;",
+                        "  pthread_cond_t cond;",
+                        "  struct timespec ts;",
+                        "  int ret = pthread_condattr_init(&attr);",
+                        "  if (ret != 0) {",
+                        "    return 1;",
+                        "  }",
+                        "  ret = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);",
+                        "  if (ret != 0) {",
+                        "    pthread_condattr_destroy(&attr);",
+                        "    return 1;",
+                        "  }",
+                        "  ret = pthread_cond_init(&cond, &attr);",
+                        "  pthread_condattr_destroy(&attr);",
+                        "  if (ret != 0) {",
+                        "    return 1;",
+                        "  }",
+                        "  ret = clock_gettime(CLOCK_MONOTONIC, &ts);",
+                        "  pthread_cond_destroy(&cond);",
+                        "  return ret != 0;",
+                    ],
+                ),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_HAVE_PTHREAD_COND_TIMEDWAIT_MONOTONIC",
+                condition = "je_cv_pthread_cond_timedwait_monotonic",
+            ),
         ],
     }) + [
         checks.AC_TRY_LINK(
