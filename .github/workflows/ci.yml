@@ -151,6 +151,25 @@ jobs:
             os: ubuntu-24.04
             configure_args: --with-jemalloc-prefix=je_
             bazel_args: --//settings/flags:jemalloc_prefix=je_
+          - name: debug
+            os: ubuntu-24.04
+            configure_args: --enable-debug
+            bazel_args: --//settings/flags:enable_debug=yes
+          - name: debug from -c dbg
+            os: ubuntu-24.04
+            configure_args: --enable-debug
+            bazel_args: --compilation_mode=dbg
+          - name: debug off in -c dbg
+            os: ubuntu-24.04
+            bazel_args: --compilation_mode=dbg --//settings/flags:enable_debug=no
+          - name: opt safety checks
+            os: ubuntu-24.04
+            configure_args: --enable-opt-safety-checks
+            bazel_args: --//settings/flags:enable_opt_safety_checks
+          - name: opt size checks
+            os: ubuntu-24.04
+            configure_args: --enable-opt-size-checks
+            bazel_args: --//settings/flags:enable_opt_size_checks
           - name: macOS default
             os: macos-15
           - name: Alpine default

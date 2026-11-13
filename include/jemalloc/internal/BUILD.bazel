@@ -591,6 +591,12 @@ autoconf(
         "//settings/flags:log": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_LOG", "")],
         "//conditions:default": [],
     }) + select({
+        "//settings/flags:opt_safety_checks": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_OPT_SAFETY_CHECKS", "")],
+        "//conditions:default": [],
+    }) + select({
+        "//settings/flags:opt_size_checks": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_OPT_SIZE_CHECKS", "")],
+        "//conditions:default": [],
+    }) + select({
         "//settings/flags:uaf_detection": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_UAF_DETECTION", "")],
         "//conditions:default": [],
     }) + select({
