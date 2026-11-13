@@ -74,12 +74,13 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
  read the huge page size. It is an integer flag. It must be greater than lg_page, as configure requires, or the build
  fails; so on aarch64 Linux and Android and ppc64le Linux, where lg_page defaults to 16, a value of 16 or below needs
  lg_page set explicitly too. The comparison is skipped when lg_page does not read as an integer.
-- **JEMALLOC_HAVE_RDTSCP (no configure option):** Defined on x86_64 Apple targets and nowhere else, with no flag to
- change it. There percpu_arena needs it: malloc_getcpu reads it only where neither _WIN32 nor sched_getcpu applies,
- and without it percpu_arena reaches not_reached(). A native configure on an Intel Mac whose CPU has rdtscp defines
- it; a cross build or --with-lg-vaddr leaves it undefined, as this build does on every other target, where leaving it
- out has no effect. On an x86_64 CPU without rdtscp (Intel's before Nehalem, AMD K8 before revision F, the Bonnell and
- Saltwell Atoms), percpu_arena, which is off by default, reaches an illegal instruction instead.
+- **JEMALLOC_HAVE_RDTSCP (no configure option):** Defined on x86_64 targets and nowhere else, with no flag to change
+ it. 5.4.0's configure runs a program on an x86_64 build machine to decide it, so a native configure defines it on
+ nearly every x86_64 CPU and a cross build leaves it undefined; this build answers as a native configure does, which
+ is wrong only for x86_64 CPUs without rdtscp (Intel's before Nehalem, AMD K8 before revision F, the Bonnell and
+ Saltwell Atoms). Nothing that runs depends on it: only the POSIX CPU backend reads it, after sched_getcpu, and outside
+ Windows and Apple percpu_arena, its only caller, needs sched_getcpu. Intel macOS reads the CPU number from the
+ interrupt descriptor table instead (os/darwin/cpu.h).
 - **JEMALLOC_HAVE_PTHREAD_COND_TIMEDWAIT_MONOTONIC (no configure option):** Whether the background thread's condition
  variable waits on CLOCK_MONOTONIC, so a change to the wall clock does not move its deadlines. configure runs a program
  that sets the clock with pthread_condattr_setclock and checks that each call succeeds, which confirms that the running
