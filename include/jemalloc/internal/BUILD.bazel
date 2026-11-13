@@ -762,9 +762,6 @@ autoconf(
         "//settings/flags:force_getenv": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_FORCE_GETENV", "")],
         "//conditions:default": [],
     }) + select({
-        "//settings/flags:pageid": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PAGEID", "")],
-        "//conditions:default": [],
-    }) + select({
         "//settings/flags:lazy_lock": [
             checks.AC_TRY_COMPILE(
                 name = "lazy_lock_dlsym",
@@ -1159,6 +1156,15 @@ autoconf(
             condition = "ac_cv_func_prctl",
         ),
     ] + select({
+        # configure.ac defines it only where prctl links as well, and without prctl goes on without an error.
+        "//settings/flags:pageid": [
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_PAGEID",
+                condition = "ac_cv_func_prctl",
+            ),
+        ],
+        "//conditions:default": [],
+    }) + select({
         "@platforms//os:windows": [],
         "//conditions:default": macros.AC_CHECK_HEADERS(["dlfcn.h"]) + [
             checks.AC_CHECK_FUNC(
