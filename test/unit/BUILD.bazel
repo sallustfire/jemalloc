@@ -89,19 +89,28 @@ UNIT_TESTS = [
         "src": "inspect.c",
         "prof_conf": "prof:false",
     },
+    # Fill is this test's subject; test/unit/junk.sh:3 sets its conf only if enable_fill, so it links a library built
+    # with it.
     {
         "src": "junk.c",
         "conf": "abort:false,zero:false,junk:true",
+        "testlib": ":testlib_fill",
     },
+    # Fill is this test's subject; test/unit/junk_alloc.sh:3 sets its conf only if enable_fill, so it links a library
+    # built with it.
     {
         "src": "junk_alloc.c",
         "deps": [":junk_c"],
         "conf": "abort:false,zero:false,junk:alloc",
+        "testlib": ":testlib_fill",
     },
+    # Fill is this test's subject; test/unit/junk_free.sh:3 sets its conf only if enable_fill, so it links a library
+    # built with it.
     {
         "src": "junk_free.c",
         "deps": [":junk_c"],
         "conf": "abort:false,zero:false,junk:free",
+        "testlib": ":testlib_fill",
     },
     {"src": "log.c"},
     {"src": "mallctl.c"},
@@ -219,9 +228,12 @@ UNIT_TESTS = [
     {"src": "tsd.c"},
     {"src": "uaf.c"},
     {"src": "witness.c"},
+    # Fill is this test's subject; test/unit/zero.sh:3 sets its conf only if enable_fill, so it links a library built
+    # with it.
     {
         "src": "zero.c",
         "conf": "abort:false,junk:false,zero:true",
+        "testlib": ":testlib_fill",
     },
     {
         "src": "zero_realloc_abort.c",
@@ -241,20 +253,29 @@ UNIT_TESTS = [
     },
 ]
 
+# Every setting not pinned here follows the user's flags; a test pins only its subject on top of these.
+TESTLIB_SETTINGS = {
+    "//settings:enable_jet": "True",
+    "//settings:with_test": "unit",
+    # This needs to be pinned for testing. The MALLOC_CONF ENV depends on it. The make build allows for it to be
+    # set dynamically via templating and generates a test harness around it. By requiring a value that cannot be
+    # set internally by accident, this exercises the same functionality.
+    "//settings/flags:jemalloc_prefix": "je_test_",
+}
+
 with_settings(
     name = "testlib",
     testonly = True,
     src = "//test:testlib",
-    settings = {
-        "//settings:enable_jet": "True",
-        "//settings:with_test": "unit",
-        "//settings/flags:enable_fill": "True",
-        # This needs to be pinned for testing. The MALLOC_CONF ENV depends on it. The make build allows for it to be
-        # set dynamically via templating and generates a test harness around it. By requiring a value that cannot be
-        # set internally by accident, this exercises the same functionality.
-        "//settings/flags:jemalloc_prefix": "je_test_",
-    },
+    settings = TESTLIB_SETTINGS,
     visibility = ["//:__subpackages__"],
+)
+
+with_settings(
+    name = "testlib_fill",
+    testonly = True,
+    src = "//test:testlib",
+    settings = TESTLIB_SETTINGS | {"//settings/flags:enable_fill": "True"},
 )
 
 # Handle C source inclusions
@@ -288,7 +309,7 @@ with_settings(
     }),
     linkstatic = True,
     local_defines = ["JEMALLOC_UNIT_TEST"],
-    deps = [":testlib"] + test.get("deps", []),
+    deps = [test.get("testlib", ":testlib")] + test.get("deps", []),
 ) for test in UNIT_TESTS]
 
 cc_test(
