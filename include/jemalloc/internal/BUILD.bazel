@@ -690,6 +690,36 @@ autoconf(
         "//settings/flags:cxx": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_ENABLE_CXX", "")],
         "//conditions:default": [],
     }) + select({
+        # configure.ac's enable_cxx.
+        "//settings/flags:cxx": [checks.M4_VARIABLE("enable_cxx", "1")],
+        "//conditions:default": [checks.M4_VARIABLE("enable_cxx", "0")],
+    }) + [
+        # configure.ac links this C++ program (JE_COMPILABLE) only with C++ enabled, under the user's C++ flags, so
+        # -fno-exceptions fails it. Here the check only compiles it, as C++ with --copt and --cxxopt as the library's
+        # C++ source sees them: whether throw and catch are available is a compiler fact, and the link adds only that
+        # the C++ runtime provides the exception ABI (__cxa_throw and the rest), which this build expects of any C++
+        # toolchain it supports. Linking also failed on ld.bfd hosts (Alpine), where rules_cc_autoconf 0.34 puts the
+        # toolchain's as-needed -lstdc++ before the probe's object, so the linker drops libstdc++ and __cxa_throw is
+        # undefined.
+        checks.AC_TRY_COMPILE(
+            name = "je_cv_cxx_exceptions",
+            code = utils.AC_LANG_PROGRAM(
+                "#include <new>",
+                [
+                    "\ttry {",
+                    "\t\tthrow std::bad_alloc();",
+                    "\t} catch (const std::bad_alloc &) {",
+                    "\t}",
+                ],
+            ),
+            language = "cpp",
+            requires = ["enable_cxx"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_CXX_EXCEPTIONS",
+            condition = "je_cv_cxx_exceptions",
+        ),
+    ] + select({
         # configure.ac's enable_experimental_sdt.
         "//settings/flags:experimental_sdt": [checks.M4_VARIABLE("enable_experimental_sdt", "1")],
         "//conditions:default": [checks.M4_VARIABLE("enable_experimental_sdt", "0")],
