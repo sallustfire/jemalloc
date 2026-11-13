@@ -1,6 +1,6 @@
 module(
     name = "jemalloc",
-    version = "5.3.1",
+    version = "5.4.0",
     bazel_compatibility = [">=7.4.0"],  # need support for "overlay" directory and cxxopts in cc_binary
     compatibility_level = 5,
 )

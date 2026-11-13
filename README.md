@@ -179,8 +179,8 @@ only. The host toolchain examples build a jemalloc() target with debug on every 
 
 ## How the registry entry is produced
 
-The registry entry does not fetch the repository above. It fetches upstream's release tarball (for 5.3.1,
-`jemalloc-5.3.1.tar.bz2` from jemalloc's GitHub releases) and adds the Bazel build to it:
+The registry entry does not fetch the repository above. It fetches upstream's release tarball (for 5.4.0,
+`jemalloc-5.4.0.tar.bz2` from jemalloc's GitHub releases) and adds the Bazel build to it:
 
 - **overlay/** holds every committed file the tarball lacks: the BUILD and .bzl files, MODULE.bazel, settings/, tools/,
   examples/ and this README. The repository's own tooling, listed in `.bcr/fork_only.txt`, stays out.
@@ -210,7 +210,7 @@ re-rolled upstream asset cannot slip into a new `.bcr.N`. `.bcr/presubmit.yml` b
 ## Contributing
 
 Send changes as pull requests to https://github.com/sallustfire/jemalloc, against the branch for the jemalloc version,
-such as `bcr-5.3.1`. Support for a new jemalloc release starts as a new `bcr-<version>` branch.
+such as `bcr-5.4.0`. Support for a new jemalloc release starts as a new `bcr-<version>` branch.
 
 - Leave upstream's files as upstream ships them where you can. Each edit to one ships to the registry as a patch, so
   edit one only when the Bazel build needs it, and say why in a comment beside the edit.
