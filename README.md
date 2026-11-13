@@ -39,8 +39,10 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
 - **//settings/flags:enable_debug (--enable-debug):** Defaults to "__auto__", which defines JEMALLOC_DEBUG in
  `-c dbg` builds only; "yes" and "no" set it in any compilation mode. configure's --enable-debug also turns off its
  optimization flags; here the compilation mode alone decides optimization. Debug builds include the checks of
- //settings/flags:enable_opt_safety_checks (--enable-opt-safety-checks) and //settings/flags:enable_opt_size_checks
- (--enable-opt-size-checks), which, off by default, turn them on without the rest of debug.
+ //settings/flags:enable_opt_safety_checks (--enable-opt-safety-checks), //settings/flags:enable_opt_size_checks
+ (--enable-opt-size-checks) and //settings/flags:enable_uaf_detection (--enable-uaf-detection), which, off by
+ default, turn them on without the rest of debug. jemalloc()'s debug, opt_safety_checks, opt_size_checks and
+ uaf_detection set them per target.
 - **Library targets:** @jemalloc//:jemalloc is the cc_library to depend on, through deps or the malloc attribute. It
  builds libjemalloc.a and no shared library of its own (linkstatic). Each jemalloc() target is a library of its own,
  built with its attributes' settings.

@@ -161,3 +161,38 @@ cc_test(
     target_compatible_with = _MALLOC_REPLACED,
     deps = [":jemalloc_custom"],
 )
+
+# Case 13: jemalloc() turns on debug in any compilation mode, and with it the safety checks
+jemalloc(
+    name = "jemalloc_debug",
+    debug = "yes",
+)
+
+cc_test(
+    name = "test_13_debug_config",
+    size = "small",
+    srcs = ["test_config.c"],
+    args = [
+        "config.debug=1",
+        "config.opt_safety_checks=1",
+    ],
+    malloc = ":jemalloc_debug",
+)
+
+# Case 14: jemalloc() turns on the safety checks without debug, in any compilation mode
+jemalloc(
+    name = "jemalloc_safety_checks",
+    debug = "no",
+    opt_safety_checks = "True",
+)
+
+cc_test(
+    name = "test_14_safety_checks_config",
+    size = "small",
+    srcs = ["test_config.c"],
+    args = [
+        "config.debug=0",
+        "config.opt_safety_checks=1",
+    ],
+    malloc = ":jemalloc_safety_checks",
+)
