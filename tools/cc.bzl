@@ -25,8 +25,7 @@ CXXOPTS = select({
 
 # The flags that change what jemalloc's sources and the system headers mean: -D_REENTRANT (configure.ac:2182), the
 # host's feature test macros (configure.ac:755-817), -fvisibility=hidden, -fcommon on Windows, and the frame pointers
-# prof's frame-pointer and gcc unwinders walk (configure.ac:1531, 1579). Then the warnings jemalloc's sources trip on
-# purpose.
+# prof's gcc unwinder walks (configure.ac:1579). Then the warnings jemalloc's sources trip on purpose.
 #
 # configure.ac's other defaults are the builder's choices. Target copts come after --copt, so anything here would
 # override them wherever jemalloc is compiled, including in every build that depends on this module:
@@ -62,7 +61,6 @@ COPTS = ["-D_REENTRANT"] + select({
     "@rules_cc//cc/compiler:clang-cl": ["-fcommon"],
     "//conditions:default": [],
 }) + select({
-    "//settings/flags:prof_frame_pointer": ["-fno-omit-frame-pointer"],
     "//settings/flags:prof_gcc": ["-fno-omit-frame-pointer"],
     "//conditions:default": [],
 }) + select({

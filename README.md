@@ -104,11 +104,6 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
  Linux target whose headers lack them, as configure does wherever its probe fails and madvise links. The value is
  written into the header as is. Unlike configure, the build also writes EXPERIMENTAL_SYS_PROCESS_MADVISE_NR where the
  probe passes or madvise is missing, where nothing reads it.
-- **//settings/flags:enable_prof (--enable-prof):** "no" by default. "libunwind", "libgcc" and "gcc" choose configure's
- backtrace methods; "frame_pointer" is --enable-prof-frameptr, which compiles jemalloc with -fno-omit-frame-pointer.
- musl has no <execinfo.h>, so frame_pointer does not build there, as with configure. configure offers frame_pointer
- only on Linux with a GCC-compatible compiler and silently picks another method elsewhere; here any other platform or
- compiler fails the build.
 - **--enable-tsan, --enable-ubsan and --with-cxx-stdlib:** configure's sanitizer options only add -fsanitize=thread
  or -fsanitize=undefined to the compile and link flags, and --with-cxx-stdlib only chooses -lstdc++ or -lc++. Here the
  C and C++ toolchain owns both, so there are no flags for them: enable a sanitizer through the toolchain's features or
