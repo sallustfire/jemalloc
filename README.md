@@ -119,6 +119,13 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
  else jemalloc's own on Linux x86_64, aarch64 and 32-bit Arm and on Android aarch64 and x86_64. As with configure, any
  other Linux or Android CPU gets no probes and no error, and any other platform fails the build. jemalloc()'s
  experimental_sdt sets it per target.
+- **//settings/flags:enable_experimental_fiber_safe_tls (--enable-experimental-fiber-safe-tls):** Off by default. On,
+ jemalloc's TSD get and set accessors recompute the thread-local data's address through an out-of-line function behind
+ an optimization barrier, so a fiber or stackful coroutine that migrates between threads across a user-space context
+ switch does not keep using the previous thread's tcache, which the compiler may otherwise cache when it inlines the
+ allocator into the caller, as whole-program LTO does. It covers only those accessors, not every thread-local access
+ jemalloc or its caller makes; see INSTALL.md. The accessor is GNU inline assembly, so the build fails with a compiler
+ that does not define __GNUC__, such as cl. jemalloc()'s experimental_fiber_safe_tls sets it per target.
 - **//settings/flags:experimental_sys_process_madvise (--with-experimental-sys-process-madvise):** Empty by default.
  jemalloc uses process_madvise (for batched purging, which opt.process_madvise_max_batch enables) where the C library's
  headers declare SYS_process_madvise and PIDFD_SELF. Set it to the system call number, for example 440, to use it on a

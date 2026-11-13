@@ -764,6 +764,13 @@ autoconf(
             ),
         ],
     }) + select({
+        # tsd_tls_addr.h fails the compile with an #error where the compiler does not define __GNUC__, as configure,
+        # which checks nothing for this option, leaves it to.
+        "//settings/flags:experimental_fiber_safe_tls": [
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_EXPERIMENTAL_FIBER_SAFE_TLS", ""),
+        ],
+        "//conditions:default": [],
+    }) + select({
         "//settings/flags:force_getenv": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_FORCE_GETENV", "")],
         "//conditions:default": [],
     }) + select({

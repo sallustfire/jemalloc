@@ -183,6 +183,21 @@ config_setting(
     flag_values = {":enable_dss": "True"},
 )
 
+# JEMALLOC_EXPERIMENTAL_FIBER_SAFE_TLS (--enable-experimental-fiber-safe-tls): jemalloc's TSD get and set accessors
+# compute the thread-local address out of line, so fibers that migrate between threads do not reuse another thread's
+# tcache
+bool_flag(
+    name = "enable_experimental_fiber_safe_tls",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+    scope = "target",
+)
+
+config_setting(
+    name = "experimental_fiber_safe_tls",
+    flag_values = {":enable_experimental_fiber_safe_tls": "True"},
+)
+
 # JEMALLOC_EXPERIMENTAL_SMALLOCX_API
 bool_flag(
     name = "enable_experimental_smallocx",
