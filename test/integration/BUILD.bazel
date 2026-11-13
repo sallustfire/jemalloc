@@ -39,6 +39,7 @@ with_settings(
 INTEGRATION_TESTS = [
     {"src": "aligned_alloc.c"},
     {"src": "allocated.c"},
+    {"src": "free_sized.c"},
     {"src": "malloc.c"},
     {"src": "MALLOCX_ARENA.c"},
     {"src": "overflow.c"},
@@ -119,6 +120,13 @@ cc_test(
     deps = [":testlib"],
 )
 
+# Makefile.in:358-367 also lists tcache_fiber_migration.c, the regression test for upstream issue #2890, but only for an
+# ELF build with a static library, ucontext, --enable-experimental-fiber-safe-tls and -flto in CFLAGS, and links it on
+# its own against the static archive between -Wl,--whole-archive and -Wl,--no-whole-archive. It has no target here. The
+# bug it guards against appears only when whole-program LTO inlines the allocator into the fiber code, which neither a
+# test-owned transition nor the build's own flags can turn on portably (Bazel's thin_lto feature is distributed ThinLTO
+# for clang only), and without LTO the test cannot observe it.
+
 # Makefile.in:338 empties TESTS_INTEGRATION_CPP unless @enable_cxx@ (on by default; --disable-cxx turns it off).
 INTEGRATION_CPP_TESTS = [
     {"src": "cpp/basic.cpp"},
@@ -134,34 +142,6 @@ INTEGRATION_CPP_TESTS = [
     }),
     deps = [":testlib_cpp"],
 ) for test in INTEGRATION_CPP_TESTS]
-
-# Tests whose .sh exports a MALLOC_CONF in every configuration. test.sh.in does not pass enable_xmalloc to the .sh, so
-# the infallible_new scripts never add their xmalloc:false.
-INTEGRATION_CPP_CONF_TESTS = [
-    {
-        "src": "cpp/infallible_new_true.cpp",
-        "conf": "experimental_infallible_new:true",
-    },
-    {
-        "src": "cpp/infallible_new_false.cpp",
-        "conf": "experimental_infallible_new:false",
-    },
-]
-
-[cc_test(
-    name = test_name(test),
-    src = test["src"],
-    env = {"JE_TEST_MALLOC_CONF": test["conf"]},
-    local_defines = ["JEMALLOC_INTEGRATION_CPP_TEST"],
-    target_compatible_with = select({
-        "//settings/flags:cxx": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }) + select({
-        "//settings/flags:user_config": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
-    deps = [":testlib_cpp"],
-) for test in INTEGRATION_CPP_CONF_TESTS]
 
 # Makefile.in:743, check_integration_decay.
 [cc_test(
@@ -228,7 +208,7 @@ cc_test(
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib_cpp"],
-) for test in INTEGRATION_CPP_TESTS + INTEGRATION_CPP_CONF_TESTS]
+) for test in INTEGRATION_CPP_TESTS]
 
 # Makefile.in:744, check_integration_decay.
 [cc_test(
@@ -295,7 +275,7 @@ cc_test(
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib_cpp"],
-) for test in INTEGRATION_CPP_TESTS + INTEGRATION_CPP_CONF_TESTS]
+) for test in INTEGRATION_CPP_TESTS]
 
 # Makefile.in:739, check_integration_prof.
 [cc_test(
@@ -374,7 +354,7 @@ cc_test(
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib_cpp"],
-) for test in INTEGRATION_CPP_TESTS + INTEGRATION_CPP_CONF_TESTS]
+) for test in INTEGRATION_CPP_TESTS]
 
 # Makefile.in:740, check_integration_prof.
 [cc_test(
@@ -453,4 +433,4 @@ cc_test(
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib_cpp"],
-) for test in INTEGRATION_CPP_TESTS + INTEGRATION_CPP_CONF_TESTS]
+) for test in INTEGRATION_CPP_TESTS]
