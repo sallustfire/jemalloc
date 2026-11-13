@@ -192,6 +192,10 @@ only. The host toolchain examples build a jemalloc() target with debug on every 
     MSYS2's mingw-gcc is not built in CI.
   - With cl and clang-cl, `@jemalloc` is a static library only: its API is declared with an empty `JEMALLOC_EXPORT`,
     so a DLL made from it with `cc_shared_library` exports none of it.
+- **macOS 11 and earlier (arm64):** 5.4.0 reads the current CPU number on arm64 Darwin from the low bits of tpidr_el0
+  (include/jemalloc/internal/os/darwin/cpu.h), which assumes macOS 12 or later; on macOS 11 the CPU number is kept
+  elsewhere and is misread. Only percpu_arena (MALLOC_CONF's `percpu_arena:percpu` or `percpu_arena:phycpu`) reads it,
+  and that is off by default, so it matters only where percpu_arena is turned on.
 - **FreeBSD:** configure's FreeBSD settings are translated (lazy lock, -D_BSD_SOURCE for probes), but nothing has
   been built on FreeBSD.
 
