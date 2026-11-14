@@ -118,8 +118,6 @@ Profiling (`--config=prof-*`) is tested on Linux only.
     instead. Upstream's 5.4.0 removes both obstacles.
   - With cl and clang-cl, `@jemalloc` is a static library only: its API is declared with an empty `JEMALLOC_EXPORT`,
     so a DLL made from it with `cc_shared_library` exports none of it.
-  - With Visual Studio 2026, rules_cc before 0.2.23 links fastbuild with `/DEBUG:FASTLINK`, which the linker no longer
-    supports; it warns (LNK4315) and uses `/DEBUG:FULL`.
 - **FreeBSD:** configure's FreeBSD settings are translated (lazy lock, the vm.overcommit sysctl, -D_BSD_SOURCE for
   probes), but nothing has been built on FreeBSD.
 
