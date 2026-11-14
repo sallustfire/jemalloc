@@ -1,7 +1,6 @@
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
-# The headers of every Windows build, which depends on this on @platforms//os:windows whatever the compiler. Upstream
-# reaches them in two ways:
+# The headers of every Windows build, whatever the compiler. Upstream reaches them in two ways:
 # - As "msvc_compat/strings.h" and "msvc_compat/windows_extra.h", which jemalloc_internal_decls.h and
 #   test/include/test/jemalloc_test.h.in include under _WIN32, through the -Iinclude every compile gets
 #   (Makefile.in:27). strip_include_prefix gives them that path.
