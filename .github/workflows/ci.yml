@@ -322,3 +322,22 @@ jobs:
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
         run: bazel --output_user_root=C:/b test ${{ matrix.bazel_config }} //...
+      # TEMPORARY, to be reverted: which archive member each private namespace listing says defines a CRT stdio
+      # function, and whether the generated headers rename it.
+      - name: Debug private namespace listings
+        if: always()
+        shell: bash
+        env:
+          USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
+        run: |
+          out="$(bazel --output_user_root=C:/b info ${{ matrix.bazel_config }} output_path)"
+          crt='(_?v?s?n?w?printf(_s|_l|_p)?|_?v?s?n?w?scanf(_s|_l)?|__local_stdio_(printf|scanf)_options|__stdio_common_[a-z_]+)'
+          find "$out" -path '*include/jemalloc/internal/private_namespace*' \( -name '*.listing' -o -name '*.h' \) \
+            -not -path '*.runfiles*' -not -path '*objroot*' | sort |
+            while read -r f; do
+              echo "=== $f ($(wc -l < "$f") lines)"
+              case "$f" in
+                *.listing) tr -d '\r' < "$f" | awk -v re="^$crt\$" '/:$/ { member = $0 } { if ($NF ~ re) print NR ": [" member "] " $0 }' ;;
+                *.h) grep -nE "^#define $crt " "$f" || echo "(no CRT stdio function is renamed)" ;;
+              esac
+            done
