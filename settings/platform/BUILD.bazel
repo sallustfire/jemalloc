@@ -1,6 +1,9 @@
 load("@bazel_skylib//rules:common_settings.bzl", "int_flag", "string_flag")
 load("//settings:platform_defaults.bzl", "resolved_setting")
 
+# These settings describe the target platform, never the platform a tool runs on, so each declares scope = "target"
+# to stay out of exec configurations. Bazel 9 and later honor it; earlier versions ignore it.
+
 ### Bazel-ification of platform feature detection performed by ./configure ###
 
 # LG_HUGEPAGE Base 2 log of system huge page size, can be explicitly set --with-lg-hugepage
@@ -12,6 +15,7 @@ int_flag(
     build_setting_default = 21,
     make_variable = "LG_HUGEPAGE",
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 # LG_PAGE Base 2 log of system page size, can be explicitly set --with-lg-page
@@ -19,6 +23,7 @@ string_flag(
     name = "lg_page",
     build_setting_default = "__auto__",
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 # LG_VADDR Number of significant virtual address bits, can be explicitly set --with-lg-vaddr
@@ -26,6 +31,7 @@ string_flag(
     name = "lg_vaddr",
     build_setting_default = "__auto__",
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 # 64K pages on aarch64 Linux and Android and ppc64le Linux: LG_PAGE must be at least the kernel's page size or

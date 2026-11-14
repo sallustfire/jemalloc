@@ -1,11 +1,15 @@
 load("@bazel_skylib//rules:common_settings.bzl", "bool_setting", "string_setting")
 
+# These settings configure the library and its test harness, never a tool that builds them, so each declares
+# scope = "target" to stay out of exec configurations. Bazel 9 and later honor it; earlier versions ignore it.
+
 package(default_visibility = ["//:__subpackages__"])
 
 # JEMALLOC_JET - Explicitly used for testing
 bool_setting(
     name = "enable_jet",
     build_setting_default = False,
+    scope = "target",
 )
 
 config_setting(
@@ -18,6 +22,7 @@ config_setting(
 bool_setting(
     name = "enable_no_private_namespace",
     build_setting_default = False,
+    scope = "target",
 )
 
 config_setting(
@@ -40,6 +45,7 @@ string_setting(
         "integration",
         "integration_cpp",
     ],
+    scope = "target",
 )
 
 # JEMALLOC_UNIT_TEST

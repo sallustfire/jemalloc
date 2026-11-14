@@ -2,6 +2,10 @@ load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "int_flag", "string_flag")
 load("//settings:platform_defaults.bzl", "DARWIN_OSES", "JE_PREFIX_OSES", "resolved_setting")
 
+# These settings configure the library, never a tool that builds it, so each skylib setting declares scope = "target"
+# to stay out of exec configurations. Bazel 9 and later honor it; earlier versions ignore it. :nm, below, names a tool
+# and is a native label_flag.
+
 package(default_visibility = ["//:__subpackages__"])
 
 ### Bazel-ification of optional flags accepted by ./configure ###
@@ -11,6 +15,7 @@ bool_flag(
     name = "enable_cache_oblivious",
     build_setting_default = True,
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 config_setting(
@@ -23,6 +28,7 @@ bool_flag(
     name = "enable_cxx",
     build_setting_default = True,
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 config_setting(
@@ -41,6 +47,7 @@ bool_flag(
     name = "enable_experimental_smallocx",
     build_setting_default = False,
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 config_setting(
@@ -53,6 +60,7 @@ bool_flag(
     name = "enable_fill",
     build_setting_default = True,
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 config_setting(
@@ -70,6 +78,7 @@ string_flag(
         "__auto__",
     ],
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 config_setting(
@@ -103,6 +112,7 @@ bool_flag(
     name = "enable_log",
     build_setting_default = False,
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 config_setting(
@@ -115,6 +125,7 @@ bool_flag(
     name = "enable_stats",
     build_setting_default = True,
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 config_setting(
@@ -127,6 +138,7 @@ bool_flag(
     name = "enable_uaf_detection",
     build_setting_default = False,
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 config_setting(
@@ -139,6 +151,7 @@ bool_flag(
     name = "enable_xmalloc",
     build_setting_default = False,
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 config_setting(
@@ -153,6 +166,7 @@ string_flag(
     name = "jemalloc_prefix",
     build_setting_default = "__auto__",
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 # JEMALLOC_PREFIX: :jemalloc_prefix with __auto__ resolved to configure's default, "je_" for the macho and pecoff ABIs
@@ -220,6 +234,7 @@ int_flag(
     build_setting_default = -1,
     make_variable = "LG_QUANTUM",
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 config_setting(
@@ -233,6 +248,7 @@ string_flag(
     build_setting_default = "",
     make_variable = "MALLOC_CONF",
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 # PRIVATE_NAMESPACE Prefix to prepend to all library-private APIs (--with-private-namespace)
@@ -241,6 +257,7 @@ string_flag(
     build_setting_default = "",
     make_variable = "PRIVATE_NAMESPACE",
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 # JEMALLOC_EXPORT via --without-export which disables the export of the jemalloc API
@@ -248,6 +265,7 @@ bool_flag(
     name = "without_export",
     build_setting_default = False,
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 config_setting(
@@ -265,6 +283,7 @@ string_flag(
         "__auto__",
     ],
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 config_setting(
@@ -315,6 +334,7 @@ string_flag(
         "no",
     ],
     visibility = ["//visibility:public"],
+    scope = "target",
 )
 
 selects.config_setting_group(

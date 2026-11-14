@@ -1,6 +1,14 @@
 common:bazel8 --incompatible_resolve_select_keys_eagerly
 common:bazel9 --incompatible_resolve_select_keys_eagerly
 
+# Each configuration jemalloc's transitions make would otherwise carry their settings into an exec configuration of
+# its own, which builds every tool again. Of the Starlark settings, tools read only //settings/flags:nm, the nm that
+# private_namespace and private_namespace_leak_test run.
+common:bazel8 --experimental_exclude_starlark_flags_from_exec_config
+common:bazel8 --experimental_propagate_custom_flag=//settings/flags:nm
+common:bazel9 --incompatible_exclude_starlark_flags_from_exec_config
+common:bazel9 --experimental_propagate_custom_flag=//settings/flags:nm
+
 common:prof-libunwind --//settings/flags:enable_xmalloc
 common:prof-libunwind --//settings/flags:enable_prof=libunwind
 

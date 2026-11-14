@@ -9,3 +9,8 @@ common --@jemalloc//settings/flags:nm=@llvm//tools:llvm-nm
 
 common:bazel8 --incompatible_resolve_select_keys_eagerly
 common:bazel9 --incompatible_resolve_select_keys_eagerly
+
+# No exclusion of Starlark settings from exec configurations on Bazel 8, unlike examples/host_toolchain: the llvm
+# toolchain builds its own runtimes through transitions whose settings must reach exec configurations, and Bazel 8
+# excludes every setting not named by --experimental_propagate_custom_flag. Bazel 9 and later keep jemalloc's settings
+# out through their scope = "target".
