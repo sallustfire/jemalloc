@@ -7,13 +7,6 @@ load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolcha
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
-# This repository, as the owner of the library's own linker inputs, so that a dependency's archive (libunwind) is not
-# read as jemalloc's.
-_REPO = Label("//:BUILD.bazel").repo_name
-
-# The unset value of //settings/flags:nm.
-_TOOLCHAIN_NM = Label("//settings/flags:toolchain_nm")
-
 # The private namespace of private_namespace_jet.h, under JEMALLOC_JET
 JET_PREFIX = "jet_"
 
@@ -21,7 +14,9 @@ def _static_archives(target):
     """The static archives of this repository's linker inputs in target's CcInfo."""
     archives = []
     for linker_input in target[CcInfo].linking_context.linker_inputs.to_list():
-        if linker_input.owner.repo_name != _REPO:
+        # This repository owns the library's own linker inputs, so a dependency's archive (libunwind) is not read as
+        # jemalloc's.
+        if linker_input.owner.repo_name != Label("//:BUILD.bazel").repo_name:
             continue
         for library in linker_input.libraries:
             for archive in [library.static_library, library.pic_static_library]:
@@ -44,7 +39,9 @@ def _symbol_lister(ctx, cc_toolchain):
 
     Returns a struct of the lister's path, its options, the tools and inputs its action needs and its environment.
     """
-    if ctx.attr._nm.label != _TOOLCHAIN_NM:
+
+    # toolchain_nm is the flag's unset value.
+    if ctx.attr._nm.label != Label("//settings/flags:toolchain_nm"):
         flag = ctx.attr._nm[DefaultInfo]
         executable = flag.files_to_run.executable
         if executable != None:

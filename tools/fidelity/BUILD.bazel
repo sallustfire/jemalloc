@@ -25,11 +25,6 @@ diff_test(
     file2 = "//:VERSION",
 )
 
-# Each optional symbol's macro, as SYMBOL=MACRO entries
-_PUBLIC_MACROS = ",".join([symbol + "=" + coupling[1] for symbol, coupling in OPTIONAL_PUBLIC_SYMBOLS.items()])
-
-_WRAP_MACROS = ",".join([symbol + "=" + coupling[1] for symbol, coupling in OPTIONAL_WRAP_SYMBOLS.items()])
-
 native_test(
     name = "configure_symbols_test",
     size = "small",
@@ -40,8 +35,9 @@ native_test(
         "-vgid=" + VERSION.gid,
         "-vpublic=" + ",".join(ALL_PUBLIC_SYMBOLS),
         "-vwrap=" + ",".join(ALL_WRAP_SYMBOLS),
-        "-vpublic_macros=" + _PUBLIC_MACROS,
-        "-vwrap_macros=" + _WRAP_MACROS,
+        # Each optional symbol's macro, as SYMBOL=MACRO entries
+        "-vpublic_macros=" + ",".join([symbol + "=" + coupling[1] for symbol, coupling in OPTIONAL_PUBLIC_SYMBOLS.items()]),
+        "-vwrap_macros=" + ",".join([symbol + "=" + coupling[1] for symbol, coupling in OPTIONAL_WRAP_SYMBOLS.items()]),
         "$(rootpath //:configure.ac)",
     ],
     data = [
