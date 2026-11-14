@@ -20,24 +20,61 @@ config_setting(
     flag_values = {":enable_cache_oblivious": "True"},
 )
 
-# JEMALLOC_ENABLE_CXX
-bool_flag(
+# JEMALLOC_ENABLE_CXX. jemalloc 5.3 cannot build its C++ support with cl or clang-cl: jemalloc_cpp.cpp throws with
+# libstdc++'s and libc++'s std::__throw_bad_alloc, which the MSVC STL lacks, and the internal headers it includes use C
+# compound literals, which cl rejects in C++. 5.4.0 drops both constructs (jemalloc/jemalloc 1a15fe33 and 70d4102f).
+# So __auto__ is off with those compilers and on with every other, and True with them fails analysis. Configure instead
+# turns C++ off for cl whatever --enable-cxx says, as its C++14 check fails there (cl reports __cplusplus as 199711L),
+# which leaves a program's operator new and delete with the C runtime without a word.
+string_flag(
     name = "enable_cxx",
-    build_setting_default = True,
+    build_setting_default = "__auto__",
+    values = [
+        "True",
+        "False",
+        "__auto__",
+    ],
     visibility = ["//visibility:public"],
     scope = "target",
 )
 
 config_setting(
-    name = "cxx",
+    name = "enable_cxx_is_true",
     flag_values = {":enable_cxx": "True"},
 )
 
-# C++ asked for with cl or clang-cl, which jemalloc 5.3 cannot build: jemalloc_cpp.cpp throws with libstdc++'s and
-# libc++'s std::__throw_bad_alloc, which the MSVC STL lacks, and the internal headers it includes use C compound
-# literals, which cl rejects in C++. Configure instead turns C++ off for cl whatever --enable-cxx says, as its C++14
-# check fails there (cl reports __cplusplus as 199711L). 5.4.0 drops both constructs (jemalloc/jemalloc 1a15fe33 and
-# 70d4102f), so this may go with it.
+config_setting(
+    name = "enable_cxx_is_auto",
+    flag_values = {":enable_cxx": "__auto__"},
+)
+
+[
+    config_setting(
+        name = "enable_cxx_is_auto_" + compiler.replace("-", "_"),
+        flag_values = {
+            ":enable_cxx": "__auto__",
+            "@rules_cc//cc/compiler:compiler": compiler,
+        },
+    )
+    for compiler in [
+        "clang-cl",
+        "msvc-cl",
+    ]
+]
+
+# C++ is on: True, or __auto__ with a compiler other than cl and clang-cl. The negation has no config_setting, so this
+# resolves to a setting that matches where it holds and to :enable_cxx_is_true, which cannot match there, where it does
+# not. :enable_cxx_is_auto_clang_cl and :enable_cxx_is_auto_msvc_cl specialize :enable_cxx_is_auto.
+alias(
+    name = "cxx",
+    actual = select({
+        ":enable_cxx_is_auto": ":enable_cxx_is_auto",
+        ":enable_cxx_is_auto_clang_cl": ":enable_cxx_is_true",
+        ":enable_cxx_is_auto_msvc_cl": ":enable_cxx_is_true",
+        "//conditions:default": ":enable_cxx_is_true",
+    }),
+)
+
 config_setting(
     name = "cxx_with_msvc_cl",
     flag_values = {
@@ -57,8 +94,8 @@ config_setting(
 unsupported(
     name = "cxx_unsupported_with_cl",
     message = "jemalloc 5.3's C++ support (operator new and delete, src/jemalloc_cpp.cpp) needs libstdc++ or libc++, " +
-              "and cl and clang-cl build against the MSVC STL. Build without it: " +
-              "--@jemalloc//settings/flags:enable_cxx=False",
+              "and cl and clang-cl build against the MSVC STL. Build without it: leave " +
+              "--@jemalloc//settings/flags:enable_cxx at __auto__, or set it to False",
     # Only a dependency under the unsupported settings analyzes it; //... must not.
     tags = ["manual"],
 )

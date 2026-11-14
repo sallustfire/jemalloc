@@ -66,6 +66,7 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
  these names are listed but not defined.
 
 Settings whose "__auto__" default jemalloc resolves for the target platform:
+- //settings/flags:enable_cxx (by the C++ compiler: off for cl and clang-cl)
 - //settings/flags:enable_lazy_lock
 - //settings/flags:enable_zone_allocator
 - //settings/flags:jemalloc_prefix
@@ -113,9 +114,10 @@ Profiling (`--config=prof-*`) is tested on Linux only.
 - **Windows:**
   - MinGW-w64 builds are cross-compiled in CI with hermetic LLVM, from Linux and macOS, but their programs are not run.
     clang-cl and MSYS2's mingw-gcc are not built in CI.
-  - jemalloc 5.3's C++ support (`operator new`/`delete`) needs libstdc++ or libc++, so with cl and clang-cl the build
-    fails analysis unless `--@jemalloc//settings/flags:enable_cxx=False` is set. Configure drops C++ for cl silently
-    instead. Upstream's 5.4.0 removes both obstacles.
+  - jemalloc 5.3's C++ support (`operator new`/`delete`) needs libstdc++ or libc++, so with cl and clang-cl
+    `//settings/flags:enable_cxx`'s `__auto__` default turns it off, and a program's `operator new` and `delete` use
+    the C runtime's allocator. Setting it to True with them fails analysis. Configure drops C++ for cl silently, even
+    when asked for. Upstream's 5.4.0 removes both obstacles.
   - With cl and clang-cl, `@jemalloc` is a static library only: its API is declared with an empty `JEMALLOC_EXPORT`,
     so a DLL made from it with `cc_shared_library` exports none of it.
 - **FreeBSD:** configure's FreeBSD settings are translated (lazy lock, the vm.overcommit sysctl, -D_BSD_SOURCE for

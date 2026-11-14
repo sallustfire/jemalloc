@@ -43,7 +43,6 @@ def _jemalloc_transition_impl(settings, attr):
     # Boolean flags
     bool_flags = {
         "//settings/flags:enable_cache_oblivious": attr.cache_oblivious,
-        "//settings/flags:enable_cxx": attr.cxx,
         "//settings/flags:enable_experimental_smallocx": attr.experimental_smallocx,
         "//settings/flags:enable_fill": attr.fill,
         "//settings/flags:enable_log": attr.log,
@@ -59,6 +58,9 @@ def _jemalloc_transition_impl(settings, attr):
             result[flag] = False
 
     # String flags
+    if attr.cxx != "":
+        result["//settings/flags:enable_cxx"] = attr.cxx
+
     if attr.jemalloc_prefix != _UNSET:
         result["//settings/flags:jemalloc_prefix"] = attr.jemalloc_prefix
 
@@ -114,7 +116,7 @@ jemalloc = rule(
     implementation = _jemalloc_config_impl,
     attrs = {
         "cache_oblivious": attr.string(values = ["True", "False", ""]),
-        "cxx": attr.string(values = ["True", "False", ""]),
+        "cxx": attr.string(values = ["True", "False", "__auto__", ""]),
         "experimental_smallocx": attr.string(values = ["True", "False", ""]),
         "fill": attr.string(values = ["True", "False", ""]),
         "jemalloc_prefix": attr.string(

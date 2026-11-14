@@ -302,15 +302,14 @@ jobs:
           bazelisk-cache: true
           repository-cache: true
       # The fidelity tests run upstream's shell scripts with the gawk, grep and sed dev dependencies, which are not
-      # built for Windows. A short output root keeps Bazel's paths under MAX_PATH. jemalloc 5.3's C++ needs libstdc++
-      # or libc++, so it is turned off for cl.
+      # built for Windows. A short output root keeps Bazel's paths under MAX_PATH.
       - name: Build
         shell: bash
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
-        run: bazel --output_user_root=C:/b build ${{ matrix.bazel_config }} --//settings/flags:enable_cxx=False -- //... -//tools/fidelity/...
+        run: bazel --output_user_root=C:/b build ${{ matrix.bazel_config }} -- //... -//tools/fidelity/...
       - name: Test
         shell: bash
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
-        run: bazel --output_user_root=C:/b test ${{ matrix.bazel_config }} --//settings/flags:enable_cxx=False -- //... -//tools/fidelity/...
+        run: bazel --output_user_root=C:/b test ${{ matrix.bazel_config }} -- //... -//tools/fidelity/...

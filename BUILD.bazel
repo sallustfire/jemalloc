@@ -162,7 +162,7 @@ cc_library(
         "//settings/flags:prof_libunwind": ["@libunwind"],
         "//conditions:default": [],
     }) + select({
-        # Fails analysis: C++ with cl or clang-cl is unsupported (settings/flags/BUILD.bazel).
+        # Fails analysis: enable_cxx=True with cl or clang-cl is unsupported (settings/flags/BUILD.bazel).
         "//settings/flags:cxx_with_clang_cl": ["//settings/flags:cxx_unsupported_with_cl"],
         "//settings/flags:cxx_with_msvc_cl": ["//settings/flags:cxx_unsupported_with_cl"],
         "//conditions:default": [],
