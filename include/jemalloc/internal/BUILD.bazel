@@ -720,11 +720,7 @@ autoconf(
             condition = "je_cv_os_unfair_lock",
         ),
     ] + select({
-        "@platforms//os:ios": [],
-        "@platforms//os:macos": [],
-        "@platforms//os:tvos": [],
-        "@platforms//os:visionos": [],
-        "@platforms//os:watchos": [],
+        "//settings/platform:darwin": [],
         "@platforms//os:windows": [],
         "//conditions:default": [
             checks.AC_DEFINE_UNQUOTED(
@@ -770,14 +766,10 @@ autoconf(
             ),
         ]
         for os in [
+            "//settings/platform:darwin",
             "@platforms//os:android",
-            "@platforms//os:ios",
-            "@platforms//os:macos",
             "@platforms//os:openbsd",
             "@platforms//os:qnx",
-            "@platforms//os:tvos",
-            "@platforms//os:visionos",
-            "@platforms//os:watchos",
             "@platforms//os:windows",
         ]
     } | {"//conditions:default": [
@@ -803,11 +795,7 @@ autoconf(
         ),
     ] + select({
         # configure.ac's host table sets sbrk_deprecated for these.
-        "@platforms//os:ios": [],
-        "@platforms//os:macos": [],
-        "@platforms//os:tvos": [],
-        "@platforms//os:visionos": [],
-        "@platforms//os:watchos": [],
+        "//settings/platform:darwin": [],
         "//conditions:default": [
             checks.AC_DEFINE_UNQUOTED(
                 "JEMALLOC_DSS",

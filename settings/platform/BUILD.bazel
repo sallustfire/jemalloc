@@ -1,5 +1,6 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "int_flag", "string_flag")
-load("//settings:platform_defaults.bzl", "resolved_setting")
+load("//settings:platform_defaults.bzl", "DARWIN_OSES", "resolved_setting")
 
 ### Bazel-ification of platform feature detection performed by ./configure ###
 
@@ -61,5 +62,12 @@ resolved_setting(
     },
     make_variable = "LG_VADDR",
     setting = ":lg_vaddr",
+    visibility = ["//:__subpackages__"],
+)
+
+# Every Apple OS, configure.ac's *-*-darwin* and *-*-ios* hosts
+selects.config_setting_group(
+    name = "darwin",
+    match_any = ["@platforms//os:" + os for os in DARWIN_OSES],
     visibility = ["//:__subpackages__"],
 )
