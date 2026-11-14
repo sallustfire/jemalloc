@@ -24,9 +24,10 @@ def _static_archives(target):
                     archives.append(archive)
     return archives
 
-def _directory(path):
-    """The directory of a path written with slashes or with backslashes."""
-    return path[:max(path.rfind("/"), path.rfind("\\"))]
+def _sibling(path, name):
+    """The file `name` in the directory of `path`, a path written with slashes or with backslashes. That is `name`
+    alone for a path with no directory, which a program search finds as it finds `path`."""
+    return path[:max(path.rfind("/"), path.rfind("\\")) + 1] + name
 
 def _symbol_lister(ctx, cc_toolchain):
     """The program that lists the archives' symbols, and the options it takes before them.
@@ -72,7 +73,7 @@ def _symbol_lister(ctx, cc_toolchain):
     else:
         action_name = ACTION_NAMES.c_compile
         compiler = cc_common.get_tool_for_action(feature_configuration = feature_configuration, action_name = action_name)
-        path = _directory(compiler) + "/llvm-nm.exe"
+        path = _sibling(compiler, "llvm-nm.exe")
         arguments = ["-a"]
     env = cc_common.get_environment_variables(
         feature_configuration = feature_configuration,
