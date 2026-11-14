@@ -35,9 +35,9 @@ config_setting(
 
 # C++ asked for with cl or clang-cl, which jemalloc 5.3 cannot build: jemalloc_cpp.cpp throws with libstdc++'s and
 # libc++'s std::__throw_bad_alloc, which the MSVC STL lacks, and the internal headers it includes use C compound
-# literals, which cl rejects in C++. //:jemalloc depends on :cxx_unsupported_with_cl under these, so analysis fails.
-# Configure instead turns C++ off for cl whatever --enable-cxx says, as its C++14 check fails there (cl reports
-# __cplusplus as 199711L). 5.4.0 drops both constructs (jemalloc/jemalloc 1a15fe33), so this may go with it.
+# literals, which cl rejects in C++. Configure instead turns C++ off for cl whatever --enable-cxx says, as its C++14
+# check fails there (cl reports __cplusplus as 199711L). 5.4.0 drops both constructs (jemalloc/jemalloc 1a15fe33 and
+# 70d4102f), so this may go with it.
 config_setting(
     name = "cxx_with_msvc_cl",
     flag_values = {
