@@ -6,8 +6,7 @@ load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("//include/jemalloc/internal:public_symbols.bzl", "symbol_list")
 
 _CXXOPTS = select({
-    "@rules_cc//cc/compiler:clang-cl": ["/std:c++14"],
-    "@rules_cc//cc/compiler:msvc-cl": ["/std:c++14"],
+    "//settings/compiler:msvc_compatible": ["/std:c++14"],
     "//conditions:default": ["-std=c++14"],
 })
 

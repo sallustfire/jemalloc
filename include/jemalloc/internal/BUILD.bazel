@@ -1473,7 +1473,7 @@ autoconf(
             requires = ["!je_cv_msvc"],
         ),
     ] + select({
-        compiler: [
+        "//settings/compiler:msvc_compatible": [
             checks.AC_TRY_COMPILE(
                 name = "msvc_compiler_consistent",
                 code = utils.AC_LANG_PROGRAM("", ""),
@@ -1486,25 +1486,22 @@ autoconf(
                 if_false = "",
                 if_true = "_mm_pause()",
             ),
-        ]
-        for compiler in [
-            "@rules_cc//cc/compiler:clang-cl",
-            "@rules_cc//cc/compiler:msvc-cl",
-        ]
-    } | {"//conditions:default": [
-        checks.AC_TRY_COMPILE(
-            name = "msvc_compiler_consistent",
-            code = utils.AC_LANG_PROGRAM("", ""),
-            error = "The compiler defines _MSC_VER, but rules_cc does not identify it as msvc-cl or clang-cl",
-            requires = ["!je_cv_msvc"],
-        ),
-        checks.AC_DEFINE_UNQUOTED(
-            "CPU_SPINWAIT",
-            condition = "je_cv_pause",
-            if_false = "",
-            if_true = "__asm__ volatile(\"pause\")",
-        ),
-    ]}),
+        ],
+        "//conditions:default": [
+            checks.AC_TRY_COMPILE(
+                name = "msvc_compiler_consistent",
+                code = utils.AC_LANG_PROGRAM("", ""),
+                error = "The compiler defines _MSC_VER, but rules_cc does not identify it as msvc-cl or clang-cl",
+                requires = ["!je_cv_msvc"],
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "CPU_SPINWAIT",
+                condition = "je_cv_pause",
+                if_false = "",
+                if_true = "__asm__ volatile(\"pause\")",
+            ),
+        ],
+    }),
     conlyopts = CONLYOPTS,
     copts = HOST_CPPFLAGS,
     tags = ["manual"],

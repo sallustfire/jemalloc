@@ -6,14 +6,12 @@
 # no GNU C dialect, so C compiles there keep cl's default, as upstream's msvc/
 # projects do.
 CONLYOPTS = select({
-    "@rules_cc//cc/compiler:clang-cl": [],
-    "@rules_cc//cc/compiler:msvc-cl": [],
+    "//settings/compiler:msvc_compatible": [],
     "//conditions:default": ["-std=gnu11"],
 })
 
 CXXOPTS = select({
-    "@rules_cc//cc/compiler:clang-cl": ["/std:c++17"],
-    "@rules_cc//cc/compiler:msvc-cl": ["/std:c++17"],
+    "//settings/compiler:msvc_compatible": ["/std:c++17"],
     "//conditions:default": ["-std=c++17"],
 })
 

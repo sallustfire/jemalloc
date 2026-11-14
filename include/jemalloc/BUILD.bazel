@@ -72,8 +72,7 @@ autoconf(
         # MSVC compilers never get.
         checks.AC_CHECK_SIZEOF("void *"),
     ] + select({
-        "@rules_cc//cc/compiler:clang-cl": [checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_PTR", "LG_SIZEOF_PTR_WIN")],
-        "@rules_cc//cc/compiler:msvc-cl": [checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_PTR", "LG_SIZEOF_PTR_WIN")],
+        "//settings/compiler:msvc_compatible": [checks.AC_DEFINE_UNQUOTED("LG_SIZEOF_PTR", "LG_SIZEOF_PTR_WIN")],
         "//conditions:default": [
             checks.AC_TRY_COMPILE(
                 name = "pointer_size_supported",
