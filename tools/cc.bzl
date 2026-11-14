@@ -31,13 +31,12 @@ CXXOPTS = select({
 # - -DPIC (configure.ac:544) is defined by upstream only for its PIC objects (Makefile.in:433-436), which go into the
 #   shared library and libjemalloc_pic.a, and nothing reads it. Position independent code is the toolchain's job.
 COPTS = ["-D_REENTRANT"] + select({
-    # configure.ac adds it only when GCC=yes and the ABI is ELF (configure.ac:846-849). It is keyed on the compiler
-    # alone here, so these compilers also get it on Mach-O and PE targets.
+    # configure.ac adds it only for GCC=yes on the ELF ABI. Here it goes to every compiler that takes GCC's command
+    # line, so Mach-O, which also honours visibility, gets it too. clang-cl and mingw-gcc target only PE/COFF, where
+    # exports come from dllexport or .def files, and clang-cl ignores the flag.
     "@rules_cc//cc/compiler:clang": ["-fvisibility=hidden"],
-    "@rules_cc//cc/compiler:clang-cl": ["-fvisibility=hidden"],
     "@rules_cc//cc/compiler:emscripten": ["-fvisibility=hidden"],
     "@rules_cc//cc/compiler:gcc": ["-fvisibility=hidden"],
-    "@rules_cc//cc/compiler:mingw-gcc": ["-fvisibility=hidden"],
     "//conditions:default": [],
 }) + select({
     "@platforms//os:android": ["-D_GNU_SOURCE"],
