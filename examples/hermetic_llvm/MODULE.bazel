@@ -14,4 +14,5 @@ local_path_override(
     path = "../host_toolchain",
 )
 
+bazel_dep(name = "bazel_lib", version = "3.2.2", dev_dependency = True)
 bazel_dep(name = "llvm", version = "0.8.26", dev_dependency = True)

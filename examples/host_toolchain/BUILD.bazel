@@ -2,11 +2,11 @@ load("@jemalloc//settings:config.bzl", "jemalloc")
 load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
+# examples/hermetic_llvm builds these tests with its own toolchain, through the suite and, for Windows, one by one.
+package(default_visibility = ["//visibility:public"])
+
 # With no tests listed, a test_suite holds every test in its package that isn't tagged manual.
-test_suite(
-    name = "consumer_tests",
-    visibility = ["//visibility:public"],
-)
+test_suite(name = "consumer_tests")
 
 # Under the platform's default prefix, plain malloc reaches jemalloc through the replaced symbols, or on macOS through
 # the zone. On Windows the default prefix is je_ and there is no zone to overlay, so plain malloc stays with the C
