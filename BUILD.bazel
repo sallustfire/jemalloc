@@ -117,6 +117,15 @@ cc_library(
     conlyopts = CONLYOPTS,
     copts = ["-Iinclude/jemalloc/internal"] + COPTS,
     cxxopts = CXXOPTS,
+    # For every compile that includes jemalloc.h, this library's and its consumers'. Under _MSC_VER, jemalloc_macros.h
+    # declares the API __declspec(dllimport) unless DLLEXPORT or JEMALLOC_EXPORT is defined, and cl then rejects
+    # jemalloc's own definitions (C2491) and a program's malloc_conf. jemalloc is a static archive, so it is defined
+    # empty, as upstream's static MSVC projects do (msvc/projects/vc2017/jemalloc/jemalloc.vcxproj). Other compilers
+    # take the attribute branch, where JEMALLOC_EXPORT is visibility("default").
+    defines = select({
+        "//settings/compiler:msvc_compatible": ["JEMALLOC_EXPORT="],
+        "//conditions:default": [],
+    }),
     includes = ["include"],
     linkopts = select({
         "@platforms//os:android": ["-ldl"],
@@ -167,6 +176,11 @@ cc_library(
     conlyopts = CONLYOPTS,
     copts = ["-Iinclude/jemalloc/internal"] + COPTS,
     cxxopts = CXXOPTS,
+    # As :jemalloc's, for the integration tests that include jemalloc.h through this library.
+    defines = select({
+        "//settings/compiler:msvc_compatible": ["JEMALLOC_EXPORT="],
+        "//conditions:default": [],
+    }),
     includes = ["include"],
     linkopts = select({
         "@platforms//os:linux": [
