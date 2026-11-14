@@ -105,15 +105,15 @@ Tested in CI with the latest Bazel 7.x, 8.x and 9.x:
 
 The minimum supported Bazel, 7.4.0, is tested on Ubuntu 24.04 (x86_64) and, for the host toolchain examples only,
 MacOS 15.
-Windows Server 2025 (x86_64) is tested with MSVC (msvc-cl) on the latest Bazel 7.x, 8.x and 9.x, without the fidelity
-checks, whose gawk, grep and sed dev dependencies do not build for Windows.
+Windows Server 2025 (x86_64) is tested with MSVC (msvc-cl) on the latest Bazel 7.x, 8.x and 9.x and with clang-cl on
+the latest 9.x, without the fidelity checks, whose gawk, grep and sed dev dependencies do not build for Windows.
 Profiling (`--config=prof-*`) is tested on Linux only.
 
 ## Known Issues
 
 - **Windows:**
   - MinGW-w64 builds are cross-compiled in CI with hermetic LLVM, from Linux and macOS, but their programs are not run.
-    clang-cl and MSYS2's mingw-gcc are not built in CI.
+    MSYS2's mingw-gcc is not built in CI.
   - jemalloc 5.3's C++ support (`operator new`/`delete`) needs libstdc++ or libc++, so with cl and clang-cl
     `//settings/flags:enable_cxx`'s `__auto__` default turns it off, and a program's `operator new` and `delete` use
     the C runtime's allocator. Setting it to True with them fails analysis. Configure drops C++ for cl silently, even

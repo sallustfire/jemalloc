@@ -295,6 +295,16 @@ jobs:
             bazel_config: "--config=bazel8"
           - bazel_version: "9.x"
             bazel_config: "--config=bazel9"
+          # The auto-configured clang-cl toolchain, chosen ahead of msvc-cl through .github/platforms, on one Bazel
+          # version. Bazel 7 configures C++ with its built-in cc_configure, under other labels.
+          - os: windows-2025
+            compiler: clang-cl
+            bazel_version: "9.x"
+            bazel_config: >-
+              --config=bazel9
+              --extra_toolchains=@@rules_cc++cc_configure_extension+local_config_cc//:cc-toolchain-x64_windows-clang-cl
+              --extra_execution_platforms=//.github/platforms:x64_windows-clang-cl
+              --platforms=//.github/platforms:x64_windows-clang-cl
     steps:
       - uses: actions/checkout@v4
       - uses: bazel-contrib/setup-bazel@0.14.0
