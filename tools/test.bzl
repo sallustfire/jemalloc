@@ -1,5 +1,8 @@
 "Various test related utility functions"
 
+load("@rules_cc//cc:cc_test.bzl", _cc_test = "cc_test")
+load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
+
 def join_conf(conf1, conf2):
     """Joins two configuration strings with a ',' delimiter.
 
@@ -35,3 +38,23 @@ def test_name(data, suffix = None):
         return "%s_%s" % (name, suffix)
     else:
         return name
+
+def cc_test(name, src, **kwargs):
+    """rules_cc's cc_test with the flags every jemalloc test program compiles with.
+
+    Each of upstream's test programs is built from one source file (Makefile.in:526, 530, 534); code a test shares with
+    another comes in through deps.
+
+    Args:
+        name: The test's name.
+        src: The test's source file.
+        **kwargs: Passed to cc_test.
+    """
+    _cc_test(
+        name = name,
+        srcs = [src],
+        conlyopts = CONLYOPTS,
+        copts = COPTS,
+        cxxopts = CXXOPTS,
+        **kwargs
+    )
