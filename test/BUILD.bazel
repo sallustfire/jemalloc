@@ -134,5 +134,9 @@ cc_library(
             "//settings:integration_cpp_test": ["//:utils"],
             "//conditions:default": [],
         },
-    ),
+    ) + select({
+        # jemalloc_test.h includes msvc_compat/strings.h and msvc_compat/windows_extra.h under _WIN32
+        "@platforms//os:windows": ["//include/msvc_compat"],
+        "//conditions:default": [],
+    }),
 )

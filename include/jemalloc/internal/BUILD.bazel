@@ -188,6 +188,11 @@ cc_library(
     }),
     tags = ["manual"],
     visibility = ["//:__subpackages__"],
+    # jemalloc_internal_decls.h includes msvc_compat/strings.h and msvc_compat/windows_extra.h under _WIN32
+    deps = select({
+        "@platforms//os:windows": ["//include/msvc_compat"],
+        "//conditions:default": [],
+    }),
 )
 
 expand_template(

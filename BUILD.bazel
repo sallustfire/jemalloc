@@ -150,10 +150,6 @@ cc_library(
     toolchains = ["//include/jemalloc/internal:jemalloc_private_namespace"],
     visibility = ["//visibility:public"],
     deps = ["//include/jemalloc/internal"] + select({
-        "@rules_cc//cc/compiler:clang-cl": ["//include/msvc_compat"],
-        "@rules_cc//cc/compiler:msvc-cl": ["//include/msvc_compat"],
-        "//conditions:default": [],
-    }) + select({
         "//settings/flags:prof_libunwind": ["@libunwind"],
         "//conditions:default": [],
     }),
