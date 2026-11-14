@@ -23,6 +23,13 @@ bool is_defined_symbol_type(const std::string& symbol_type);
 // awk's $3 ~ /^[A-Za-z0-9_]+$/.
 bool is_identifier(const std::string& text);
 
+// The name of the symbol a `dumpbin /SYMBOLS` line defines with external linkage, "... SECTn ... External | NAME", as
+// private_symbols.awk matches it: $3 ~ /^SECT[0-9]+/ && $(NF-2) == "External". Sets *name and returns true for such a
+// line, given its fields. dumpbin numbers sections in hex (SECT9, SECTA, ..., SECTA4), so this also accepts the
+// numbers awk's [0-9] misses, those that begin with a letter; an external symbol in such a section would otherwise
+// escape the private namespace and the leak check alike.
+bool dumpbin_external_symbol(const std::vector<std::string>& fields, std::string* name);
+
 // Appends each line of nm's stderr at `stderr_path`, other than "...: no symbols", to *diagnostics.
 bool read_nm_diagnostics(const std::string& stderr_path, std::string* diagnostics);
 

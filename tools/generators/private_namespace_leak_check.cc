@@ -13,6 +13,7 @@
 
 namespace {
 
+using private_namespace::dumpbin_external_symbol;
 using private_namespace::ends_with;
 using private_namespace::is_defined_symbol_type;
 using private_namespace::is_identifier;
@@ -89,13 +90,20 @@ int check_for_leaks() {
     bool in_cpp_member = false, has_slim_lto = false, found_exported_symbol = false;
     for (const std::string& line : listing_lines) {
         if (is_archive_member_header(line, &in_cpp_member)) continue;
-        // nm -a: "ADDRESS TYPE NAME"
         std::vector<std::string> fields = split_fields(line);
-        if (fields.size() != 3) continue;
-        const std::string& symbol_type = fields[1];
-        const std::string& name = fields[2];
-        if (name == sym_prefix + "__gnu_lto_slim") has_slim_lto = true;
-        if (is_defined_symbol_type(symbol_type) && is_identifier(name) && !in_cpp_member) {
+        std::string name;
+        bool defined;
+        if (fields.size() == 3) {
+            // nm -a: "ADDRESS TYPE NAME"
+            name = fields[2];
+            if (name == sym_prefix + "__gnu_lto_slim") has_slim_lto = true;
+            defined = is_defined_symbol_type(fields[1]);
+        } else {
+            // dumpbin /SYMBOLS, which names no archive members: jemalloc_cpp.obj's symbols are C++, so mangled ones
+            // that are no identifiers.
+            defined = dumpbin_external_symbol(fields, &name);
+        }
+        if (defined && is_identifier(name) && !in_cpp_member) {
             if (exported_symbols.count(name)) {
                 found_exported_symbol = true;
             } else if (!private_symbols.count(name) && leaked_symbols.insert(name).second) {

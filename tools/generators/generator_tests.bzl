@@ -61,7 +61,7 @@ def leak_check_test(name, listing, expected_leak = None):
 
     Args:
       name: The test's name.
-      listing: The archive's `nm -a` symbol listing.
+      listing: The archive's symbol listing, `nm -a` or dumpbin's.
       expected_leak: A symbol the check must report; the test then passes only if the check fails naming it.
     """
     data = [

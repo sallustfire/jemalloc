@@ -1,10 +1,14 @@
 // Generates private_namespace.h from an `nm -a` (or `dumpbin /SYMBOLS`) listing, as upstream's private_symbols.awk
-// and private_namespace.sh do. It adds no shell or awk of its own: nm is run directly, so nm and any interpreter a
-// wrapper nm needs remain the dependencies of whatever supplies nm, the C++ toolchain or //settings/flags:nm.
+// and private_namespace.sh do. It adds no shell or awk of its own: the lister is run directly, so it and any
+// interpreter a wrapper needs remain the dependencies of whatever supplies it, the C++ toolchain or
+// //settings/flags:nm.
 //
-//   private_namespace_gen list NM LISTING STDERR ARCHIVE...
+//   private_namespace_gen list LISTER LISTING STDERR ARGUMENT...
 //   private_namespace_gen header HEADER LISTING STDERR SYM_PREFIX LISTING_SOURCE UNFOUND_REASON [--prefix=PREFIX]
 //       [--public=SYMBOL]... [--public-file=PATH]... [--wrap=SYMBOL]... [--wrap-file=PATH]... [--export-syms=PATH]
+//
+// list mode runs LISTER with the ARGUMENTs, its options and then the archives, with stdout to LISTING and stderr to
+// STDERR: `nm -a ARCHIVE...`, or `link /DUMP /SYMBOLS ARCHIVE...` (dumpbin) with an MSVC toolchain.
 //
 // Each public symbol, given directly or as a line of a --public-file, is exported as PREFIX followed by the symbol;
 // each wrapped symbol as is. --export-syms writes configure.ac's export_syms: the exported public symbols, then the
@@ -22,6 +26,7 @@
 
 namespace {
 
+using private_namespace::dumpbin_external_symbol;
 using private_namespace::is_defined_symbol_type;
 using private_namespace::is_identifier;
 using private_namespace::read_lines;
@@ -40,8 +45,7 @@ const std::string kExportSymsFlag = "--export-syms=";
 bool read_symbols(const std::string& path, std::vector<std::string>* symbols) {
     std::vector<std::string> lines;
     if (!read_lines(path, &lines)) return false;
-    for (std::string& line : lines) {
-        if (!line.empty() && line.back() == '\r') line.pop_back();
+    for (const std::string& line : lines) {
         if (!line.empty()) symbols->push_back(line);
     }
     return true;
@@ -67,9 +71,7 @@ void print_lister_stderr(const std::string& stderr_path) {
 }
 
 int run_lister(const std::string& lister, const std::string& listing_path, const std::string& stderr_path,
-               const std::vector<std::string>& archives) {
-    std::vector<std::string> arguments = {"-a"};
-    arguments.insert(arguments.end(), archives.begin(), archives.end());
+               const std::vector<std::string>& arguments) {
     int exit_code;
     std::string error;
     if (!process::run(lister, arguments, &listing_path, stderr_path, &exit_code, &error)) {
@@ -115,12 +117,12 @@ int write_header(const std::string& header_path, const std::string& listing_path
                 define_private(name.size() > sym_prefix.size() ? name.substr(sym_prefix.size()) : "");
             }
         }
-        // dumpbin /SYMBOLS: "... SECT1 ... External | NAME"
-        if (field_count >= 3 && starts_with(fields[2], "SECT") && fields[2].size() > 4 && fields[2][4] >= '0' &&
-            fields[2][4] <= '9' && fields[field_count - 3] == "External") {
-            const std::string& name = fields[field_count - 1];
+        // dumpbin /SYMBOLS. Unlike private_symbols.awk, only identifiers are namespaced, as for nm: MSVC also gives
+        // external linkage to its constant pool entries, such as __real@3ff0000000000000, which are no C names.
+        std::string name;
+        if (dumpbin_external_symbol(fields, &name)) {
             if (public_api_symbols.count(name)) found_public_symbol = true;
-            if (!exported_symbols.count(name)) define_private(name);
+            if (!exported_symbols.count(name) && is_identifier(name)) define_private(name);
         }
     }
 
@@ -184,7 +186,7 @@ int main(int argc, char* argv[]) {
         return write_header(arguments[1], arguments[2], arguments[3], arguments[4], arguments[5], arguments[6],
                             public_symbols, wrap_symbols);
     }
-    std::cerr << "usage: private_namespace_gen list NM LISTING STDERR ARCHIVE...\n"
+    std::cerr << "usage: private_namespace_gen list LISTER LISTING STDERR ARGUMENT...\n"
                  "       private_namespace_gen header HEADER LISTING STDERR SYM_PREFIX LISTING_SOURCE UNFOUND_REASON "
                  "[--prefix=PREFIX] [--public=SYMBOL]... [--public-file=PATH]... [--wrap=SYMBOL]... [--wrap-file=PATH]... "
                  "[--export-syms=PATH]\n";
