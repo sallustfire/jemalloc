@@ -279,3 +279,38 @@ jobs:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
         working-directory: examples/hermetic_llvm
         run: bazel test //... @jemalloc//include/jemalloc/internal:private_namespace_leak_test ${{ matrix.bazel_config }}
+
+  windows:
+    name: Windows (${{ matrix.os }}, ${{ matrix.compiler }}, Bazel ${{ matrix.bazel_version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025]
+        # Bazel's auto-configured Windows toolchain. clang-cl and mingw-gcc each need a platform of their own.
+        compiler: [msvc-cl]
+        bazel_version: ["7.x", "8.x", "9.x"]
+        include:
+          - bazel_version: "8.x"
+            bazel_config: "--config=bazel8"
+          - bazel_version: "9.x"
+            bazel_config: "--config=bazel9"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          repository-cache: true
+      # The fidelity tests run upstream's shell scripts with the gawk, grep and sed dev dependencies, which are not
+      # built for Windows. A short output root keeps Bazel's paths under MAX_PATH. jemalloc 5.3's C++ needs libstdc++
+      # or libc++, so it is turned off for cl.
+      - name: Build
+        shell: bash
+        env:
+          USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
+        run: bazel --output_user_root=C:/b build ${{ matrix.bazel_config }} --//settings/flags:enable_cxx=False -- //... -//tools/fidelity/...
+      - name: Test
+        shell: bash
+        env:
+          USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
+        run: bazel --output_user_root=C:/b test ${{ matrix.bazel_config }} --//settings/flags:enable_cxx=False -- //... -//tools/fidelity/...
