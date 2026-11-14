@@ -122,14 +122,15 @@ cc_test(
 )
 
 # Case 11: A shared jemalloc is a cc_shared_library of @jemalloc, here under upstream's file names. A binary that links
-# it through dynamic_deps allocates from it, through plain malloc as in case 8.
+# it through dynamic_deps allocates from it, through plain malloc as in case 8. Neither is built for Windows: with cl
+# and clang-cl @jemalloc is a static library only (README.md, Known Issues), and no Windows test uses a DLL.
 cc_shared_library(
     name = "jemalloc_shared",
     shared_lib_name = select({
         "@platforms//os:macos": "libjemalloc.2.dylib",
-        "@platforms//os:windows": "jemalloc.dll",
         "//conditions:default": "libjemalloc.so.2",
     }),
+    target_compatible_with = _MALLOC_REPLACED,
     deps = ["@jemalloc"],
 )
 
@@ -147,9 +148,9 @@ cc_shared_library(
     name = "jemalloc_custom_shared",
     shared_lib_name = select({
         "@platforms//os:macos": "libjemalloc_custom.2.dylib",
-        "@platforms//os:windows": "jemalloc_custom.dll",
         "//conditions:default": "libjemalloc_custom.so.2",
     }),
+    target_compatible_with = _MALLOC_REPLACED,
     deps = [":jemalloc_custom"],
 )
 
