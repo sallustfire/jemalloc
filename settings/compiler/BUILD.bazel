@@ -2,7 +2,7 @@ load("@bazel_skylib//lib:selects.bzl", "selects")
 
 package(default_visibility = ["//:__subpackages__"])
 
-# The compilers that define _MSC_VER and take MSVC's command line, configure.ac's je_cv_msvc (configure.ac:218-226).
+# The compilers that define _MSC_VER and take MSVC's command line, configure.ac's je_cv_msvc (configure.ac:191-200).
 selects.config_setting_group(
     name = "msvc_compatible",
     match_any = [
