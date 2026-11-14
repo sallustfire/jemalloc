@@ -47,10 +47,11 @@ COPTS = ["-D_REENTRANT"] + select({
 }) + select({
     # On _WIN32, je_malloc_conf and je_malloc_conf_2_conf_harder are not weak (src/jemalloc.c:33-37, 55-59), so a
     # program overrides them with its own malloc_conf only if the library's uninitialized definitions are common
-    # symbols. cl makes them so; GCC 10 and clang 11 stopped by default. Upstream's CI passes -fcommon to every Windows
-    # compiler other than cl (scripts/gen_travis.py:147-155), and without it any program that sets malloc_conf, as nine
-    # of the unit tests do, fails to link with a duplicate symbol.
+    # symbols. cl makes them so; GCC 10, clang 11 and clang-cl default to -fno-common. Upstream's CI passes -fcommon to
+    # every Windows compiler other than cl (scripts/gen_travis.py:147-155), and so does this, since without it any
+    # program that sets malloc_conf, as nine of the unit tests do, fails to link with a duplicate symbol.
     "//settings/compiler:windows_gcc_compatible": ["-fcommon"],
+    "@rules_cc//cc/compiler:clang-cl": ["-fcommon"],
     "//conditions:default": [],
 }) + select({
     "//settings/flags:prof_gcc": ["-fno-omit-frame-pointer"],
