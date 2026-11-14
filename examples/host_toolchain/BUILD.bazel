@@ -123,7 +123,7 @@ cc_test(
 
 # Case 11: A shared jemalloc is a cc_shared_library of @jemalloc, here under upstream's file names. A binary that links
 # it through dynamic_deps allocates from it, through plain malloc as in case 8. Neither is built for Windows: with cl
-# and clang-cl @jemalloc is a static library only (README.md, Known Issues), and no Windows test uses a DLL.
+# and clang-cl @jemalloc is a static library only (README.md, Known Issues), and a MinGW DLL of it is unproven.
 cc_shared_library(
     name = "jemalloc_shared",
     shared_lib_name = select({
