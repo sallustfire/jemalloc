@@ -2,10 +2,6 @@ load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "int_flag", "string_flag")
 load("//settings:platform_defaults.bzl", "DARWIN_OSES", "JE_PREFIX_OSES", "resolved_setting")
 
-# These settings configure the library, never a tool that builds it, so each skylib setting declares scope = "target"
-# to stay out of exec configurations. Bazel 9 and later honor it; earlier versions ignore it. :nm, below, names a tool
-# and is a native label_flag.
-
 package(default_visibility = ["//:__subpackages__"])
 
 ### Bazel-ification of optional flags accepted by ./configure ###
