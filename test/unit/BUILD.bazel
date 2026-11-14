@@ -1,9 +1,7 @@
 load("@package_metadata//licenses/rules:license.bzl", "license")
 load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
-load("@rules_cc//cc:cc_test.bzl", "cc_test")
-load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
-load("//tools:test.bzl", "join_conf", "test_name")
+load("//tools:test.bzl", "cc_test", "join_conf", "test_name")
 load("//tools:transition.bzl", "with_settings")
 
 license(
@@ -275,10 +273,7 @@ with_settings(
 
 [cc_test(
     name = test_name(test),
-    srcs = [test["src"]],
-    conlyopts = CONLYOPTS,
-    copts = COPTS,
-    cxxopts = CXXOPTS,
+    src = test["src"],
     env = select({
         "//settings/flags:prof": {"JE_TEST_MALLOC_CONF": join_conf(
             test.get("conf", ""),
@@ -293,10 +288,7 @@ with_settings(
 
 cc_test(
     name = "arena_reset_prof",
-    srcs = ["arena_reset_prof.c"],
-    conlyopts = CONLYOPTS,
-    copts = COPTS,
-    cxxopts = CXXOPTS,
+    src = "arena_reset_prof.c",
     env = {"JE_TEST_MALLOC_CONF": "prof:true,lg_prof_sample:0"},
     linkstatic = True,
     local_defines = ["JEMALLOC_UNIT_TEST"],
@@ -312,10 +304,7 @@ cc_test(
 
 cc_test(
     name = "batch_alloc_prof",
-    srcs = ["batch_alloc_prof.c"],
-    conlyopts = CONLYOPTS,
-    copts = COPTS,
-    cxxopts = CXXOPTS,
+    src = "batch_alloc_prof.c",
     env = {"JE_TEST_MALLOC_CONF": "prof:true,lg_prof_sample:14"},
     linkstatic = True,
     local_defines = ["JEMALLOC_UNIT_TEST"],
