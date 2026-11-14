@@ -144,7 +144,7 @@ def fidelity_test(name, generated, srcs = [], script = None, script_args = [], s
 def private_namespace_fidelity_test(name, namespace, sym_prefix, settings = {}):
     """Compares a private_namespace target with upstream's private_symbols.sh, awk and private_namespace.sh.
 
-    The upstream side runs over the target's `nm` listing (`<namespace>.nm`, generated or checked in) and its
+    The upstream side runs over the target's symbol listing (`<namespace>.listing`, generated or checked in) and its
     export_syms, both from its `upstream_inputs` output group.
 
     Args:
@@ -174,5 +174,5 @@ def private_namespace_fidelity_test(name, namespace, sym_prefix, settings = {}):
         script_args = [label.name + ".sym"],
         settings = settings,
         setup = ("include/jemalloc/internal/private_symbols.sh \"" + sym_prefix + "\" `cat " + stem + ".export_syms` > " + label.name + ".awk && " +
-                 "awk -f " + label.name + ".awk " + stem + ".nm > " + label.name + ".sym"),
+                 "awk -f " + label.name + ".awk " + stem + ".listing > " + label.name + ".sym"),
     )

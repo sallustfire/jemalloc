@@ -2,7 +2,7 @@
 // and private_namespace.sh do. It adds no shell or awk of its own: nm is run directly, so nm and any interpreter a
 // wrapper nm needs remain the dependencies of whatever supplies nm, the C++ toolchain or //settings/flags:nm.
 //
-//   private_namespace_gen nm NM LISTING STDERR ARCHIVE...
+//   private_namespace_gen list NM LISTING STDERR ARCHIVE...
 //   private_namespace_gen header HEADER LISTING STDERR SYM_PREFIX LISTING_SOURCE UNFOUND_REASON [--prefix=PREFIX]
 //       [--public=SYMBOL]... [--public-file=PATH]... [--wrap=SYMBOL]... [--wrap-file=PATH]... [--export-syms=PATH]
 //
@@ -187,7 +187,7 @@ int write_header(const std::string& header_path, const std::string& listing_path
 
 int main(int argc, char* argv[]) {
     std::vector<std::string> arguments(argv + 1, argv + argc);
-    if (arguments.size() >= 5 && arguments[0] == "nm") {
+    if (arguments.size() >= 5 && arguments[0] == "list") {
         return run_nm(arguments[1], arguments[2], arguments[3],
                       std::vector<std::string>(arguments.begin() + 4, arguments.end()));
     }
@@ -219,7 +219,7 @@ int main(int argc, char* argv[]) {
         return write_header(arguments[1], arguments[2], arguments[3], arguments[4], arguments[5], arguments[6],
                             public_symbols, wrap_symbols);
     }
-    std::cerr << "usage: private_namespace_gen nm NM LISTING STDERR ARCHIVE...\n"
+    std::cerr << "usage: private_namespace_gen list NM LISTING STDERR ARCHIVE...\n"
                  "       private_namespace_gen header HEADER LISTING STDERR SYM_PREFIX LISTING_SOURCE UNFOUND_REASON "
                  "[--prefix=PREFIX] [--public=SYMBOL]... [--public-file=PATH]... [--wrap=SYMBOL]... [--wrap-file=PATH]... "
                  "[--export-syms=PATH]\n";

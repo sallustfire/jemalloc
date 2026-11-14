@@ -92,12 +92,15 @@ def _private_namespace_impl(ctx):
     output = ctx.actions.declare_file(ctx.attr.out)
     if bool(ctx.attr.input) == bool(ctx.file.listing):
         fail("set exactly one of input and listing")
-    nm_stderr = ctx.actions.declare_file(ctx.label.name + ".nm.stderr")
+    lister_stderr = ctx.actions.declare_file(ctx.label.name + ".listing.stderr")
     sym_prefix = ctx.attr.sym_prefix
+    listing = ctx.actions.declare_file(ctx.label.name + ".listing")
     if ctx.file.listing:
-        listing = ctx.file.listing
-        ctx.actions.write(output = nm_stderr, content = "")
-        listing_source = listing.short_path
+        # A checked-in listing is named for the tool that wrote it (.nm, .dumpbin). Linking it to <name>.listing gives
+        # the upstream_inputs output group the same path whether the listing is checked in or generated.
+        ctx.actions.symlink(output = listing, target_file = ctx.file.listing)
+        ctx.actions.write(output = lister_stderr, content = "")
+        listing_source = ctx.file.listing.short_path
         unfound_reason = "public_symbols, prefix or sym_prefix does not match it"
     else:
         nm = _nm(ctx, cc_toolchain)
@@ -106,19 +109,18 @@ def _private_namespace_impl(ctx):
         archives = _static_archives(ctx.attr.input[0])
         if not archives:
             fail("{} provides no static archive to list; its linker inputs are owned by {}".format(ctx.attr.input[0].label, _linker_input_owners(ctx.attr.input[0])))
-        listing = ctx.actions.declare_file(ctx.label.name + ".nm")
         ctx.actions.run(
             executable = ctx.executable._generator,
-            arguments = ["nm", nm.path, listing.path, nm_stderr.path] + [archive.path for archive in archives],
+            arguments = ["list", nm.path, listing.path, lister_stderr.path] + [archive.path for archive in archives],
             inputs = depset(archives, transitive = nm.inputs),
-            outputs = [listing, nm_stderr],
+            outputs = [listing, lister_stderr],
             tools = nm.tools,
-            mnemonic = "PrivateNamespaceNM",
+            mnemonic = "PrivateNamespaceList",
         )
 
     export_syms = ctx.actions.declare_file(ctx.label.name + ".export_syms")
     args = ctx.actions.args()
-    args.add_all(["header", output.path, listing, nm_stderr, sym_prefix, listing_source, unfound_reason])
+    args.add_all(["header", output.path, listing, lister_stderr, sym_prefix, listing_source, unfound_reason])
     args.add(prefix, format = "--prefix=%s")
     args.add(ctx.file.public_symbols, format = "--public-file=%s")
     args.add(ctx.file.wrap_symbols, format = "--wrap-file=%s")
@@ -126,7 +128,7 @@ def _private_namespace_impl(ctx):
     ctx.actions.run(
         executable = ctx.executable._generator,
         arguments = [args],
-        inputs = [listing, nm_stderr, ctx.file.public_symbols, ctx.file.wrap_symbols],
+        inputs = [listing, lister_stderr, ctx.file.public_symbols, ctx.file.wrap_symbols],
         outputs = [output, export_syms],
         mnemonic = "PrivateNamespace",
     )
@@ -154,7 +156,7 @@ transition_config_settings = transition(
 )
 
 private_namespace = rule(
-    doc = "Generate the private namespace header from the `nm -a` listing of `input`, as upstream's private_symbols.awk " +
+    doc = "Generate the private namespace header from the symbol listing of `input`, `nm -a` or dumpbin's, as upstream's private_symbols.awk " +
           "and private_namespace.sh do. Output group `export_syms` holds configure's export_syms, and " +
           "`upstream_inputs` holds that and the listing.",
     implementation = _private_namespace_impl,
@@ -219,15 +221,15 @@ def _private_namespace_leak_test_impl(ctx):
     header = namespace[DefaultInfo].files.to_list()[0]
 
     nm = _nm(ctx, cc_toolchain)
-    listing = ctx.actions.declare_file(ctx.label.name + ".nm")
-    nm_stderr = ctx.actions.declare_file(ctx.label.name + ".nm.stderr")
+    listing = ctx.actions.declare_file(ctx.label.name + ".listing")
+    lister_stderr = ctx.actions.declare_file(ctx.label.name + ".listing.stderr")
     ctx.actions.run(
         executable = ctx.executable._generator,
-        arguments = ["nm", nm.path, listing.path, nm_stderr.path] + [archive.path for archive in archives],
+        arguments = ["list", nm.path, listing.path, lister_stderr.path] + [archive.path for archive in archives],
         inputs = depset(archives, transitive = nm.inputs),
-        outputs = [listing, nm_stderr],
+        outputs = [listing, lister_stderr],
         tools = nm.tools,
-        mnemonic = "PrivateNamespaceLeakNM",
+        mnemonic = "PrivateNamespaceLeakList",
     )
 
     executable = ctx.actions.declare_file(ctx.label.name)
@@ -236,10 +238,10 @@ def _private_namespace_leak_test_impl(ctx):
     return [
         DefaultInfo(
             executable = executable,
-            runfiles = ctx.runfiles(files = [listing, nm_stderr, export_syms, header]).merge(ctx.attr._checker[DefaultInfo].default_runfiles),
+            runfiles = ctx.runfiles(files = [listing, lister_stderr, export_syms, header]).merge(ctx.attr._checker[DefaultInfo].default_runfiles),
         ),
         RunEnvironmentInfo(environment = {
-            "PRIVATE_NAMESPACE_LEAK_STDERR": _rlocationpath(ctx, nm_stderr),
+            "PRIVATE_NAMESPACE_LEAK_STDERR": _rlocationpath(ctx, lister_stderr),
             "PRIVATE_NAMESPACE_LEAK_EXPORTS": _rlocationpath(ctx, export_syms),
             "PRIVATE_NAMESPACE_LEAK_HEADER": _rlocationpath(ctx, header),
             "PRIVATE_NAMESPACE_LEAK_LISTING": _rlocationpath(ctx, listing),

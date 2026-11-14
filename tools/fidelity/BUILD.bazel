@@ -241,7 +241,7 @@ private_namespace(
     name = "private_namespace_fixture_dumpbin",
     testonly = True,
     out = "private_namespace_fixture_dumpbin.h",
-    listing = ":private_namespace_fixture_dumpbin.nm",
+    listing = ":private_namespace_fixture_dumpbin.dumpbin",
     public_symbols = ":malloc_public_syms",
     sym_prefix = "",
     tags = ["manual"],

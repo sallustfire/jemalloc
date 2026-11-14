@@ -130,7 +130,7 @@ cc_binary(
     ],
 )
 
-# expect_failure and fake_nm use POSIX process APIs, as private_namespace_gen's nm mode does.
+# expect_failure and fake_nm use POSIX process APIs, as private_namespace_gen's list mode does.
 _POSIX = select({
     "@platforms//os:windows": ["@platforms//:incompatible"],
     "//conditions:default": [],
@@ -265,7 +265,7 @@ _FAILURE_CASES = [
         "expected": "fake_nm: cannot read archive member",
         "command": ":private_namespace_gen",
         "args": [
-            "nm",
+            "list",
             "$(rootpath :fake_nm)",
             "@TEST_TMPDIR@/listing.nm",
             "@TEST_TMPDIR@/nm.stderr",
