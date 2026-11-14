@@ -161,3 +161,11 @@ cc_test(
     target_compatible_with = _MALLOC_REPLACED,
     deps = [":jemalloc_custom"],
 )
+
+# Case 13: A program's malloc_conf overrides the library's under any prefix
+cc_test(
+    name = "test_13_malloc_conf",
+    size = "small",
+    srcs = ["test_malloc_conf.c"],
+    malloc = "@jemalloc",
+)

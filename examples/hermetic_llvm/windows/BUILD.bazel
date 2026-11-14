@@ -14,6 +14,7 @@ platform_transition_filegroup(
         "@jemalloc_examples_host_toolchain//:test_3_config",
         "@jemalloc_examples_host_toolchain//:test_4_requires_stats",
         "@jemalloc_examples_host_toolchain//:test_7_prefix",
+        "@jemalloc_examples_host_toolchain//:test_13_malloc_conf",
     ],
     target_platform = "@llvm//platforms:windows_aarch64",
 )
@@ -28,6 +29,7 @@ platform_transition_filegroup(
         "@jemalloc_examples_host_toolchain//:test_3_config",
         "@jemalloc_examples_host_toolchain//:test_4_requires_stats",
         "@jemalloc_examples_host_toolchain//:test_7_prefix",
+        "@jemalloc_examples_host_toolchain//:test_13_malloc_conf",
     ],
     target_platform = "@llvm//platforms:windows_x86_64",
 )
