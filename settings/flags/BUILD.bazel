@@ -1,6 +1,7 @@
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "int_flag", "string_flag")
 load("//settings:platform_defaults.bzl", "DARWIN_OSES", "JE_PREFIX_OSES", "resolved_setting")
+load("//settings:unsupported.bzl", "unsupported")
 
 package(default_visibility = ["//:__subpackages__"])
 
@@ -30,6 +31,36 @@ bool_flag(
 config_setting(
     name = "cxx",
     flag_values = {":enable_cxx": "True"},
+)
+
+# C++ asked for with cl or clang-cl, which jemalloc 5.3 cannot build: jemalloc_cpp.cpp throws with libstdc++'s and
+# libc++'s std::__throw_bad_alloc, which the MSVC STL lacks, and the internal headers it includes use C compound
+# literals, which cl rejects in C++. //:jemalloc depends on :cxx_unsupported_with_cl under these, so analysis fails.
+# Configure instead turns C++ off for cl whatever --enable-cxx says, as its C++14 check fails there (cl reports
+# __cplusplus as 199711L). 5.4.0 drops both constructs (jemalloc/jemalloc 1a15fe33), so this may go with it.
+config_setting(
+    name = "cxx_with_msvc_cl",
+    flag_values = {
+        ":enable_cxx": "True",
+        "@rules_cc//cc/compiler:compiler": "msvc-cl",
+    },
+)
+
+config_setting(
+    name = "cxx_with_clang_cl",
+    flag_values = {
+        ":enable_cxx": "True",
+        "@rules_cc//cc/compiler:compiler": "clang-cl",
+    },
+)
+
+unsupported(
+    name = "cxx_unsupported_with_cl",
+    message = "jemalloc 5.3's C++ support (operator new and delete, src/jemalloc_cpp.cpp) needs libstdc++ or libc++, " +
+              "and cl and clang-cl build against the MSVC STL. Build without it: " +
+              "--@jemalloc//settings/flags:enable_cxx=False",
+    # Only a dependency under the unsupported settings analyzes it; //... must not.
+    tags = ["manual"],
 )
 
 # JEMALLOC_DEBUG
