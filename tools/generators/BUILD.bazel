@@ -110,12 +110,22 @@ cc_library(
     cxxopts = _CXXOPTS,
 )
 
+cc_library(
+    name = "process",
+    srcs = ["process.cc"],
+    hdrs = ["process.h"],
+    cxxopts = _CXXOPTS,
+)
+
 cc_binary(
     name = "private_namespace_gen",
     srcs = ["private_namespace_gen.cc"],
     cxxopts = _CXXOPTS,
     visibility = ["//include/jemalloc/internal:__pkg__"],
-    deps = [":private_namespace_listing"],
+    deps = [
+        ":private_namespace_listing",
+        ":process",
+    ],
 )
 
 cc_binary(
