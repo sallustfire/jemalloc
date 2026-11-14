@@ -44,6 +44,8 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
  that only through a cc_legacy_tool, so with one that declares none, such as the hermetic LLVM toolchain (the `llvm`
  module), the build fails at that step until this is set to an nm target, for example
  `--@jemalloc//settings/flags:nm=@llvm//tools:llvm-nm`, as [examples/hermetic_llvm](examples/hermetic_llvm) does.
+ MSVC-compatible toolchains declare no nm, so with msvc-cl the symbols are listed by the toolchain's linker as
+ `link /DUMP /SYMBOLS`, which is dumpbin, and with clang-cl by the llvm-nm.exe beside its clang-cl.exe.
 - **//settings/platform:lg_vaddr (--with-lg-vaddr):** Defaults as configure does: 48 on aarch64, 57 on x86_64 (the
  configure script's cross compilation value; a native configure runs CPUID instead, which gives 48 on a CPU without
  5-level paging), and the pointer width on any other CPU whose width @platforms makes clear. Any other CPU, such as
@@ -79,8 +81,8 @@ The upstream build generates several headers with shell, awk and sed scripts, ru
 Here Bazel generates them with small C++ tools, so a module that depends on `@jemalloc` needs only its C and C++
 toolchain: no host shell, awk or sed. As in configure, the public symbols include optional functions only where the
 configured headers define the matching macro, so the headers built from them are written when the build runs.
-private_namespace.h comes from running the toolchain's `nm`, which the tool can only do on POSIX hosts for now (see
-Windows under Known Issues).
+private_namespace.h comes from listing the library's symbols with the toolchain's `nm`, or with dumpbin for MSVC, as
+upstream's private_symbols.awk reads both.
 
 The upstream scripts are kept, not replaced. Each generated header has a `fidelity_test` in
 [tools/fidelity](tools/fidelity) that runs the unmodified upstream script, as configure.ac invokes it, on the
@@ -102,12 +104,22 @@ Tested in CI with the latest Bazel 7.x, 8.x and 9.x:
 
 The minimum supported Bazel, 7.4.0, is tested on Ubuntu 24.04 (x86_64) and, for the host toolchain examples only,
 MacOS 15.
+Windows Server 2025 (x86_64) is tested with MSVC (msvc-cl) on the latest Bazel 7.x, 8.x and 9.x, without the fidelity
+checks, whose gawk, grep and sed dev dependencies do not build for Windows.
 Profiling (`--config=prof-*`) is tested on Linux only.
 
 ## Known Issues
 
-- **Windows:** Upstream's MSVC configuration is translated but has never been built or tested, and will likely fail.
-  Generating private_namespace.h fails there regardless: the tool that runs `nm` is not implemented on Windows.
+- **Windows:**
+  - MinGW-w64 builds are cross-compiled in CI with hermetic LLVM, from Linux and macOS, but their programs are not run.
+    clang-cl and MSYS2's mingw-gcc are not built in CI.
+  - jemalloc 5.3's C++ support (`operator new`/`delete`) needs libstdc++ or libc++, so with cl and clang-cl the build
+    fails analysis unless `--@jemalloc//settings/flags:enable_cxx=False` is set. Configure drops C++ for cl silently
+    instead. Upstream's 5.4.0 removes both obstacles.
+  - With cl and clang-cl, `@jemalloc` is a static library only: its API is declared with an empty `JEMALLOC_EXPORT`,
+    so a DLL made from it with `cc_shared_library` exports none of it.
+  - With Visual Studio 2026, rules_cc before 0.2.23 links fastbuild with `/DEBUG:FASTLINK`, which the linker no longer
+    supports; it warns (LNK4315) and uses `/DEBUG:FULL`.
 - **FreeBSD:** configure's FreeBSD settings are translated (lazy lock, the vm.overcommit sysctl, -D_BSD_SOURCE for
   probes), but nothing has been built on FreeBSD.
 
