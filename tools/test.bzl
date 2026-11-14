@@ -54,7 +54,16 @@ def cc_test(name, src, **kwargs):
         name = name,
         srcs = [src],
         conlyopts = CONLYOPTS,
-        copts = COPTS,
+        # The test library compiles with COPTS alone. The test programs' expect_*() and assert_*() calls pass empty
+        # messages, which -Wformat-zero-length flags (configure.ac:255).
+        copts = COPTS + select({
+            "@rules_cc//cc/compiler:clang": ["-Wno-format-zero-length"],
+            "@rules_cc//cc/compiler:clang-cl": ["-Wno-format-zero-length"],
+            "@rules_cc//cc/compiler:emscripten": ["-Wno-format-zero-length"],
+            "@rules_cc//cc/compiler:gcc": ["-Wno-format-zero-length"],
+            "@rules_cc//cc/compiler:mingw-gcc": ["-Wno-format-zero-length"],
+            "//conditions:default": [],
+        }),
         cxxopts = CXXOPTS,
         **kwargs
     )

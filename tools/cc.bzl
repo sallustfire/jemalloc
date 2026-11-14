@@ -17,14 +17,16 @@ CXXOPTS = select({
     "//conditions:default": ["-std=c++17"],
 })
 
-# Only the flags that change what jemalloc's sources and the system headers mean: -D_REENTRANT (configure.ac:1876), the
+# The flags that change what jemalloc's sources and the system headers mean: -D_REENTRANT (configure.ac:1876), the
 # host's feature test macros (configure.ac:658-707), -fvisibility=hidden, and the frame pointers prof's gcc unwinder
-# walks (configure.ac:1370).
+# walks (configure.ac:1370). Then the warnings jemalloc's sources trip on purpose.
 #
 # configure.ac's other defaults are the builder's choices. Target copts come after --copt, so anything here would
-# override them, for every module depending on jemalloc too:
-# - Warnings (configure.ac:249-264, 271, 310-311, 926-927) are set with --copt, --conlyopt and --cxxopt.
-# - Debug info (-g3, -Zi, -FS; configure.ac:266, 269, 272, 312) comes from --compilation_mode.
+# override them wherever jemalloc is compiled, including in every build that depends on this module:
+# - Turning warnings on (configure.ac:249-254, 256, 271, 310-311, 926-927) is done with --copt, --conlyopt and
+#   --cxxopt. Only the suppressions below stay.
+# - Debug info (-g3, -Zi; configure.ac:266, 269, 312) comes from --compilation_mode. -FS (configure.ac:272) only
+#   matters when compiles share a PDB, and Bazel's /Z7 embeds the debug info in each object instead.
 # - -pipe (configure.ac:265) only changes the speed of the build; --copt sets it.
 # - The C runtime (-MT; configure.ac:270) is the toolchain's, from its static_link_msvcrt and dynamic_link_msvcrt
 #   features. Forcing it here breaks consumers linking the other runtime (LNK2038).
@@ -46,5 +48,33 @@ COPTS = ["-D_REENTRANT"] + select({
     "//conditions:default": [],
 }) + select({
     "//settings/flags:prof_gcc": ["-fno-omit-frame-pointer"],
+    "//conditions:default": [],
+}) + select({
+    # The warnings configure.ac turns off for patterns jemalloc's sources use on purpose:
+    # - -Wno-missing-braces (configure.ac:257-261) for the universal zero initializer {0}, as in the tcache's static
+    #   initializer of nested structs, which older GCC flags (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53119).
+    # - -Wno-missing-field-initializers (configure.ac:262-263), for the same initializers and for struct initializers
+    #   that leave their trailing fields zero, as test/unit/hpa.c's options do.
+    # - -Wno-missing-attributes (configure.ac:264), for the __libc_* aliases of je_* (src/jemalloc.c:3279-3302), which
+    #   are compiled only where glibc still links its malloc hooks (before 2.34), and which GCC 9 and later flag for
+    #   having fewer attributes than their targets. Clang has no such warning and warns about the unknown flag on every
+    #   compile, so only GCC gets it.
+    # Turning a warning off can't fail a build the way turning one on can, so the library declares these. Target copts
+    # come after --copt, so a builder who wants one of these warnings anyway turns it back on with --per_file_copt,
+    # which comes after both. clang-cl takes clang's -W flags as they are, and its /W4 turns on -Wextra, so it gets them
+    # too. cl has no counterpart and upstream's MSVC flags suppress nothing (configure.ac:267-273).
+    "@rules_cc//cc/compiler:clang": ["-Wno-missing-braces", "-Wno-missing-field-initializers"],
+    "@rules_cc//cc/compiler:clang-cl": ["-Wno-missing-braces", "-Wno-missing-field-initializers"],
+    "@rules_cc//cc/compiler:emscripten": ["-Wno-missing-braces", "-Wno-missing-field-initializers"],
+    "@rules_cc//cc/compiler:gcc": [
+        "-Wno-missing-braces",
+        "-Wno-missing-field-initializers",
+        "-Wno-missing-attributes",
+    ],
+    "@rules_cc//cc/compiler:mingw-gcc": [
+        "-Wno-missing-braces",
+        "-Wno-missing-field-initializers",
+        "-Wno-missing-attributes",
+    ],
     "//conditions:default": [],
 })
