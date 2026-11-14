@@ -11,6 +11,14 @@ load("//tools:transition.bzl", "settings_transition", "with_settings")
 
 _COREUTILS = "@bazel_lib//lib:coreutils_toolchain_type"
 
+# The upstream scripts run under the host's /bin/sh with the gawk, grep and sed dev dependencies, none of which build
+# for Windows. An incompatible test is skipped before its dependencies are analyzed, so they are neither fetched nor
+# built there.
+POSIX_ONLY = select({
+    "@platforms//os:windows": ["@platforms//:incompatible"],
+    "//conditions:default": [],
+})
+
 def _upstream_output_impl(ctx):
     coreutils = ctx.toolchains[_COREUTILS].coreutils_info.bin
     tools = []
@@ -139,6 +147,7 @@ def fidelity_test(name, generated, srcs = [], script = None, script_args = [], s
         size = size,
         file1 = ":" + upstream,
         file2 = ":" + generated_out,
+        target_compatible_with = POSIX_ONLY,
     )
 
 def private_namespace_fidelity_test(name, namespace, sym_prefix, settings = {}):
