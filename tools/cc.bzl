@@ -16,8 +16,8 @@ CXXOPTS = select({
 })
 
 # The flags that change what jemalloc's sources and the system headers mean: -D_REENTRANT (configure.ac:1876), the
-# host's feature test macros (configure.ac:658-707), -fvisibility=hidden, and the frame pointers prof's gcc unwinder
-# walks (configure.ac:1370). Then the warnings jemalloc's sources trip on purpose.
+# host's feature test macros (configure.ac:658-707), -fvisibility=hidden, -fcommon on Windows, and the frame pointers
+# prof's gcc unwinder walks (configure.ac:1370). Then the warnings jemalloc's sources trip on purpose.
 #
 # configure.ac's other defaults are the builder's choices. Target copts come after --copt, so anything here would
 # override them wherever jemalloc is compiled, including in every build that depends on this module:
@@ -43,6 +43,14 @@ COPTS = ["-D_REENTRANT"] + select({
     "@platforms//os:android": ["-D_GNU_SOURCE"],
     "@platforms//os:freebsd": ["-D_BSD_SOURCE"],
     "@platforms//os:linux": ["-D_GNU_SOURCE"],
+    "//conditions:default": [],
+}) + select({
+    # On _WIN32, je_malloc_conf and je_malloc_conf_2_conf_harder are not weak (src/jemalloc.c:33-37, 55-59), so a
+    # program overrides them with its own malloc_conf only if the library's uninitialized definitions are common
+    # symbols. cl makes them so; GCC 10 and clang 11 stopped by default. Upstream's CI passes -fcommon to every Windows
+    # compiler other than cl (scripts/gen_travis.py:147-155), and without it any program that sets malloc_conf, as nine
+    # of the unit tests do, fails to link with a duplicate symbol.
+    "//settings/compiler:windows_gcc_compatible": ["-fcommon"],
     "//conditions:default": [],
 }) + select({
     "//settings/flags:prof_gcc": ["-fno-omit-frame-pointer"],
