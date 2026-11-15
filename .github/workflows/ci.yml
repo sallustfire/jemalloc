@@ -234,13 +234,8 @@ jobs:
             bazel_version: "7.4.0"
           - os: macos-15
             bazel_version: "7.4.0"
-          # A short output root keeps Bazel's paths under MAX_PATH. Include adds keys only to the os x bazel_version
-          # combinations, so the 7.4.0 one, which include adds, sets its own.
-          - os: windows-2025
-            bazel_startup: "--output_user_root=C:/b"
           - os: windows-2025
             bazel_version: "7.4.0"
-            bazel_startup: "--output_user_root=C:/b"
     steps:
       - uses: actions/checkout@v4
       - uses: bazel-contrib/setup-bazel@0.14.0
@@ -248,17 +243,15 @@ jobs:
           bazelisk-cache: true
           repository-cache: true
       - name: Build
-        shell: bash
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
         working-directory: examples/host_toolchain
-        run: bazel ${{ matrix.bazel_startup }} build //... ${{ matrix.bazel_config }}
+        run: bazel build //... ${{ matrix.bazel_config }}
       - name: Test
-        shell: bash
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
         working-directory: examples/host_toolchain
-        run: bazel ${{ matrix.bazel_startup }} test //... ${{ matrix.bazel_config }}
+        run: bazel test //... ${{ matrix.bazel_config }}
 
   examples-hermetic-llvm:
     name: Examples (hermetic LLVM, ${{ matrix.os }}, Bazel ${{ matrix.bazel_version }})
@@ -323,14 +316,13 @@ jobs:
         with:
           bazelisk-cache: true
           repository-cache: true
-      # A short output root keeps Bazel's paths under MAX_PATH.
       - name: Build
         shell: bash
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
-        run: bazel --output_user_root=C:/b build ${{ matrix.bazel_config }} //...
+        run: bazel build ${{ matrix.bazel_config }} //...
       - name: Test
         shell: bash
         env:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
-        run: bazel --output_user_root=C:/b test ${{ matrix.bazel_config }} //...
+        run: bazel test ${{ matrix.bazel_config }} //...
