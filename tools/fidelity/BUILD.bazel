@@ -236,8 +236,8 @@ private_namespace_fidelity_test(
 
 # Lines of a real link /DUMP /SYMBOLS listing of jemalloc.lib (MSVC 14.51), renamed to this test's symbols. Unlike the
 # tools/generators fixtures it has LF line endings, as the awk here would keep a CR in each name, and neither an external
-# symbol in a section numbered SECTA and above nor a communal symbol (UNDEF with a non-zero value), both of which the
-# generator namespaces and awk skips.
+# symbol in a section whose hex number begins with a letter (SECTA4) nor a communal symbol (UNDEF with a non-zero
+# value), both of which the generator namespaces and awk skips.
 private_namespace(
     name = "private_namespace_fixture_dumpbin",
     testonly = True,

@@ -83,7 +83,9 @@ Here Bazel generates them with small C++ tools, so a module that depends on `@je
 toolchain: no host shell, awk or sed. As in configure, the public symbols include optional functions only where the
 configured headers define the matching macro, so the headers built from them are written when the build runs.
 private_namespace.h comes from listing the library's symbols with the toolchain's `nm`, or with dumpbin for MSVC, as
-upstream's private_symbols.awk reads both.
+upstream's private_symbols.awk reads both. From dumpbin it also renames two kinds of external definition that awk skips:
+symbols in a section whose hex number begins with a letter, and communal symbols, which nm lists as `C` and awk accepts
+there. Those are what cl's private_namespace.h adds to upstream's, so its fidelity tests use listings without them.
 
 The upstream scripts are kept, not replaced. Each generated header has a `fidelity_test` in
 [tools/fidelity](tools/fidelity) that runs the unmodified upstream script, as configure.ac invokes it, on the
