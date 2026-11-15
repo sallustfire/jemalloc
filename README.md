@@ -105,10 +105,11 @@ Tested in CI with the latest Bazel 7.x, 8.x and 9.x:
 - Ubuntu 24.04 (aarch64)
 - MacOS 15 & 26 (arm64)
 
-The minimum supported Bazel, 7.4.0, is tested on Ubuntu 24.04 (x86_64) and, for the host toolchain examples only,
-MacOS 15.
-Windows Server 2025 (x86_64) is tested with MSVC (msvc-cl) on the latest Bazel 7.x, 8.x and 9.x and with clang-cl on
-the latest 9.x, without the fidelity checks, whose gawk, grep and sed dev dependencies do not build for Windows.
+The minimum supported Bazel, 7.4.0, is tested on Ubuntu 24.04 (x86_64), on Windows Server 2025 with MSVC and, for the
+host toolchain examples only, MacOS 15.
+Windows Server 2025 (x86_64) is tested with MSVC (msvc-cl), host toolchain examples included, on the latest Bazel 7.x,
+8.x and 9.x, and with clang-cl on the latest 9.x, without the fidelity checks, whose gawk, grep and sed dev dependencies
+do not build for Windows.
 Profiling (`--config=prof-*`) is tested on Linux only.
 
 ## Known Issues
