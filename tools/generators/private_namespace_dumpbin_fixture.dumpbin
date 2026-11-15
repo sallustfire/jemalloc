@@ -18,6 +18,7 @@ COFF SYMBOL TABLE
 03B 00000000 UNDEF  notype ()    External     | malloc_printf
 03A 00000000 UNDEF  notype       External     | __imp_abort
 054 00000008 UNDEF  notype       External     | je_malloc_conf
+055 00000004 UNDEF  notype       External     | ncpus
 0A0 00000000 SECT6  notype ()    External     | je_malloc
 0A4 00000000 SECTA4 notype ()    External     | arena_malloc_hard
 0A5 00000000 SECTA5 notype       External     | __real@3ff0000000000000

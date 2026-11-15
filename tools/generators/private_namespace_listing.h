@@ -25,9 +25,12 @@ bool is_identifier(const std::string& text);
 
 // The name of the symbol a `dumpbin /SYMBOLS` line defines with external linkage, "... SECTn ... External | NAME", as
 // private_symbols.awk matches it: $3 ~ /^SECT[0-9]+/ && $(NF-2) == "External". Sets *name and returns true for such a
-// line, given its fields. dumpbin numbers sections in hex (SECT9, SECTA, ..., SECTA4), so this also accepts the
-// numbers awk's [0-9] misses, those that begin with a letter; an external symbol in such a section would otherwise
-// escape the private namespace and the leak check alike.
+// line, given its fields. Two kinds of line awk misses are accepted too, as either symbol would otherwise escape the
+// private namespace and the leak check alike:
+// - dumpbin numbers sections in hex (SECT9, SECTA, ..., SECTA4), so section numbers that begin with a letter.
+// - A communal symbol, the uninitialized global cl puts in no section, which dumpbin prints as UNDEF with its size as the
+//   value ("054 00000008 UNDEF ... External | je_malloc_conf"); nm reports it as C, which awk accepts. An undefined
+//   reference prints as UNDEF with the value 0.
 bool dumpbin_external_symbol(const std::vector<std::string>& fields, std::string* name);
 
 // Appends each line of nm's stderr at `stderr_path`, other than "...: no symbols", to *diagnostics.

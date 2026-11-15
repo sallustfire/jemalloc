@@ -17,7 +17,6 @@ COFF SYMBOL TABLE
 018 00000660 SECT5  notype ()    Static       | dumpbin_static
 04A 00000130 SECT5  notype       Label        | $LN3
 03B 00000000 UNDEF  notype ()    External     | dumpbin_undefined
-054 00000008 UNDEF  notype       External     | je_malloc_conf
 0A6 00000000 SECT6  notype ()    External     | pthread_create
 761 00000000 SECT9  notype       Static       | .debug$T
     Section length 14458, #relocs    0, #linenums    0, checksum        0

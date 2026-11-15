@@ -16,6 +16,7 @@ COFF SYMBOL TABLE
 018 00000660 SECT5  notype ()    Static       | witness_lock_error_impl
 03B 00000000 UNDEF  notype ()    External     | free
 054 00000008 UNDEF  notype       External     | je_malloc_conf
+056 00000004 UNDEF  notype       External     | leaked_variable
 0A6 00000000 SECTA6 notype ()    External     | leaked_function
 0A7 00000000 SECTA7 notype       External     | __real@3ff0000000000000
 0A8 00000000 SECTA8 notype ()    External     | ??2@YAPEAX_K@Z
