@@ -10,11 +10,19 @@ matrix:
     - macos
     - macos_arm64
   bazel: ["7.4.0", "7.x", "8.x", "9.x", "rolling"]
+  # The Bazel versions the fork's CI tests Windows on, with the auto-configured MSVC toolchain.
+  windows_bazel: ["7.x", "8.x", "9.x"]
 tasks:
   verify_jemalloc:
     name: Build as a dependency
     platform: ${{ platform }}
     bazel: ${{ bazel }}
+    build_targets:
+      - "@jemalloc"
+  verify_jemalloc_windows:
+    name: Build as a dependency on Windows
+    platform: windows
+    bazel: ${{ windows_bazel }}
     build_targets:
       - "@jemalloc"
 
@@ -40,11 +48,19 @@ bcr_test_module:
     # Not rolling: it resets --@jemalloc//settings/flags:nm in exec configurations, so private_namespace.h falls back to
     # the toolchain's nm, which the llvm toolchain does not declare.
     llvm_bazel: ["8.x", "9.x"]
+    # The Bazel versions the fork's CI tests Windows on, with the auto-configured MSVC toolchain.
+    windows_bazel: ["7.x", "8.x", "9.x"]
   tasks:
     test_jemalloc:
       name: Run upstream's tests and the fidelity tests
       platform: ${{ platform }}
       bazel: ${{ bazel }}
+      test_targets:
+        - "//..."
+    test_jemalloc_windows:
+      name: Run upstream's tests on Windows
+      platform: windows
+      bazel: ${{ windows_bazel }}
       test_targets:
         - "//..."
     test_host_toolchain:
