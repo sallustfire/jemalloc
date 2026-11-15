@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, macos-15, macos-26]
-        bazel_version: ["7.x", "8.x", "9.x"]
+        bazel_version: ["7.x", "8.x", "9.x", "rolling"]  # TEMPORARY: the BCR presubmit's rolling
         include:
           - bazel_version: "8.x"
             bazel_config: "--config=bazel8"
@@ -224,7 +224,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, macos-15, macos-26, windows-2025]
-        bazel_version: ["7.x", "8.x", "9.x"]
+        bazel_version: ["7.x", "8.x", "9.x", "rolling"]  # TEMPORARY: the BCR presubmit's rolling
         include:
           - bazel_version: "8.x"
             bazel_config: "--config=bazel8"
@@ -298,7 +298,7 @@ jobs:
         os: [windows-2025]
         # Bazel's auto-configured Windows toolchain. clang-cl and mingw-gcc each need a platform of their own.
         compiler: [msvc-cl]
-        bazel_version: ["7.x", "8.x", "9.x"]
+        bazel_version: ["7.x", "8.x", "9.x", "rolling"]  # TEMPORARY: the BCR presubmit's rolling
         include:
           - bazel_version: "8.x"
             bazel_config: "--config=bazel8"
