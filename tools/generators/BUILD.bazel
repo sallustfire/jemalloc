@@ -2,26 +2,27 @@ load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
-load("@rules_cc//cc:cc_test.bzl", "cc_test")
+load("//include/jemalloc/internal:private_namespace.bzl", "private_namespace")
 load("//include/jemalloc/internal:public_symbols.bzl", "symbol_list")
-
-_CXXOPTS = select({
-    "@rules_cc//cc/compiler:clang-cl": ["/std:c++14"],
-    "@rules_cc//cc/compiler:msvc-cl": ["/std:c++14"],
-    "//conditions:default": ["-std=c++14"],
-})
+load(":generator_tests.bzl", "expect_failure_test", "leak_check_test", "runfile", "temporary")
 
 cc_binary(
     name = "jemalloc_hdr_gen",
     srcs = ["jemalloc_hdr_gen.cc"],
-    cxxopts = _CXXOPTS,
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
     visibility = ["//include/jemalloc:__pkg__"],
 )
 
 cc_binary(
     name = "public_symbols_gen",
     srcs = ["public_symbols_gen.cc"],
-    cxxopts = _CXXOPTS,
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
     visibility = ["//include/jemalloc/internal:__pkg__"],
 )
 
@@ -54,46 +55,42 @@ write_file(
     ],
 )
 
-_FIXTURE_HEADER = "public_symbols_gen_fixture.h"
-
-# Each symbol in the fixture list, mapped to the fixture header and the macro that decides it.
-_LIST_FIXTURE_SYMBOLS = {
-    "defined_plain": [
-        _FIXTURE_HEADER,
-        "DEFINED_PLAIN",
-    ],
-    "undefined_commented": [
-        _FIXTURE_HEADER,
-        "UNDEFINED_COMMENTED",
-    ],
-    "defined_indented": [
-        _FIXTURE_HEADER,
-        "DEFINED_INDENTED",
-    ],
-    "undefined_plain": [
-        _FIXTURE_HEADER,
-        "UNDEFINED_PLAIN",
-    ],
-    "defined_commented": [
-        _FIXTURE_HEADER,
-        "DEFINED_COMMENTED",
-    ],
-    "defined_function_like": [
-        _FIXTURE_HEADER,
-        "DEFINED_FUNCTION_LIKE",
-    ],
-    "defined_crlf": [
-        _FIXTURE_HEADER,
-        "DEFINED_CRLF",
-    ],
-}
-
 symbol_list(
     name = "public_symbols_gen_list",
     testonly = True,
     out = "public_symbols_gen_list.txt",
     headers = [":public_symbols_gen_fixture"],
-    optional_symbols = _LIST_FIXTURE_SYMBOLS,
+    # Each symbol in the fixture list, mapped to the fixture header and the macro that decides it.
+    optional_symbols = {
+        "defined_plain": [
+            "public_symbols_gen_fixture.h",
+            "DEFINED_PLAIN",
+        ],
+        "undefined_commented": [
+            "public_symbols_gen_fixture.h",
+            "UNDEFINED_COMMENTED",
+        ],
+        "defined_indented": [
+            "public_symbols_gen_fixture.h",
+            "DEFINED_INDENTED",
+        ],
+        "undefined_plain": [
+            "public_symbols_gen_fixture.h",
+            "UNDEFINED_PLAIN",
+        ],
+        "defined_commented": [
+            "public_symbols_gen_fixture.h",
+            "DEFINED_COMMENTED",
+        ],
+        "defined_function_like": [
+            "public_symbols_gen_fixture.h",
+            "DEFINED_FUNCTION_LIKE",
+        ],
+        "defined_crlf": [
+            "public_symbols_gen_fixture.h",
+            "DEFINED_CRLF",
+        ],
+    },
     symbols = ["always"],
 )
 
@@ -108,22 +105,44 @@ cc_library(
     name = "private_namespace_listing",
     srcs = ["private_namespace_listing.cc"],
     hdrs = ["private_namespace_listing.h"],
-    cxxopts = _CXXOPTS,
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
+)
+
+cc_library(
+    name = "process",
+    srcs = ["process.cc"],
+    hdrs = ["process.h"],
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
 )
 
 cc_binary(
     name = "private_namespace_gen",
     srcs = ["private_namespace_gen.cc"],
-    cxxopts = _CXXOPTS,
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
     visibility = ["//include/jemalloc/internal:__pkg__"],
-    deps = [":private_namespace_listing"],
+    deps = [
+        ":private_namespace_listing",
+        ":process",
+    ],
 )
 
 cc_binary(
     name = "private_namespace_leak_check",
     testonly = True,
     srcs = ["private_namespace_leak_check.cc"],
-    cxxopts = _CXXOPTS,
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
     visibility = ["//include/jemalloc/internal:__pkg__"],
     deps = [
         ":private_namespace_listing",
@@ -131,173 +150,238 @@ cc_binary(
     ],
 )
 
-# expect_failure and fake_nm use POSIX process APIs, as private_namespace_gen's nm mode does.
-_POSIX = select({
-    "@platforms//os:windows": ["@platforms//:incompatible"],
-    "//conditions:default": [],
-})
-
 cc_binary(
     name = "fake_nm",
     testonly = True,
     srcs = ["fake_nm.cc"],
-    cxxopts = _CXXOPTS,
-    target_compatible_with = _POSIX,
+    cxxopts = select({
+        "//settings/compiler:msvc_compatible": ["/std:c++14"],
+        "//conditions:default": ["-std=c++14"],
+    }),
 )
 
-_LEAK_ENV = {
-    "PRIVATE_NAMESPACE_LEAK_EXPORTS": "$(rlocationpath :private_namespace_leak_fixture.export_syms)",
-    "PRIVATE_NAMESPACE_LEAK_HEADER": "$(rlocationpath :private_namespace_leak_fixture.h)",
-    "PRIVATE_NAMESPACE_LEAK_PREFIX": "je_",
-    "PRIVATE_NAMESPACE_LEAK_STDERR": "/dev/null",
-    "PRIVATE_NAMESPACE_LEAK_SYM_PREFIX": "",
-}
+# What the lister wrote on stderr: nothing, as for a listing that read cleanly.
+write_file(
+    name = "private_namespace_leak_fixture_stderr",
+    testonly = True,
+    out = "private_namespace_leak_fixture.listing.stderr",
+    content = [],
+)
 
-_LEAK_DATA = [
-    ":private_namespace_leak_fixture.export_syms",
-    ":private_namespace_leak_fixture.h",
-]
-
-cc_test(
+leak_check_test(
     name = "private_namespace_leak_check_clean_test",
-    size = "small",
-    srcs = ["private_namespace_leak_check.cc"],
-    cxxopts = _CXXOPTS,
-    data = _LEAK_DATA + [":private_namespace_leak_fixture.nm"],
-    env = _LEAK_ENV | {"PRIVATE_NAMESPACE_LEAK_LISTING": "$(rlocationpath :private_namespace_leak_fixture.nm)"},
-    deps = [
-        ":private_namespace_listing",
-        "@rules_cc//cc/runfiles",
+    listing = ":private_namespace_leak_fixture.nm",
+)
+
+leak_check_test(
+    name = "private_namespace_leak_check_leak_test",
+    expected_leak = "leaked_function",
+    listing = ":private_namespace_leak_fixture_leaky.nm",
+)
+
+# The same archive as link /DUMP /SYMBOLS lists it. The fixtures are lines of a real listing of jemalloc.lib (MSVC 14.51)
+# with their CRLF line endings, renamed to this test's symbols. The leaky fixture's leaked_function is in section 0xA6,
+# which dumpbin prints as SECTA6, and its leaked_variable is a communal symbol: an uninitialized global, which cl puts in
+# no section, so dumpbin prints it as UNDEF with its size as the value, as it does je_malloc_conf. Not from a real
+# listing: leaked_variable, the MSVC constant pool entry and the mangled C++ symbol the check must pass over.
+leak_check_test(
+    name = "private_namespace_leak_check_clean_dumpbin_test",
+    listing = ":private_namespace_leak_fixture.dumpbin",
+)
+
+leak_check_test(
+    name = "private_namespace_leak_check_leak_dumpbin_test",
+    expected_leak = "leaked_function",
+    listing = ":private_namespace_leak_fixture_leaky.dumpbin",
+)
+
+leak_check_test(
+    name = "private_namespace_leak_check_leak_communal_dumpbin_test",
+    expected_leak = "leaked_variable",
+    listing = ":private_namespace_leak_fixture_leaky.dumpbin",
+)
+
+# private_namespace.h from a link /DUMP /SYMBOLS listing: lines of a real listing of jemalloc.lib (MSVC 14.51) with their
+# CRLF line endings, je_test_ renamed to je_. Three differences from private_symbols.awk: an external symbol in a section
+# whose hex number begins with a letter (SECTA4) is namespaced, so is a communal symbol (ncpus, UNDEF with its size as
+# the value), and only identifiers are, so an MSVC constant pool entry or a mangled C++ symbol makes no #define. The
+# lines for ncpus and the last three symbols are not from a real listing.
+write_file(
+    name = "private_namespace_dumpbin_fixture_public_syms",
+    testonly = True,
+    out = "private_namespace_dumpbin_fixture_public_syms.txt",
+    content = [
+        "malloc",
+        "malloc_conf",
     ],
 )
 
-_HEADER_ARGS = [
-    "header",
-    "@TEST_TMPDIR@/private_namespace.h",
-]
+write_file(
+    name = "private_namespace_dumpbin_fixture_wrap_syms",
+    testonly = True,
+    out = "private_namespace_dumpbin_fixture_wrap_syms.txt",
+    content = [],
+)
+
+private_namespace(
+    name = "private_namespace_dumpbin_fixture",
+    testonly = True,
+    out = "private_namespace_dumpbin_fixture.h",
+    listing = ":private_namespace_dumpbin_fixture.dumpbin",
+    prefix = "je_",
+    public_symbols = ":private_namespace_dumpbin_fixture_public_syms",
+    sym_prefix = "",
+    wrap_symbols = ":private_namespace_dumpbin_fixture_wrap_syms",
+)
+
+diff_test(
+    name = "private_namespace_dumpbin_test",
+    size = "small",
+    file1 = ":private_namespace_dumpbin_fixture",
+    file2 = "private_namespace_dumpbin_fixture.h.expected",
+)
 
 # public_symbols_gen list on a macro the fixture header does not decide, or decides both ways.
-_LIST_FAILURE_CASES = [
-    ("public_symbols_gen_absent_macro_test", "neither defines nor undefines ABSENT", "ABSENT"),
-    ("public_symbols_gen_block_comment_test", "neither defines nor undefines IN_BLOCK_COMMENT", "IN_BLOCK_COMMENT"),
-    ("public_symbols_gen_commented_test", "neither defines nor undefines DEFINE_IN_COMMENT", "DEFINE_IN_COMMENT"),
-    ("public_symbols_gen_undef_trailer_test", "neither defines nor undefines UNDEF_WITH_TRAILER", "UNDEF_WITH_TRAILER"),
-    ("public_symbols_gen_conflicting_test", "both defines and undefines CONFLICTING", "CONFLICTING"),
-]
+expect_failure_test(
+    name = "public_symbols_gen_absent_macro_test",
+    arguments = [
+        "list",
+        temporary("list.txt"),
+        runfile(
+            ":public_symbols_gen_fixture",
+            prefix = "--symbol=symbol:ABSENT:",
+        ),
+    ],
+    command = ":public_symbols_gen",
+    expected = "neither defines nor undefines ABSENT",
+)
 
-# Each case runs a generator tool on a fixture that must make it fail, naming the problem.
-_FAILURE_CASES = [
-    {
-        "name": name,
-        "expected": expected,
-        "command": ":public_symbols_gen",
-        "args": [
-            "list",
-            "@TEST_TMPDIR@/list.txt",
-            "--symbol=symbol:{}:$(rootpath :public_symbols_gen_fixture)".format(macro),
-        ],
-        "data": [":public_symbols_gen_fixture"],
-        "env": {},
-    }
-    for name, expected, macro in _LIST_FAILURE_CASES
-] + [
-    {
-        "name": "public_symbols_gen_no_header_test",
-        "expected": "expected --symbol=NAME:MACRO:HEADER",
-        "command": ":public_symbols_gen",
-        "args": [
-            "list",
-            "@TEST_TMPDIR@/list.txt",
-            "--symbol=symbol:DEFINED_PLAIN",
-        ],
-        "data": [],
-        "env": {},
-    },
-    {
-        "name": "private_namespace_gen_unreadable_member_test",
-        "expected": "could not read every archive member",
-        "command": ":private_namespace_gen",
-        "args": _HEADER_ARGS + [
-            "$(rootpath :private_namespace_leak_fixture.nm)",
-            "$(rootpath :private_namespace_gen_unreadable_member.stderr)",
-            "''",
-            "fixture",
-            "fixture",
-            "--public=malloc",
-        ],
-        "data": [
-            ":private_namespace_leak_fixture.nm",
-            ":private_namespace_gen_unreadable_member.stderr",
-        ],
-        "env": {},
-    },
-    {
-        "name": "private_namespace_gen_slim_lto_test",
-        "expected": "GCC slim-LTO objects",
-        "command": ":private_namespace_gen",
-        "args": _HEADER_ARGS + [
-            "$(rootpath :private_namespace_gen_slim_lto.nm)",
-            "/dev/null",
-            "''",
-            "fixture",
-            "fixture",
-            "--public=malloc",
-        ],
-        "data": [":private_namespace_gen_slim_lto.nm"],
-        "env": {},
-    },
-    {
-        "name": "private_namespace_gen_no_public_symbol_test",
-        "expected": "defines none of the public symbols",
-        "command": ":private_namespace_gen",
-        "args": _HEADER_ARGS + [
-            "$(rootpath :private_namespace_leak_fixture.nm)",
-            "/dev/null",
-            "''",
-            "fixture",
-            "fixture",
-            "--public=absent_symbol",
-        ],
-        "data": [":private_namespace_leak_fixture.nm"],
-        "env": {},
-    },
-    {
-        "name": "private_namespace_gen_nm_fails_test",
-        "expected": "fake_nm: cannot read archive member",
-        "command": ":private_namespace_gen",
-        "args": [
-            "nm",
-            "$(rootpath :fake_nm)",
-            "@TEST_TMPDIR@/listing.nm",
-            "@TEST_TMPDIR@/nm.stderr",
-            "libjemalloc.a",
-        ],
-        "data": [":fake_nm"],
-        "env": {},
-    },
-    {
-        "name": "private_namespace_leak_check_leak_test",
-        "expected": "leaked_function",
-        "command": ":private_namespace_leak_check",
-        "args": [],
-        "data": _LEAK_DATA + [":private_namespace_leak_fixture_leaky.nm"],
-        "env": _LEAK_ENV | {"PRIVATE_NAMESPACE_LEAK_LISTING": "$(rlocationpath :private_namespace_leak_fixture_leaky.nm)"},
-    },
-]
+expect_failure_test(
+    name = "public_symbols_gen_block_comment_test",
+    arguments = [
+        "list",
+        temporary("list.txt"),
+        runfile(
+            ":public_symbols_gen_fixture",
+            prefix = "--symbol=symbol:IN_BLOCK_COMMENT:",
+        ),
+    ],
+    command = ":public_symbols_gen",
+    expected = "neither defines nor undefines IN_BLOCK_COMMENT",
+)
 
-[
-    cc_test(
-        name = case["name"],
-        size = "small",
-        srcs = ["expect_failure.cc"],
-        args = [
-            "'{}'".format(case["expected"]),
-            "$(rootpath {})".format(case["command"]),
-        ] + case["args"],
-        cxxopts = _CXXOPTS,
-        data = [case["command"]] + case["data"],
-        env = case["env"],
-        target_compatible_with = _POSIX,
-    )
-    for case in _FAILURE_CASES
-]
+expect_failure_test(
+    name = "public_symbols_gen_commented_test",
+    arguments = [
+        "list",
+        temporary("list.txt"),
+        runfile(
+            ":public_symbols_gen_fixture",
+            prefix = "--symbol=symbol:DEFINE_IN_COMMENT:",
+        ),
+    ],
+    command = ":public_symbols_gen",
+    expected = "neither defines nor undefines DEFINE_IN_COMMENT",
+)
+
+expect_failure_test(
+    name = "public_symbols_gen_undef_trailer_test",
+    arguments = [
+        "list",
+        temporary("list.txt"),
+        runfile(
+            ":public_symbols_gen_fixture",
+            prefix = "--symbol=symbol:UNDEF_WITH_TRAILER:",
+        ),
+    ],
+    command = ":public_symbols_gen",
+    expected = "neither defines nor undefines UNDEF_WITH_TRAILER",
+)
+
+expect_failure_test(
+    name = "public_symbols_gen_conflicting_test",
+    arguments = [
+        "list",
+        temporary("list.txt"),
+        runfile(
+            ":public_symbols_gen_fixture",
+            prefix = "--symbol=symbol:CONFLICTING:",
+        ),
+    ],
+    command = ":public_symbols_gen",
+    expected = "both defines and undefines CONFLICTING",
+)
+
+expect_failure_test(
+    name = "public_symbols_gen_no_header_test",
+    arguments = [
+        "list",
+        temporary("list.txt"),
+        "--symbol=symbol:DEFINED_PLAIN",
+    ],
+    command = ":public_symbols_gen",
+    expected = "expected --symbol=NAME:MACRO:HEADER",
+)
+
+# private_namespace_gen header on listings it must refuse.
+expect_failure_test(
+    name = "private_namespace_gen_unreadable_member_test",
+    arguments = [
+        "header",
+        temporary("private_namespace.h"),
+        runfile(":private_namespace_leak_fixture.nm"),
+        runfile(":private_namespace_gen_unreadable_member.stderr"),
+        "",
+        "fixture",
+        "fixture",
+        "--public=malloc",
+    ],
+    command = ":private_namespace_gen",
+    expected = "could not read every archive member",
+)
+
+expect_failure_test(
+    name = "private_namespace_gen_slim_lto_test",
+    arguments = [
+        "header",
+        temporary("private_namespace.h"),
+        runfile(":private_namespace_gen_slim_lto.nm"),
+        runfile(":private_namespace_leak_fixture_stderr"),
+        "",
+        "fixture",
+        "fixture",
+        "--public=malloc",
+    ],
+    command = ":private_namespace_gen",
+    expected = "GCC slim-LTO objects",
+)
+
+expect_failure_test(
+    name = "private_namespace_gen_no_public_symbol_test",
+    arguments = [
+        "header",
+        temporary("private_namespace.h"),
+        runfile(":private_namespace_leak_fixture.nm"),
+        runfile(":private_namespace_leak_fixture_stderr"),
+        "",
+        "fixture",
+        "fixture",
+        "--public=absent_symbol",
+    ],
+    command = ":private_namespace_gen",
+    expected = "defines none of the public symbols",
+)
+
+# private_namespace_gen list when the lister fails.
+expect_failure_test(
+    name = "private_namespace_gen_lister_fails_test",
+    arguments = [
+        "list",
+        runfile(":fake_nm"),
+        temporary("listing"),
+        temporary("nm.stderr"),
+        "libjemalloc.a",
+    ],
+    command = ":private_namespace_gen",
+    expected = "fake_nm: cannot read archive member",
+)

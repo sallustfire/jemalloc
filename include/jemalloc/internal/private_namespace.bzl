@@ -2,15 +2,10 @@
 JEMALLOC_PRIVATE_NAMESPACE."""
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolchain")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
-
-# This repository, as the owner of the library's own linker inputs, so that a dependency's archive (libunwind) is not
-# read as jemalloc's.
-_REPO = Label("//:BUILD.bazel").repo_name
-
-# The unset value of //settings/flags:nm.
-_TOOLCHAIN_NM = Label("//settings/flags:toolchain_nm")
 
 # The private namespace of private_namespace_jet.h, under JEMALLOC_JET
 JET_PREFIX = "jet_"
@@ -19,7 +14,9 @@ def _static_archives(target):
     """The static archives of this repository's linker inputs in target's CcInfo."""
     archives = []
     for linker_input in target[CcInfo].linking_context.linker_inputs.to_list():
-        if linker_input.owner.repo_name != _REPO:
+        # This repository owns the library's own linker inputs, so a dependency's archive (libunwind) is not read as
+        # jemalloc's.
+        if linker_input.owner.repo_name != Label("//:BUILD.bazel").repo_name:
             continue
         for library in linker_input.libraries:
             for archive in [library.static_library, library.pic_static_library]:
@@ -27,28 +24,63 @@ def _static_archives(target):
                     archives.append(archive)
     return archives
 
-def _nm(ctx, cc_toolchain):
-    """The nm to run: the //settings/flags:nm target if set, otherwise the toolchain's nm_executable.
+def _sibling(path, name):
+    """The file `name` in the directory of `path`, a path written with slashes or with backslashes. That is `name`
+    alone for a path with no directory, which a program search finds as it finds `path`."""
+    return path[:max(path.rfind("/"), path.rfind("\\")) + 1] + name
 
-    Returns a struct of the nm's path, the tools its action needs and the inputs (the toolchain's files, for its nm).
+def _symbol_lister(ctx, cc_toolchain):
+    """The program that lists the archives' symbols, and the options it takes before them.
+
+    That is the //settings/flags:nm target if set, otherwise the C++ toolchain's own lister: its nm_executable, as
+    configure's NM, run as `nm -a`. An MSVC-compatible toolchain declares no nm (rules_cc's are a no-op placeholder),
+    so for msvc-cl it is the toolchain's linker as `link /DUMP /SYMBOLS`, which is dumpbin, whose listing
+    private_symbols.awk also reads, and for clang-cl the llvm-nm.exe of the LLVM installation its clang-cl.exe is in.
+    Those run with the toolchain's environment for the action whose tool they are.
+
+    Returns a struct of the lister's path, its options, the tools and inputs its action needs and its environment.
     """
-    if ctx.attr._nm.label == _TOOLCHAIN_NM:
-        return struct(path = cc_toolchain.nm_executable, tools = [], inputs = [cc_toolchain.all_files])
-    flag = ctx.attr._nm[DefaultInfo]
-    executable = flag.files_to_run.executable
-    if executable != None:
-        tool = flag.files_to_run
-    else:
-        files = flag.files.to_list()
-        if len(files) != 1:
-            fail("//settings/flags:nm must name one executable, but {} provides {}".format(ctx.attr._nm.label, files))
-        executable = files[0]
-        tool = executable
 
-    # private_namespace_gen runs nm with posix_spawnp, which searches PATH for a name without a slash, as the path of a
-    # file in the main repository's root package is.
-    path = executable.path if "/" in executable.path else "./" + executable.path
-    return struct(path = path, tools = [tool], inputs = [])
+    # toolchain_nm is the flag's unset value.
+    if ctx.attr._nm.label != Label("//settings/flags:toolchain_nm"):
+        flag = ctx.attr._nm[DefaultInfo]
+        executable = flag.files_to_run.executable
+        if executable != None:
+            tool = flag.files_to_run
+        else:
+            files = flag.files.to_list()
+            if len(files) != 1:
+                fail("//settings/flags:nm must name one executable, but {} provides {}".format(ctx.attr._nm.label, files))
+            executable = files[0]
+            tool = executable
+
+        # On POSIX hosts private_namespace_gen runs nm with posix_spawnp, which searches PATH for a name without a
+        # slash, as the path of a file in the main repository's root package is.
+        path = executable.path if "/" in executable.path else "./" + executable.path
+        return struct(path = path, arguments = ["-a"], tools = [tool], inputs = [], env = {})
+    if cc_toolchain.compiler not in ["clang-cl", "msvc-cl"]:
+        return struct(path = cc_toolchain.nm_executable, arguments = ["-a"], tools = [], inputs = [cc_toolchain.all_files], env = {})
+    feature_configuration = cc_common.configure_features(
+        ctx = ctx,
+        cc_toolchain = cc_toolchain,
+        requested_features = ctx.features,
+        unsupported_features = ctx.disabled_features,
+    )
+    if cc_toolchain.compiler == "msvc-cl":
+        action_name = ACTION_NAMES.cpp_link_executable
+        path = cc_common.get_tool_for_action(feature_configuration = feature_configuration, action_name = action_name)
+        arguments = ["/DUMP", "/SYMBOLS"]
+    else:
+        action_name = ACTION_NAMES.c_compile
+        compiler = cc_common.get_tool_for_action(feature_configuration = feature_configuration, action_name = action_name)
+        path = _sibling(compiler, "llvm-nm.exe")
+        arguments = ["-a"]
+    env = cc_common.get_environment_variables(
+        feature_configuration = feature_configuration,
+        action_name = action_name,
+        variables = cc_common.empty_variables(),
+    )
+    return struct(path = path, arguments = arguments, tools = [], inputs = [cc_toolchain.all_files], env = env)
 
 def _linker_input_owners(target):
     return [str(linker_input.owner) for linker_input in target[CcInfo].linking_context.linker_inputs.to_list()]
@@ -92,33 +124,36 @@ def _private_namespace_impl(ctx):
     output = ctx.actions.declare_file(ctx.attr.out)
     if bool(ctx.attr.input) == bool(ctx.file.listing):
         fail("set exactly one of input and listing")
-    nm_stderr = ctx.actions.declare_file(ctx.label.name + ".nm.stderr")
+    lister_stderr = ctx.actions.declare_file(ctx.label.name + ".listing.stderr")
     sym_prefix = ctx.attr.sym_prefix
+    listing = ctx.actions.declare_file(ctx.label.name + ".listing")
     if ctx.file.listing:
-        listing = ctx.file.listing
-        ctx.actions.write(output = nm_stderr, content = "")
-        listing_source = listing.short_path
+        # A checked-in listing is named for the tool that wrote it (.nm, .dumpbin). Linking it to <name>.listing gives
+        # the upstream_inputs output group the same path whether the listing is checked in or generated.
+        ctx.actions.symlink(output = listing, target_file = ctx.file.listing)
+        ctx.actions.write(output = lister_stderr, content = "")
+        listing_source = ctx.file.listing.short_path
         unfound_reason = "public_symbols, prefix or sym_prefix does not match it"
     else:
-        nm = _nm(ctx, cc_toolchain)
-        listing_source = "`{}`".format(nm.path)
+        lister = _symbol_lister(ctx, cc_toolchain)
+        listing_source = "`{}`".format(" ".join([lister.path] + lister.arguments))
         unfound_reason = "it read no symbol table (for example from LTO bitcode it cannot parse)"
         archives = _static_archives(ctx.attr.input[0])
         if not archives:
             fail("{} provides no static archive to list; its linker inputs are owned by {}".format(ctx.attr.input[0].label, _linker_input_owners(ctx.attr.input[0])))
-        listing = ctx.actions.declare_file(ctx.label.name + ".nm")
         ctx.actions.run(
             executable = ctx.executable._generator,
-            arguments = ["nm", nm.path, listing.path, nm_stderr.path] + [archive.path for archive in archives],
-            inputs = depset(archives, transitive = nm.inputs),
-            outputs = [listing, nm_stderr],
-            tools = nm.tools,
-            mnemonic = "PrivateNamespaceNM",
+            arguments = ["list", lister.path, listing.path, lister_stderr.path] + lister.arguments + [archive.path for archive in archives],
+            env = lister.env,
+            inputs = depset(archives, transitive = lister.inputs),
+            outputs = [listing, lister_stderr],
+            tools = lister.tools,
+            mnemonic = "PrivateNamespaceList",
         )
 
     export_syms = ctx.actions.declare_file(ctx.label.name + ".export_syms")
     args = ctx.actions.args()
-    args.add_all(["header", output.path, listing, nm_stderr, sym_prefix, listing_source, unfound_reason])
+    args.add_all(["header", output.path, listing, lister_stderr, sym_prefix, listing_source, unfound_reason])
     args.add(prefix, format = "--prefix=%s")
     args.add(ctx.file.public_symbols, format = "--public-file=%s")
     args.add(ctx.file.wrap_symbols, format = "--wrap-file=%s")
@@ -126,7 +161,7 @@ def _private_namespace_impl(ctx):
     ctx.actions.run(
         executable = ctx.executable._generator,
         arguments = [args],
-        inputs = [listing, nm_stderr, ctx.file.public_symbols, ctx.file.wrap_symbols],
+        inputs = [listing, lister_stderr, ctx.file.public_symbols, ctx.file.wrap_symbols],
         outputs = [output, export_syms],
         mnemonic = "PrivateNamespace",
     )
@@ -142,7 +177,7 @@ def _private_namespace_impl(ctx):
 def _transition_impl(_settings, attr):
     return {
         # Only C sources are used for symbol extraction
-        "//settings/flags:enable_cxx": False,
+        "//settings/flags:enable_cxx": "False",
         "//settings:enable_no_private_namespace": True,
         "//settings:enable_jet": attr.enable_jet,
     }
@@ -154,7 +189,7 @@ transition_config_settings = transition(
 )
 
 private_namespace = rule(
-    doc = "Generate the private namespace header from the `nm -a` listing of `input`, as upstream's private_symbols.awk " +
+    doc = "Generate the private namespace header from the symbol listing of `input`, `nm -a` or dumpbin's, as upstream's private_symbols.awk " +
           "and private_namespace.sh do. Output group `export_syms` holds configure's export_syms, and " +
           "`upstream_inputs` holds that and the listing.",
     implementation = _private_namespace_impl,
@@ -203,6 +238,7 @@ private_namespace = rule(
             executable = True,
         ),
     },
+    fragments = ["cpp"],
     toolchains = use_cc_toolchain(True),
 )
 
@@ -218,16 +254,17 @@ def _private_namespace_leak_test_impl(ctx):
     export_syms = namespace[OutputGroupInfo].export_syms.to_list()[0]
     header = namespace[DefaultInfo].files.to_list()[0]
 
-    nm = _nm(ctx, cc_toolchain)
-    listing = ctx.actions.declare_file(ctx.label.name + ".nm")
-    nm_stderr = ctx.actions.declare_file(ctx.label.name + ".nm.stderr")
+    lister = _symbol_lister(ctx, cc_toolchain)
+    listing = ctx.actions.declare_file(ctx.label.name + ".listing")
+    lister_stderr = ctx.actions.declare_file(ctx.label.name + ".listing.stderr")
     ctx.actions.run(
         executable = ctx.executable._generator,
-        arguments = ["nm", nm.path, listing.path, nm_stderr.path] + [archive.path for archive in archives],
-        inputs = depset(archives, transitive = nm.inputs),
-        outputs = [listing, nm_stderr],
-        tools = nm.tools,
-        mnemonic = "PrivateNamespaceLeakNM",
+        arguments = ["list", lister.path, listing.path, lister_stderr.path] + lister.arguments + [archive.path for archive in archives],
+        env = lister.env,
+        inputs = depset(archives, transitive = lister.inputs),
+        outputs = [listing, lister_stderr],
+        tools = lister.tools,
+        mnemonic = "PrivateNamespaceLeakList",
     )
 
     executable = ctx.actions.declare_file(ctx.label.name)
@@ -236,10 +273,10 @@ def _private_namespace_leak_test_impl(ctx):
     return [
         DefaultInfo(
             executable = executable,
-            runfiles = ctx.runfiles(files = [listing, nm_stderr, export_syms, header]).merge(ctx.attr._checker[DefaultInfo].default_runfiles),
+            runfiles = ctx.runfiles(files = [listing, lister_stderr, export_syms, header]).merge(ctx.attr._checker[DefaultInfo].default_runfiles),
         ),
         RunEnvironmentInfo(environment = {
-            "PRIVATE_NAMESPACE_LEAK_STDERR": _rlocationpath(ctx, nm_stderr),
+            "PRIVATE_NAMESPACE_LEAK_STDERR": _rlocationpath(ctx, lister_stderr),
             "PRIVATE_NAMESPACE_LEAK_EXPORTS": _rlocationpath(ctx, export_syms),
             "PRIVATE_NAMESPACE_LEAK_HEADER": _rlocationpath(ctx, header),
             "PRIVATE_NAMESPACE_LEAK_LISTING": _rlocationpath(ctx, listing),
@@ -278,5 +315,6 @@ private_namespace_leak_test = rule(
             executable = True,
         ),
     },
+    fragments = ["cpp"],
     toolchains = use_cc_toolchain(True),
 )

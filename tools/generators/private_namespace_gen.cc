@@ -1,16 +1,19 @@
 // Generates private_namespace.h from an `nm -a` (or `dumpbin /SYMBOLS`) listing, as upstream's private_symbols.awk
-// and private_namespace.sh do. It adds no shell or awk of its own: nm is run directly, so nm and any interpreter a
-// wrapper nm needs remain the dependencies of whatever supplies nm, the C++ toolchain or //settings/flags:nm.
+// and private_namespace.sh do. It adds no shell or awk of its own: the lister is run directly, so it and any
+// interpreter a wrapper needs remain the dependencies of whatever supplies it, the C++ toolchain or
+// //settings/flags:nm.
 //
-//   private_namespace_gen nm NM LISTING STDERR ARCHIVE...
+//   private_namespace_gen list LISTER LISTING STDERR ARGUMENT...
 //   private_namespace_gen header HEADER LISTING STDERR SYM_PREFIX LISTING_SOURCE UNFOUND_REASON [--prefix=PREFIX]
 //       [--public=SYMBOL]... [--public-file=PATH]... [--wrap=SYMBOL]... [--wrap-file=PATH]... [--export-syms=PATH]
+//
+// list mode runs LISTER with the ARGUMENTs, its options and then the archives, with stdout to LISTING and stderr to
+// STDERR: `nm -a ARCHIVE...`, or `link /DUMP /SYMBOLS ARCHIVE...` (dumpbin) with an MSVC toolchain.
 //
 // Each public symbol, given directly or as a line of a --public-file, is exported as PREFIX followed by the symbol;
 // each wrapped symbol as is. --export-syms writes configure.ac's export_syms: the exported public symbols, then the
 // wrapped ones, one per line.
 
-#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <set>
@@ -19,16 +22,11 @@
 #include <vector>
 
 #include "private_namespace_listing.h"
-
-#ifndef _WIN32
-#include <fcntl.h>
-#include <spawn.h>
-#include <sys/wait.h>
-extern char** environ;
-#endif
+#include "process.h"
 
 namespace {
 
+using private_namespace::dumpbin_external_symbol;
 using private_namespace::is_defined_symbol_type;
 using private_namespace::is_identifier;
 using private_namespace::read_lines;
@@ -47,8 +45,7 @@ const std::string kExportSymsFlag = "--export-syms=";
 bool read_symbols(const std::string& path, std::vector<std::string>* symbols) {
     std::vector<std::string> lines;
     if (!read_lines(path, &lines)) return false;
-    for (std::string& line : lines) {
-        if (!line.empty() && line.back() == '\r') line.pop_back();
+    for (const std::string& line : lines) {
         if (!line.empty()) symbols->push_back(line);
     }
     return true;
@@ -67,53 +64,23 @@ bool write_export_syms(const std::string& path, const std::vector<std::string>& 
     return true;
 }
 
-int run_nm(const std::string& nm, const std::string& listing_path, const std::string& stderr_path,
-           const std::vector<std::string>& archives) {
-#ifdef _WIN32
-    (void)nm;
-    (void)listing_path;
-    (void)stderr_path;
-    (void)archives;
-    std::cerr << "private_namespace: running nm is not implemented on Windows\n";
-    return 1;
-#else
-    std::vector<std::string> arguments = {nm, "-a"};
-    arguments.insert(arguments.end(), archives.begin(), archives.end());
-    std::vector<char*> argument_pointers;
-    for (std::string& argument : arguments) argument_pointers.push_back(&argument[0]);
-    argument_pointers.push_back(nullptr);
+// Prints the lister's stderr, for a lister that failed.
+void print_lister_stderr(const std::string& stderr_path) {
+    std::ifstream lister_stderr(stderr_path, std::ios::binary);
+    std::cerr << lister_stderr.rdbuf();
+}
 
-    posix_spawn_file_actions_t file_actions;
-    int error_number = posix_spawn_file_actions_init(&file_actions);
-    if (error_number != 0) {
-        std::cerr << "private_namespace: cannot run " << nm << ": " << std::strerror(error_number) << "\n";
+int run_lister(const std::string& lister, const std::string& listing_path, const std::string& stderr_path,
+               const std::vector<std::string>& arguments) {
+    int exit_code;
+    std::string error;
+    if (!process::run(lister, arguments, &listing_path, stderr_path, &exit_code, &error)) {
+        std::cerr << "private_namespace: " << error << "\n";
         return 1;
     }
-    error_number = posix_spawn_file_actions_addopen(&file_actions, 1, listing_path.c_str(),
-                                                    O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (error_number == 0) {
-        error_number = posix_spawn_file_actions_addopen(&file_actions, 2, stderr_path.c_str(),
-                                                        O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    }
-    pid_t pid;
-    if (error_number == 0) {
-        error_number = posix_spawnp(&pid, nm.c_str(), &file_actions, nullptr, argument_pointers.data(), environ);
-    }
-    posix_spawn_file_actions_destroy(&file_actions);
-    if (error_number != 0) {
-        std::cerr << "private_namespace: cannot run " << nm << ": " << std::strerror(error_number) << "\n";
-        return 1;
-    }
-    int wait_status;
-    if (waitpid(pid, &wait_status, 0) < 0) {
-        std::cerr << "private_namespace: waiting for " << nm << " failed\n";
-        return 1;
-    }
-    if (WIFEXITED(wait_status) && WEXITSTATUS(wait_status) == 0) return 0;
-    std::ifstream nm_stderr(stderr_path, std::ios::binary);
-    std::cerr << nm_stderr.rdbuf();
-    return WIFEXITED(wait_status) ? WEXITSTATUS(wait_status) : 128 + WTERMSIG(wait_status);
-#endif
+    if (exit_code == 0) return 0;
+    print_lister_stderr(stderr_path);
+    return exit_code;
 }
 
 // An nm without the GCC LTO plugin reads slim-LTO objects silently as just __gnu_lto_slim. Any one public symbol
@@ -150,12 +117,12 @@ int write_header(const std::string& header_path, const std::string& listing_path
                 define_private(name.size() > sym_prefix.size() ? name.substr(sym_prefix.size()) : "");
             }
         }
-        // dumpbin /SYMBOLS: "... SECT1 ... External | NAME"
-        if (field_count >= 3 && starts_with(fields[2], "SECT") && fields[2].size() > 4 && fields[2][4] >= '0' &&
-            fields[2][4] <= '9' && fields[field_count - 3] == "External") {
-            const std::string& name = fields[field_count - 1];
+        // dumpbin /SYMBOLS. Unlike private_symbols.awk, only identifiers are namespaced, as for nm: MSVC also gives
+        // external linkage to its constant pool entries, such as __real@3ff0000000000000, which are no C names.
+        std::string name;
+        if (dumpbin_external_symbol(fields, &name)) {
             if (public_api_symbols.count(name)) found_public_symbol = true;
-            if (!exported_symbols.count(name)) define_private(name);
+            if (!exported_symbols.count(name) && is_identifier(name)) define_private(name);
         }
     }
 
@@ -187,9 +154,9 @@ int write_header(const std::string& header_path, const std::string& listing_path
 
 int main(int argc, char* argv[]) {
     std::vector<std::string> arguments(argv + 1, argv + argc);
-    if (arguments.size() >= 5 && arguments[0] == "nm") {
-        return run_nm(arguments[1], arguments[2], arguments[3],
-                      std::vector<std::string>(arguments.begin() + 4, arguments.end()));
+    if (arguments.size() >= 5 && arguments[0] == "list") {
+        return run_lister(arguments[1], arguments[2], arguments[3],
+                          std::vector<std::string>(arguments.begin() + 4, arguments.end()));
     }
     if (arguments.size() >= 7 && arguments[0] == "header") {
         std::string prefix, export_syms_path;
@@ -219,7 +186,7 @@ int main(int argc, char* argv[]) {
         return write_header(arguments[1], arguments[2], arguments[3], arguments[4], arguments[5], arguments[6],
                             public_symbols, wrap_symbols);
     }
-    std::cerr << "usage: private_namespace_gen nm NM LISTING STDERR ARCHIVE...\n"
+    std::cerr << "usage: private_namespace_gen list LISTER LISTING STDERR ARGUMENT...\n"
                  "       private_namespace_gen header HEADER LISTING STDERR SYM_PREFIX LISTING_SOURCE UNFOUND_REASON "
                  "[--prefix=PREFIX] [--public=SYMBOL]... [--public-file=PATH]... [--wrap=SYMBOL]... [--wrap-file=PATH]... "
                  "[--export-syms=PATH]\n";

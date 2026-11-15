@@ -2,7 +2,7 @@ load("@package_metadata//licenses/rules:license.bzl", "license")
 load("@package_metadata//purl:purl.bzl", "purl")
 load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
-load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
+load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS", "C_FEATURES")
 
 ####
 # Due to the complexity of the build, the overlay is maintained independently.
@@ -117,6 +117,16 @@ cc_library(
     conlyopts = CONLYOPTS,
     copts = ["-Iinclude/jemalloc/internal"] + COPTS,
     cxxopts = CXXOPTS,
+    # For every compile that includes jemalloc.h, this library's and its consumers'. Under _MSC_VER, jemalloc_macros.h
+    # declares the API __declspec(dllimport) unless DLLEXPORT or JEMALLOC_EXPORT is defined, and cl then rejects
+    # jemalloc's own definitions (C2491) and a program's malloc_conf. jemalloc is a static archive, so it is defined
+    # empty, as upstream's static MSVC projects do (msvc/projects/vc2017/jemalloc/jemalloc.vcxproj). Other compilers
+    # take the attribute branch, where JEMALLOC_EXPORT is visibility("default").
+    defines = select({
+        "//settings/compiler:msvc_compatible": ["JEMALLOC_EXPORT="],
+        "//conditions:default": [],
+    }),
+    features = C_FEATURES,
     includes = ["include"],
     linkopts = select({
         "@platforms//os:android": ["-ldl"],
@@ -146,15 +156,23 @@ cc_library(
     }) + select({
         "//settings:no_private_namespace": ["JEMALLOC_NO_PRIVATE_NAMESPACE"],
         "//conditions:default": [],
+    }) + select({
+        # clang-cl, unlike cl, emits UCRT's inline stdio functions (sprintf, _vsnprintf and others) into every object
+        # that includes stdio.h, as external definitions, which private_namespace.h would then rename away from
+        # stdio.h's declarations of them. This takes the declarations without the definitions, which holds only while
+        # these sources call none of them. It is local, so code built against jemalloc keeps UCRT's definitions.
+        "@rules_cc//cc/compiler:clang-cl": ["_NO_CRT_STDIO_INLINE"],
+        "//conditions:default": [],
     }),
     toolchains = ["//include/jemalloc/internal:jemalloc_private_namespace"],
     visibility = ["//visibility:public"],
     deps = ["//include/jemalloc/internal"] + select({
-        "@rules_cc//cc/compiler:clang-cl": ["//include/msvc_compat"],
-        "@rules_cc//cc/compiler:msvc-cl": ["//include/msvc_compat"],
+        "//settings/flags:prof_libunwind": ["@libunwind"],
         "//conditions:default": [],
     }) + select({
-        "//settings/flags:prof_libunwind": ["@libunwind"],
+        # Fails analysis: enable_cxx=True with cl or clang-cl is unsupported (settings/flags/BUILD.bazel).
+        "//settings/flags:cxx_with_clang_cl": ["//settings/flags:cxx_unsupported_with_cl"],
+        "//settings/flags:cxx_with_msvc_cl": ["//settings/flags:cxx_unsupported_with_cl"],
         "//conditions:default": [],
     }),
 )
@@ -171,6 +189,12 @@ cc_library(
     conlyopts = CONLYOPTS,
     copts = ["-Iinclude/jemalloc/internal"] + COPTS,
     cxxopts = CXXOPTS,
+    # As :jemalloc's, for the integration tests that include jemalloc.h through this library.
+    defines = select({
+        "//settings/compiler:msvc_compatible": ["JEMALLOC_EXPORT="],
+        "//conditions:default": [],
+    }),
+    features = C_FEATURES,
     includes = ["include"],
     linkopts = select({
         "@platforms//os:linux": [

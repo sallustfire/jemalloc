@@ -26,8 +26,13 @@ bool read_lines(const std::string& path, std::vector<std::string>* lines) {
         std::cerr << "private_namespace: cannot read " << path << "\n";
         return false;
     }
+    // Read in binary so every platform sees the same bytes, then drop the CR of a CRLF line ending, which link /DUMP
+    // and other Windows tools write.
     std::string line;
-    while (std::getline(stream, line)) lines->push_back(line);
+    while (std::getline(stream, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        lines->push_back(line);
+    }
     if (stream.bad()) {
         std::cerr << "private_namespace: error reading " << path << "\n";
         return false;
@@ -54,6 +59,18 @@ bool is_identifier(const std::string& text) {
                        (character >= '0' && character <= '9') || character == '_';
         if (!allowed) return false;
     }
+    return true;
+}
+
+bool dumpbin_external_symbol(const std::vector<std::string>& fields, std::string* name) {
+    std::size_t field_count = fields.size();
+    if (field_count < 3 || fields[field_count - 3] != "External") return false;
+    const std::string& section = fields[2];
+    bool in_section = starts_with(section, "SECT") && section.size() > 4 &&
+                      section.find_first_not_of("0123456789ABCDEF", 4) == std::string::npos;
+    bool communal = section == "UNDEF" && fields[1].find_first_not_of('0') != std::string::npos;
+    if (!in_section && !communal) return false;
+    *name = fields[field_count - 1];
     return true;
 }
 

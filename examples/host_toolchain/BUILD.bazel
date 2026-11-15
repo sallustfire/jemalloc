@@ -2,11 +2,11 @@ load("@jemalloc//settings:config.bzl", "jemalloc")
 load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
+# examples/hermetic_llvm builds these tests with its own toolchain, through the suite and, for Windows, one by one.
+package(default_visibility = ["//visibility:public"])
+
 # With no tests listed, a test_suite holds every test in its package that isn't tagged manual.
-test_suite(
-    name = "consumer_tests",
-    visibility = ["//visibility:public"],
-)
+test_suite(name = "consumer_tests")
 
 # Under the platform's default prefix, plain malloc reaches jemalloc through the replaced symbols, or on macOS through
 # the zone. On Windows the default prefix is je_ and there is no zone to overlay, so plain malloc stays with the C
@@ -122,14 +122,15 @@ cc_test(
 )
 
 # Case 11: A shared jemalloc is a cc_shared_library of @jemalloc, here under upstream's file names. A binary that links
-# it through dynamic_deps allocates from it, through plain malloc as in case 8.
+# it through dynamic_deps allocates from it, through plain malloc as in case 8. Neither is built for Windows: with cl
+# and clang-cl @jemalloc is a static library only (README.md, Known Issues), and a MinGW DLL of it is unproven.
 cc_shared_library(
     name = "jemalloc_shared",
     shared_lib_name = select({
         "@platforms//os:macos": "libjemalloc.2.dylib",
-        "@platforms//os:windows": "jemalloc.dll",
         "//conditions:default": "libjemalloc.so.2",
     }),
+    target_compatible_with = _MALLOC_REPLACED,
     deps = ["@jemalloc"],
 )
 
@@ -147,9 +148,9 @@ cc_shared_library(
     name = "jemalloc_custom_shared",
     shared_lib_name = select({
         "@platforms//os:macos": "libjemalloc_custom.2.dylib",
-        "@platforms//os:windows": "jemalloc_custom.dll",
         "//conditions:default": "libjemalloc_custom.so.2",
     }),
+    target_compatible_with = _MALLOC_REPLACED,
     deps = [":jemalloc_custom"],
 )
 
@@ -160,4 +161,12 @@ cc_test(
     dynamic_deps = [":jemalloc_custom_shared"],
     target_compatible_with = _MALLOC_REPLACED,
     deps = [":jemalloc_custom"],
+)
+
+# Case 13: A program's malloc_conf overrides the library's under any prefix
+cc_test(
+    name = "test_13_malloc_conf",
+    size = "small",
+    srcs = ["test_malloc_conf.c"],
+    malloc = "@jemalloc",
 )

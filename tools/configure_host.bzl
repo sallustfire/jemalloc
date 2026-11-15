@@ -8,10 +8,10 @@ HOST_CPPFLAGS = select({
     "//conditions:default": [],
 })
 
-# configure.ac adds include/msvc_compat to CPPFLAGS when the compiler defines _MSC_VER, which clang-cl does too.
+# configure.ac adds include/msvc_compat to CPPFLAGS when the compiler defines _MSC_VER, which clang-cl does too. The
+# target adds the include path only for those compilers.
 HOST_CC_DEPS = select({
-    "@rules_cc//cc/compiler:clang-cl": ["//include/msvc_compat"],
-    "@rules_cc//cc/compiler:msvc-cl": ["//include/msvc_compat"],
+    "@platforms//os:windows": ["//include/msvc_compat"],
     "//conditions:default": [],
 })
 

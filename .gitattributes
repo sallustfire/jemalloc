@@ -1,1 +1,4 @@
 * text=auto eol=lf
+
+# link /DUMP output as it is written, CRLF line endings included.
+tools/generators/*.dumpbin -text

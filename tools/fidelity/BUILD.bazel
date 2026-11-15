@@ -5,7 +5,7 @@ load("//include/jemalloc/internal:private_namespace.bzl", "private_namespace")
 load("//include/jemalloc/internal:public_symbols.bzl", "public_symbols", "public_symbols_header", "symbol_list")
 load("//include/jemalloc/internal:symbols.bzl", "ALL_PUBLIC_SYMBOLS", "ALL_WRAP_SYMBOLS", "OPTIONAL_PUBLIC_SYMBOLS", "OPTIONAL_WRAP_SYMBOLS", "SYM_PREFIX")
 load("//tools:version.bzl", "UPSTREAM_VERSION", "VERSION")
-load(":fidelity.bzl", "fidelity_test", "private_namespace_fidelity_test")
+load(":fidelity.bzl", "POSIX_ONLY", "fidelity_test", "private_namespace_fidelity_test")
 
 write_file(
     name = "upstream_version",
@@ -25,23 +25,20 @@ diff_test(
     file2 = "//:VERSION",
 )
 
-# Each optional symbol's macro, as SYMBOL=MACRO entries
-_PUBLIC_MACROS = ",".join([symbol + "=" + coupling[1] for symbol, coupling in OPTIONAL_PUBLIC_SYMBOLS.items()])
-
-_WRAP_MACROS = ",".join([symbol + "=" + coupling[1] for symbol, coupling in OPTIONAL_WRAP_SYMBOLS.items()])
-
 native_test(
     name = "configure_symbols_test",
     size = "small",
     src = "@gawk",
+    target_compatible_with = POSIX_ONLY,
     args = [
         "-f",
         "$(rootpath :configure_symbols.awk)",
         "-vgid=" + VERSION.gid,
         "-vpublic=" + ",".join(ALL_PUBLIC_SYMBOLS),
         "-vwrap=" + ",".join(ALL_WRAP_SYMBOLS),
-        "-vpublic_macros=" + _PUBLIC_MACROS,
-        "-vwrap_macros=" + _WRAP_MACROS,
+        # Each optional symbol's macro, as SYMBOL=MACRO entries
+        "-vpublic_macros=" + ",".join([symbol + "=" + coupling[1] for symbol, coupling in OPTIONAL_PUBLIC_SYMBOLS.items()]),
+        "-vwrap_macros=" + ",".join([symbol + "=" + coupling[1] for symbol, coupling in OPTIONAL_WRAP_SYMBOLS.items()]),
         "$(rootpath //:configure.ac)",
     ],
     data = [
@@ -237,11 +234,15 @@ private_namespace_fidelity_test(
     sym_prefix = "_",
 )
 
+# Lines of a real link /DUMP /SYMBOLS listing of jemalloc.lib (MSVC 14.51), renamed to this test's symbols. Unlike the
+# tools/generators fixtures it has LF line endings, as the awk here would keep a CR in each name, and neither an external
+# symbol in a section whose hex number begins with a letter (SECTA4) nor a communal symbol (UNDEF with a non-zero
+# value), both of which the generator namespaces and awk skips.
 private_namespace(
     name = "private_namespace_fixture_dumpbin",
     testonly = True,
     out = "private_namespace_fixture_dumpbin.h",
-    listing = ":private_namespace_fixture_dumpbin.nm",
+    listing = ":private_namespace_fixture_dumpbin.dumpbin",
     public_symbols = ":malloc_public_syms",
     sym_prefix = "",
     tags = ["manual"],

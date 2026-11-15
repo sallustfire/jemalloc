@@ -1,4 +1,4 @@
-// An nm that fails, for private_namespace_gen's nm mode.
+// An nm that fails, for private_namespace_gen's list mode.
 
 #include <iostream>
 

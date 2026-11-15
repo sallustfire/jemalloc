@@ -9,6 +9,7 @@ matrix:
     - fedora43
     - macos
     - macos_arm64
+    - windows
   bazel: ["7.4.0", "7.x", "8.x", "9.x", "rolling"]
 tasks:
   verify_jemalloc:
@@ -31,6 +32,7 @@ bcr_test_module:
       - fedora43
       - macos
       - macos_arm64
+      - windows
     bazel: ["7.4.0", "7.x", "8.x", "9.x", "rolling"]
     # llvm@0.8.26 needs Bazel 7.7.0 or later
     llvm_platform:

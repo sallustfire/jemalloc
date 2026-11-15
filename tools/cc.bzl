@@ -6,20 +6,24 @@
 # no GNU C dialect, so C compiles there keep cl's default, as upstream's msvc/
 # projects do.
 CONLYOPTS = select({
-    "@rules_cc//cc/compiler:clang-cl": [],
-    "@rules_cc//cc/compiler:msvc-cl": [],
+    "//settings/compiler:msvc_compatible": [],
     "//conditions:default": ["-std=gnu11"],
 })
 
+# The toolchain features that go with CONLYOPTS. From rules_cc 0.2.19, the toolchain for cl and clang-cl enables
+# default_c_std, which compiles C as /std:c17, and cl has no option that returns to its default. Under it jemalloc 5.3.0
+# declares variable-length arrays, which cl lacks, as its VARIABLE_ARRAY tests __STDC_VERSION__ alone
+# (include/jemalloc/internal/jemalloc_internal_types.h:113). A toolchain without the feature ignores its removal.
+C_FEATURES = ["-default_c_std"]
+
 CXXOPTS = select({
-    "@rules_cc//cc/compiler:clang-cl": ["/std:c++17"],
-    "@rules_cc//cc/compiler:msvc-cl": ["/std:c++17"],
+    "//settings/compiler:msvc_compatible": ["/std:c++17"],
     "//conditions:default": ["-std=c++17"],
 })
 
 # The flags that change what jemalloc's sources and the system headers mean: -D_REENTRANT (configure.ac:1876), the
-# host's feature test macros (configure.ac:658-707), -fvisibility=hidden, and the frame pointers prof's gcc unwinder
-# walks (configure.ac:1370). Then the warnings jemalloc's sources trip on purpose.
+# host's feature test macros (configure.ac:658-707), -fvisibility=hidden, -fcommon on Windows, and the frame pointers
+# prof's gcc unwinder walks (configure.ac:1370). Then the warnings jemalloc's sources trip on purpose.
 #
 # configure.ac's other defaults are the builder's choices. Target copts come after --copt, so anything here would
 # override them wherever jemalloc is compiled, including in every build that depends on this module:
@@ -33,18 +37,26 @@ CXXOPTS = select({
 # - -DPIC (configure.ac:544) is defined by upstream only for its PIC objects (Makefile.in:433-436), which go into the
 #   shared library and libjemalloc_pic.a, and nothing reads it. Position independent code is the toolchain's job.
 COPTS = ["-D_REENTRANT"] + select({
-    # configure.ac adds it only when GCC=yes and the ABI is ELF (configure.ac:846-849). It is keyed on the compiler
-    # alone here, so these compilers also get it on Mach-O and PE targets.
+    # configure.ac adds it only for GCC=yes on the ELF ABI. Here it goes to every compiler that takes GCC's command
+    # line, so Mach-O, which also honours visibility, gets it too. clang-cl and mingw-gcc target only PE/COFF, where
+    # exports come from dllexport or .def files, and clang-cl ignores the flag.
     "@rules_cc//cc/compiler:clang": ["-fvisibility=hidden"],
-    "@rules_cc//cc/compiler:clang-cl": ["-fvisibility=hidden"],
     "@rules_cc//cc/compiler:emscripten": ["-fvisibility=hidden"],
     "@rules_cc//cc/compiler:gcc": ["-fvisibility=hidden"],
-    "@rules_cc//cc/compiler:mingw-gcc": ["-fvisibility=hidden"],
     "//conditions:default": [],
 }) + select({
     "@platforms//os:android": ["-D_GNU_SOURCE"],
     "@platforms//os:freebsd": ["-D_BSD_SOURCE"],
     "@platforms//os:linux": ["-D_GNU_SOURCE"],
+    "//conditions:default": [],
+}) + select({
+    # On _WIN32, je_malloc_conf and je_malloc_conf_2_conf_harder are not weak (src/jemalloc.c:33-37, 55-59), so a
+    # program overrides them with its own malloc_conf only if the library's uninitialized definitions are common
+    # symbols. cl makes them so; GCC 10, clang 11 and clang-cl default to -fno-common. Upstream's CI passes -fcommon to
+    # every Windows compiler other than cl (scripts/gen_travis.py:147-155), and so does this, since without it any
+    # program that sets malloc_conf, as nine of the unit tests do, fails to link with a duplicate symbol.
+    "//settings/compiler:windows_gcc_compatible": ["-fcommon"],
+    "@rules_cc//cc/compiler:clang-cl": ["-fcommon"],
     "//conditions:default": [],
 }) + select({
     "//settings/flags:prof_gcc": ["-fno-omit-frame-pointer"],

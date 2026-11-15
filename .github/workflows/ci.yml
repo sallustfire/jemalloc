@@ -223,7 +223,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, macos-15, macos-26]
+        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, macos-15, macos-26, windows-2025]
         bazel_version: ["7.x", "8.x", "9.x"]
         include:
           - bazel_version: "8.x"
@@ -233,6 +233,8 @@ jobs:
           - os: ubuntu-24.04
             bazel_version: "7.4.0"
           - os: macos-15
+            bazel_version: "7.4.0"
+          - os: windows-2025
             bazel_version: "7.4.0"
     steps:
       - uses: actions/checkout@v4
@@ -279,3 +281,48 @@ jobs:
           USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
         working-directory: examples/hermetic_llvm
         run: bazel test //... @jemalloc//include/jemalloc/internal:private_namespace_leak_test ${{ matrix.bazel_config }}
+
+  windows:
+    name: Windows (${{ matrix.os }}, ${{ matrix.compiler }}, Bazel ${{ matrix.bazel_version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025]
+        # Bazel's auto-configured Windows toolchain. clang-cl and mingw-gcc each need a platform of their own.
+        compiler: [msvc-cl]
+        bazel_version: ["7.x", "8.x", "9.x"]
+        include:
+          - bazel_version: "8.x"
+            bazel_config: "--config=bazel8"
+          - bazel_version: "9.x"
+            bazel_config: "--config=bazel9"
+          - os: windows-2025
+            compiler: msvc-cl
+            bazel_version: "7.4.0"
+          # The auto-configured clang-cl toolchain, chosen ahead of msvc-cl through .github/platforms, on one Bazel
+          # version. Bazel 7 configures C++ with its built-in cc_configure, under other labels.
+          - os: windows-2025
+            compiler: clang-cl
+            bazel_version: "9.x"
+            bazel_config: >-
+              --config=bazel9
+              --extra_toolchains=@@rules_cc++cc_configure_extension+local_config_cc//:cc-toolchain-x64_windows-clang-cl
+              --extra_execution_platforms=//.github/platforms:x64_windows-clang-cl
+              --platforms=//.github/platforms:x64_windows-clang-cl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          repository-cache: true
+      - name: Build
+        shell: bash
+        env:
+          USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
+        run: bazel build ${{ matrix.bazel_config }} //...
+      - name: Test
+        shell: bash
+        env:
+          USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
+        run: bazel test ${{ matrix.bazel_config }} //...
