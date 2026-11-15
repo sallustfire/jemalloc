@@ -4,7 +4,6 @@
 #define JEMALLOC_NO_DEMANGLE
 #include <jemalloc/jemalloc.h>
 #include <errno.h>
-#include <getopt.h>
 
 void print_usage(const char* prog_name) {
     printf("Usage: %s [options]\n", prog_name);
@@ -71,32 +70,18 @@ int main(int argc, char** argv) {
     int expect_stats_available = 1; // Default: expect stats to be available
     int verbose = 0; // Default: non-verbose output
 
-    // Define long options
-    static struct option long_options[] = {
-        {"help", no_argument, 0, 'h'},
-        {"verbose", no_argument, 0, 'v'},
-        {"expect-stats-unavailable", no_argument, 0, 'u'},
-        {0, 0, 0, 0}
-    };
-
-    // Parse command line options
-    int opt;
-    int option_index = 0;
-
-    while ((opt = getopt_long(argc, argv, "hv", long_options, &option_index)) != -1) {
-        switch (opt) {
-            case 'h':
-                print_usage(argv[0]);
-                return 0;
-            case 'v':
-                verbose = 1;
-                break;
-            case 'u':
-                expect_stats_available = 0; // Expect stats to be unavailable
-                break;
-            default:
-                print_usage(argv[0]);
-                return 2;
+    // Parsed by hand rather than with getopt_long, which MSVC's C runtime lacks
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            print_usage(argv[0]);
+            return 0;
+        } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
+            verbose = 1;
+        } else if (strcmp(argv[i], "--expect-stats-unavailable") == 0) {
+            expect_stats_available = 0; // Expect stats to be unavailable
+        } else {
+            print_usage(argv[0]);
+            return 2;
         }
     }
 
@@ -113,7 +98,7 @@ int main(int argc, char** argv) {
     }
 
     // Perform some allocations to have something to measure
-    const int num_allocs = 10;
+    enum { num_allocs = 10 };  // A constant expression, as cl has no variable-length arrays
     void* ptrs[num_allocs];
     for (int i = 0; i < num_allocs; i++) {
         // Allocate blocks of increasing size
