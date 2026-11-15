@@ -1,7 +1,7 @@
 "Various test related utility functions"
 
 load("@rules_cc//cc:cc_test.bzl", _cc_test = "cc_test")
-load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
+load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS", "C_FEATURES")
 
 def join_conf(conf1, conf2):
     """Joins two configuration strings with a ',' delimiter.
@@ -54,6 +54,7 @@ def cc_test(name, src, **kwargs):
         name = name,
         srcs = [src],
         conlyopts = CONLYOPTS,
+        features = C_FEATURES,
         # The test library compiles with COPTS alone. The test programs' expect_*() and assert_*() calls pass empty
         # messages, which -Wformat-zero-length flags (configure.ac:255).
         copts = COPTS + select({

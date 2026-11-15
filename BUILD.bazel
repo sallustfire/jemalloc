@@ -2,7 +2,7 @@ load("@package_metadata//licenses/rules:license.bzl", "license")
 load("@package_metadata//purl:purl.bzl", "purl")
 load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
-load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
+load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS", "C_FEATURES")
 
 ####
 # Due to the complexity of the build, the overlay is maintained independently.
@@ -126,6 +126,7 @@ cc_library(
         "//settings/compiler:msvc_compatible": ["JEMALLOC_EXPORT="],
         "//conditions:default": [],
     }),
+    features = C_FEATURES,
     includes = ["include"],
     linkopts = select({
         "@platforms//os:android": ["-ldl"],
@@ -193,6 +194,7 @@ cc_library(
         "//settings/compiler:msvc_compatible": ["JEMALLOC_EXPORT="],
         "//conditions:default": [],
     }),
+    features = C_FEATURES,
     includes = ["include"],
     linkopts = select({
         "@platforms//os:linux": [

@@ -2,7 +2,7 @@ load("@bazel_lib//lib:expand_template.bzl", "expand_template")
 load("@package_metadata//licenses/rules:license.bzl", "license")
 load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
-load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS")
+load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS", "C_FEATURES")
 
 license(
     name = "sfmt_license",
@@ -116,6 +116,7 @@ cc_library(
     conlyopts = CONLYOPTS,
     copts = COPTS,
     cxxopts = CXXOPTS,
+    features = C_FEATURES,
     includes = ["include"],
     linkstatic = True,
     local_defines = select(

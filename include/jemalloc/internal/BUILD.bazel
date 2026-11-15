@@ -7,7 +7,7 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc_autoconf//autoconf:autoconf.bzl", "autoconf")
 load("@rules_cc_autoconf//autoconf:autoconf_hdr.bzl", "autoconf_hdr")
 load("@rules_cc_autoconf//autoconf:checks.bzl", "checks", "macros", "utils")
-load("//tools:cc.bzl", "CONLYOPTS", "CXXOPTS")
+load("//tools:cc.bzl", "CONLYOPTS", "CXXOPTS", "C_FEATURES")
 load("//tools:configure_host.bzl", "HOST_CC_DEPS", "HOST_CPPFLAGS", "HOST_LIBS")
 load(":lg_hugepage.bzl", "checked_lg_hugepage")
 load(":private_namespace.bzl", "JET_PREFIX", "jemalloc_private_namespace", "private_namespace", "private_namespace_leak_test")
@@ -1445,6 +1445,7 @@ autoconf(
     conlyopts = CONLYOPTS,
     copts = HOST_CPPFLAGS,
     cxxopts = CXXOPTS,
+    features = C_FEATURES,
     tags = ["manual"],
     deps = ["//include/jemalloc:jemalloc_defs_checks"],
 )
@@ -1497,6 +1498,7 @@ autoconf(
     }),
     conlyopts = CONLYOPTS,
     copts = HOST_CPPFLAGS,
+    features = C_FEATURES,
     tags = ["manual"],
     deps = [":jemalloc_internal_defs_checks"],
 )
@@ -1568,6 +1570,7 @@ autoconf(
     ],
     conlyopts = CONLYOPTS,
     copts = HOST_CPPFLAGS,
+    features = C_FEATURES,
     tags = ["manual"],
 )
 
