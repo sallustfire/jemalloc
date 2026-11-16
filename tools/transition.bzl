@@ -2,7 +2,7 @@
 
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
-_BOOL_SETTINGS = ["//settings:enable_jet", "//settings/flags:enable_experimental_smallocx", "//settings/flags:enable_fill"]
+_BOOL_SETTINGS = ["//settings:enable_jet"]
 
 _SETTINGS = _BOOL_SETTINGS + [
     "//settings:with_test",
