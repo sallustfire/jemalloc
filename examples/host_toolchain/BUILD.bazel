@@ -37,6 +37,7 @@ jemalloc(
     name = "jemalloc_custom",
     cache_oblivious = "False",
     cxx = "False",
+    debug = "yes",
     log = "True",
     stats = "False",
     without_export = "False",
@@ -54,7 +55,10 @@ cc_test(
     name = "test_4_requires_stats",
     size = "small",
     srcs = ["test_api.c"],
-    args = ["--expect-stats-unavailable"],
+    args = [
+        "--expect-debug",
+        "--expect-stats-unavailable",
+    ],
     malloc = ":jemalloc_custom",
 )
 

@@ -36,6 +36,14 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
  <private namespace>zone_register on Darwin, which keeps src/zone.c in a static link; an archive exported to another
  build system needs the same option. An application that defines its own global operator new and delete must define
  every overload it calls, or jemalloc's are linked as well and the duplicates fail the link.
+- **//settings/flags:enable_debug (--enable-debug):** Turns on jemalloc debug (JEMALLOC_DEBUG). Defaults to
+ "__auto__", which follows the compilation mode and defines it in `-c dbg` builds only; "yes" and "no" set it in any
+ compilation mode. configure's --enable-debug also turns off its optimization flags; here the compilation mode alone
+ decides optimization. jemalloc debug includes the checks of //settings/flags:enable_opt_safety_checks
+ (--enable-opt-safety-checks), //settings/flags:enable_opt_size_checks (--enable-opt-size-checks) and
+ //settings/flags:enable_uaf_detection (--enable-uaf-detection), which, off by default, turn them on without the rest
+ of debug. Set to False, they do not turn off the checks debug includes. jemalloc()'s debug, opt_safety_checks,
+ opt_size_checks and uaf_detection set them per target.
 - **Library targets:** @jemalloc//:jemalloc is the cc_library to depend on, through deps or the malloc attribute. It
  builds libjemalloc.a and no shared library of its own (linkstatic). Each jemalloc() target is a library of its own,
  built with its attributes' settings.
@@ -111,6 +119,8 @@ Windows Server 2025 (x86_64) is tested with MSVC (msvc-cl), host toolchain examp
 8.x and 9.x, and with clang-cl on the latest 9.x, without the fidelity checks, whose gawk, grep and sed dev dependencies
 do not build for Windows.
 Profiling (`--config=prof-*`) is tested on Linux only.
+Debug is tested with prof-libgcc, log on and cache oblivious off, on Ubuntu 24.04 (x86_64) with the latest Bazel 9.x
+only. The host toolchain examples build a jemalloc() target with debug on every tested platform.
 
 ## Known Issues
 

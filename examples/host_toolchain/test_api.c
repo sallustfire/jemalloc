@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,6 +11,7 @@ void print_usage(const char* prog_name) {
     printf("Options:\n");
     printf("  -h, --help                 Show this help message\n");
     printf("  -v, --verbose              Enable verbose output\n");
+    printf("  --expect-debug             Expect jemalloc to be built with debug (config.debug)\n");
     printf("  --expect-stats-unavailable Expect stats to be unavailable (exit 0 if unavailable, 1 if not)\n");
     printf("                             By default, test expects stats to be available\n");
 }
@@ -69,6 +71,7 @@ int test_stats_functionality(int verbose) {
 int main(int argc, char** argv) {
     int expect_stats_available = 1; // Default: expect stats to be available
     int verbose = 0; // Default: non-verbose output
+    int expect_debug = 0;
 
     // Parsed by hand rather than with getopt_long, which MSVC's C runtime lacks
     for (int i = 1; i < argc; i++) {
@@ -77,6 +80,8 @@ int main(int argc, char** argv) {
             return 0;
         } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
             verbose = 1;
+        } else if (strcmp(argv[i], "--expect-debug") == 0) {
+            expect_debug = 1;
         } else if (strcmp(argv[i], "--expect-stats-unavailable") == 0) {
             expect_stats_available = 0; // Expect stats to be unavailable
         } else {
@@ -95,6 +100,15 @@ int main(int argc, char** argv) {
 
     if (verbose) {
         printf("Using jemalloc version: %s\n", version);
+    }
+
+    if (expect_debug) {
+        bool debug;
+        size_t debug_size = sizeof(debug);
+        if (je_mallctl("config.debug", &debug, &debug_size, NULL, 0) != 0 || !debug) {
+            fprintf(stderr, "Error: config.debug is not true\n");
+            return 1;
+        }
     }
 
     // Perform some allocations to have something to measure
