@@ -119,6 +119,8 @@ Windows Server 2025 (x86_64) is tested with MSVC (msvc-cl), host toolchain examp
 8.x and 9.x, and with clang-cl on the latest 9.x, without the fidelity checks, whose gawk, grep and sed dev dependencies
 do not build for Windows.
 Profiling (`--config=prof-*`) is tested on Linux only.
+Debug is tested with prof-libgcc, log on and cache oblivious off, on Ubuntu 24.04 (x86_64) with the latest Bazel 9.x
+only. The host toolchain examples build a jemalloc() target with debug on every tested platform.
 
 ## Known Issues
 
