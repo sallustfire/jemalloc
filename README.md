@@ -144,11 +144,27 @@ The registry entry does not fetch the repository above. It fetches upstream's re
 - **overlay/** holds every committed file the tarball lacks: the BUILD and .bzl files, MODULE.bazel, settings/, tools/,
   examples/ and this README. The repository's own tooling, listed in `.bcr/fork_only.txt`, stays out.
 - **patches/** holds one patch for each upstream file the repository edits, the difference between the committed file
-  and the tarball's.
+  and the tarball's (except root dotfiles listed in `.bcr/fork_only.txt`, which ship as upstream's). Where a release's
+  tarball ships files the build must not see, a branch adds `.bcr/tarball_removals.txt`, and patches/ also holds
+  `tarball_removals.patch`, which deletes the files it lists. The exporter generates it from the tarball's own bytes,
+  and each listed file must be one the repository does not commit.
+
+The registry serves every tarball file the entry does not delete, so each one must be accounted for: committed by the
+repository, listed for removal, or listed in `.bcr/release_generated.txt` as a file upstream's release process generates
+and the repository does not commit, which ships as the tarball has it. Deleting or renaming an upstream file therefore
+takes a list entry too, or the export stops; both lists must name only tarball files the repository does not commit.
 
 `.github/scripts/export_bcr_entry.py` writes the entry into a registry checkout from a committed ref. It writes
-nothing unless the tarball, overlay and patches, applied as Bazel applies them, rebuild that ref byte for byte.
-`.bcr/presubmit.yml` becomes the entry's presubmit.
+nothing unless the tarball, overlay and patches, with the patches applied by GNU patch, rebuild the tree that ref
+defines, file for file, byte for byte and mode for mode. It builds that tree from the ref, not from the tarball: the
+ref's content for each file it ships, plus the tarball's copy of each listed release-generated file and of each root
+dotfile listed in `.bcr/fork_only.txt`. The tooling in `.bcr/fork_only.txt`, including these lists, stays out. GNU
+patch stands in for Bazel's patcher only because the exporter restricts the patches, and the files they touch, to
+what Bazel's line-based patcher reproduces exactly: plain ASCII paths, comments that cannot read as patch syntax,
+UTF-8 text without CR that ends in a newline, and deletions only of non-empty text files. A patch carries contents
+only, so the export also stops if the ref commits an upstream file as a symlink or with another executable bit. It
+stops, too, if an entry already in the registry for the same upstream release fetches a different tarball, so a
+re-rolled upstream asset cannot slip into a new `.bcr.N`. `.bcr/presubmit.yml` becomes the entry's presubmit.
 
 ## Contributing
 
