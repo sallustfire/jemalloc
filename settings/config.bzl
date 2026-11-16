@@ -46,6 +46,8 @@ def _jemalloc_transition_impl(settings, attr):
         "//settings/flags:enable_experimental_smallocx": attr.experimental_smallocx,
         "//settings/flags:enable_fill": attr.fill,
         "//settings/flags:enable_log": attr.log,
+        "//settings/flags:enable_opt_safety_checks": attr.opt_safety_checks,
+        "//settings/flags:enable_opt_size_checks": attr.opt_size_checks,
         "//settings/flags:enable_stats": attr.stats,
         "//settings/flags:enable_uaf_detection": attr.uaf_detection,
         "//settings/flags:enable_xmalloc": attr.xmalloc,
@@ -60,6 +62,9 @@ def _jemalloc_transition_impl(settings, attr):
     # String flags
     if attr.cxx != "":
         result["//settings/flags:enable_cxx"] = attr.cxx
+
+    if attr.debug != "":
+        result["//settings/flags:enable_debug"] = attr.debug
 
     if attr.jemalloc_prefix != _UNSET:
         result["//settings/flags:jemalloc_prefix"] = attr.jemalloc_prefix
@@ -81,10 +86,13 @@ _jemalloc_transition = transition(
     inputs = [
         "//settings/flags:enable_cache_oblivious",
         "//settings/flags:enable_cxx",
+        "//settings/flags:enable_debug",
         "//settings/flags:enable_experimental_smallocx",
         "//settings/flags:enable_fill",
         "//settings/flags:enable_lazy_lock",
         "//settings/flags:enable_log",
+        "//settings/flags:enable_opt_safety_checks",
+        "//settings/flags:enable_opt_size_checks",
         "//settings/flags:enable_stats",
         "//settings/flags:enable_uaf_detection",
         "//settings/flags:enable_xmalloc",
@@ -96,10 +104,13 @@ _jemalloc_transition = transition(
     outputs = [
         "//settings/flags:enable_cache_oblivious",
         "//settings/flags:enable_cxx",
+        "//settings/flags:enable_debug",
         "//settings/flags:enable_experimental_smallocx",
         "//settings/flags:enable_fill",
         "//settings/flags:enable_lazy_lock",
         "//settings/flags:enable_log",
+        "//settings/flags:enable_opt_safety_checks",
+        "//settings/flags:enable_opt_size_checks",
         "//settings/flags:enable_stats",
         "//settings/flags:enable_uaf_detection",
         "//settings/flags:enable_xmalloc",
@@ -117,6 +128,7 @@ jemalloc = rule(
     attrs = {
         "cache_oblivious": attr.string(values = ["True", "False", ""]),
         "cxx": attr.string(values = ["True", "False", "__auto__", ""]),
+        "debug": attr.string(values = ["yes", "no", "__auto__", ""]),
         "experimental_smallocx": attr.string(values = ["True", "False", ""]),
         "fill": attr.string(values = ["True", "False", ""]),
         "jemalloc_prefix": attr.string(
@@ -126,6 +138,8 @@ jemalloc = rule(
         "lazy_lock": attr.string(values = ["yes", "no", "__auto__", ""]),
         "lg_quantum": attr.int(default = -1),
         "log": attr.string(values = ["True", "False", ""]),
+        "opt_safety_checks": attr.string(values = ["True", "False", ""]),
+        "opt_size_checks": attr.string(values = ["True", "False", ""]),
         "stats": attr.string(values = ["True", "False", ""]),
         "uaf_detection": attr.string(values = ["True", "False", ""]),
         "without_export": attr.string(values = ["True", "False", ""]),
