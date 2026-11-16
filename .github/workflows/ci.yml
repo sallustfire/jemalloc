@@ -223,6 +223,22 @@ jobs:
           # shellcheck disable=SC2086
           .github/scripts/upstream_oracle.sh "${RUNNER_TEMP}/upstream.tar.bz2" ${CONFIGURE_ARGS} -- --config=bazel8 ${BAZEL_ARGS}
 
+  bcr-exporter:
+    name: BCR entry exporter
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Export the registry entry
+        run: |
+          # The release export, run on every change against upstream's real tarball. It writes nothing unless every
+          # tarball file is accounted for and the entry rebuilds the tree this commit defines, so a change the entry
+          # cannot carry, or a stale .bcr/ list, fails here rather than at release. The stub registry holds no earlier
+          # entries, so the check that they fetch the same tarball has nothing to compare.
+          registry="${RUNNER_TEMP}/registry"
+          mkdir -p "${registry}/modules/jemalloc"
+          echo '{"versions": []}' > "${registry}/modules/jemalloc/metadata.json"
+          python3 .github/scripts/export_bcr_entry.py --registry "${registry}"
+
   examples-host-toolchain:
     name: Examples (host toolchain, ${{ matrix.os }}, Bazel ${{ matrix.bazel_version }})
     runs-on: ${{ matrix.os }}

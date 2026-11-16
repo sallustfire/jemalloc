@@ -1,0 +1,6 @@
+# Files upstream's release process generates into its tarball and the fork does not commit. The entry ships them as the
+# tarball has them. One sorted path per line.
+
+configure
+doc/jemalloc.3
+doc/jemalloc.html
