@@ -87,20 +87,6 @@ UNIT_TESTS = [
         "src": "inspect.c",
         "prof_conf": "prof:false",
     },
-    {
-        "src": "junk.c",
-        "conf": "abort:false,zero:false,junk:true",
-    },
-    {
-        "src": "junk_alloc.c",
-        "deps": [":junk_c"],
-        "conf": "abort:false,zero:false,junk:alloc",
-    },
-    {
-        "src": "junk_free.c",
-        "deps": [":junk_c"],
-        "conf": "abort:false,zero:false,junk:free",
-    },
     {"src": "log.c"},
     {"src": "mallctl.c"},
     {
@@ -218,10 +204,6 @@ UNIT_TESTS = [
     {"src": "uaf.c"},
     {"src": "witness.c"},
     {
-        "src": "zero.c",
-        "conf": "abort:false,junk:false,zero:true",
-    },
-    {
         "src": "zero_realloc_abort.c",
         "conf": "zero_realloc:abort",
     },
@@ -246,7 +228,6 @@ with_settings(
     settings = {
         "//settings:enable_jet": "True",
         "//settings:with_test": "unit",
-        "//settings/flags:enable_fill": "True",
         # This needs to be pinned for testing. The MALLOC_CONF ENV depends on it. The make build allows for it to be
         # set dynamically via templating and generates a test harness around it. By requiring a value that cannot be
         # set internally by accident, this exercises the same functionality.
@@ -316,4 +297,58 @@ cc_test(
         ":batch_alloc_c",
         ":testlib",
     ],
+)
+
+cc_test(
+    name = "junk",
+    src = "junk.c",
+    env = select({
+        "//settings/flags:fill": {"JE_TEST_MALLOC_CONF": "abort:false,zero:false,junk:true"},
+        "//conditions:default": {"JE_TEST_MALLOC_CONF": ""},
+    }),
+    linkstatic = True,
+    local_defines = ["JEMALLOC_UNIT_TEST"],
+    deps = [":testlib"],
+)
+
+cc_test(
+    name = "junk_alloc",
+    src = "junk_alloc.c",
+    env = select({
+        "//settings/flags:fill": {"JE_TEST_MALLOC_CONF": "abort:false,zero:false,junk:alloc"},
+        "//conditions:default": {"JE_TEST_MALLOC_CONF": ""},
+    }),
+    linkstatic = True,
+    local_defines = ["JEMALLOC_UNIT_TEST"],
+    deps = [
+        ":junk_c",
+        ":testlib",
+    ],
+)
+
+cc_test(
+    name = "junk_free",
+    src = "junk_free.c",
+    env = select({
+        "//settings/flags:fill": {"JE_TEST_MALLOC_CONF": "abort:false,zero:false,junk:free"},
+        "//conditions:default": {"JE_TEST_MALLOC_CONF": ""},
+    }),
+    linkstatic = True,
+    local_defines = ["JEMALLOC_UNIT_TEST"],
+    deps = [
+        ":junk_c",
+        ":testlib",
+    ],
+)
+
+cc_test(
+    name = "zero",
+    src = "zero.c",
+    env = select({
+        "//settings/flags:fill": {"JE_TEST_MALLOC_CONF": "abort:false,junk:false,zero:true"},
+        "//conditions:default": {"JE_TEST_MALLOC_CONF": ""},
+    }),
+    linkstatic = True,
+    local_defines = ["JEMALLOC_UNIT_TEST"],
+    deps = [":testlib"],
 )
