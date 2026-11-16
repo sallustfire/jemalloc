@@ -2,8 +2,14 @@
 #
 # The release tarball was packed from a tree configure had run in. Its configured headers and public_symbols.txt go,
 # since an unsandboxed compile finds them ahead of the ones the build generates; the rest of that configured tree is in
-# release_generated.txt.
+# release_generated.txt. Upstream's GitHub workflows go because the fork deleted them.
 
+.github/workflows/check_formatting.yaml
+.github/workflows/freebsd-ci.yml
+.github/workflows/linux-ci.yml
+.github/workflows/macos-ci.yml
+.github/workflows/static_analysis.yaml
+.github/workflows/windows-ci.yml
 include/jemalloc/internal/jemalloc_internal_defs.h
 include/jemalloc/internal/jemalloc_preamble.h
 include/jemalloc/internal/public_namespace.h
