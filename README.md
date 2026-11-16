@@ -131,8 +131,8 @@ Settings whose "__auto__" default jemalloc resolves for the target platform:
 - //settings/platform:lg_page
 - //settings/platform:lg_vaddr
 
-The optional public functions (memalign, valloc, malloc_size) are exported exactly where configure would export them:
-where the target's toolchain links them, as the configured headers record.
+The optional public functions (memalign, valloc, pvalloc, malloc_size) are exported exactly where configure would export
+them: where the target's toolchain links them, as the configured headers record.
 
 ## Fidelity with upstream
 
