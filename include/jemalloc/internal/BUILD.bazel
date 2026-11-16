@@ -803,12 +803,8 @@ autoconf(
         ]
         for os in [
             "@platforms//os:android",
-            "@platforms//os:ios",
+            "//settings/platform:darwin",
             "@platforms//os:linux",
-            "@platforms//os:macos",
-            "@platforms//os:tvos",
-            "@platforms//os:visionos",
-            "@platforms//os:watchos",
             "@platforms//os:windows",
         ]
     } | {
