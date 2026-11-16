@@ -257,6 +257,7 @@ _EXPERIMENTAL_SDT_CUSTOM_PLATFORMS = [
     ("linux", "armv7e-mf"),
     ("linux", "armv7k"),
     ("linux", "armv8-m"),
+    ("linux", "cortex-r52"),
     ("linux", "x86_64"),
 ]
 
