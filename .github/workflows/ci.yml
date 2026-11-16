@@ -158,20 +158,19 @@ jobs:
             configure_args: --with-jemalloc-prefix=je_
             bazel_args: --//settings/flags:jemalloc_prefix=je_
           # Every configure option this build mirrors as a flag, each away from its default, so that each flag is
-          # checked against the macro configure writes for it. Left out: --with-jemalloc-prefix, which the prefix
-          # entries cover; --enable-prof-libunwind, which needs libunwind; --enable-prof-frameptr, since a profiling
-          # backend takes one value and upstream removes the option in 5.4.0; and --disable-zone-allocator, which is
-          # Darwin's.
+          # checked against the macro configure writes for it. Left out: --disable-cxx, which forces
+          # --enable-cxx-infallible-new off; --with-jemalloc-prefix, which the prefix entries cover;
+          # --enable-prof-libunwind, which needs libunwind; and --disable-zone-allocator, which is Darwin's.
           - name: options
             os: ubuntu-24.04
             configure_args: >-
-              --disable-cxx
               --enable-debug
               --enable-opt-safety-checks
               --enable-opt-size-checks
               --disable-stats
               --disable-user-config
               --enable-experimental-smallocx
+              --enable-experimental-fiber-safe-tls
               --enable-prof
               --disable-dss
               --disable-fill
@@ -183,19 +182,20 @@ jobs:
               --enable-uaf-detection
               --enable-lazy-lock
               --enable-pageid
+              --enable-cxx-infallible-new
               --with-private-namespace=ci_
               --with-malloc-conf=background_thread:true
               --with-lg-quantum=4
               --with-experimental-sys-process-madvise=440
               --without-export
             bazel_args: >-
-              --//settings/flags:enable_cxx=False
               --//settings/flags:enable_debug=yes
               --//settings/flags:enable_opt_safety_checks=True
               --//settings/flags:enable_opt_size_checks=True
               --//settings/flags:enable_stats=False
               --//settings/flags:enable_user_config=False
               --//settings/flags:enable_experimental_smallocx=True
+              --//settings/flags:enable_experimental_fiber_safe_tls=True
               --//settings/flags:enable_prof=libgcc
               --//settings/flags:enable_dss=False
               --//settings/flags:enable_fill=False
@@ -207,6 +207,7 @@ jobs:
               --//settings/flags:enable_uaf_detection=True
               --//settings/flags:enable_lazy_lock=yes
               --//settings/flags:enable_pageid=True
+              --//settings/flags:enable_cxx_infallible_new=True
               --//settings/flags:private_namespace=ci_
               --//settings/flags:malloc_conf=background_thread:true
               --//settings/flags:lg_quantum=4
