@@ -114,6 +114,28 @@ unsupported(
     tags = ["manual"],
 )
 
+# JEMALLOC_INFALLIBLE_NEW (--enable-cxx-infallible-new): the throwing operator new aborts on OOM instead of throwing
+# std::bad_alloc. configure forces it off without C++, so it takes effect only where :cxx holds.
+bool_flag(
+    name = "enable_cxx_infallible_new",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+    scope = "target",
+)
+
+config_setting(
+    name = "enable_cxx_infallible_new_is_true",
+    flag_values = {":enable_cxx_infallible_new": "True"},
+)
+
+selects.config_setting_group(
+    name = "cxx_infallible_new",
+    match_all = [
+        ":cxx",
+        ":enable_cxx_infallible_new_is_true",
+    ],
+)
+
 # JEMALLOC_DEBUG (--enable-debug). "__auto__" follows the compilation mode, defining it in -c dbg builds only;
 # "yes" and "no" set it in any compilation mode. configure's --enable-debug also drops the -O3 (-O2, -O) it otherwise
 # adds (configure.ac:1393-1405); here the compilation mode owns optimization, so that is not mirrored.

@@ -105,6 +105,12 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
 - **//settings/flags:enable_pageid (--enable-pageid):** Off by default. On, jemalloc names its anonymous mappings
  (jemalloc_pg, or jemalloc_pg_overcommit) in /proc/<pid>/maps, where the target has prctl; Linux 5.17 or later with
  CONFIG_ANON_VMA_NAME applies the names, and other kernels ignore them. jemalloc()'s pageid sets it per target.
+- **//settings/flags:enable_cxx_infallible_new (--enable-cxx-infallible-new):** Off by default. On, the throwing
+ operator new aborts with the requested size logged when an allocation fails, instead of calling the new handler and
+ throwing std::bad_alloc, which with LTO lets the compiler drop exception cleanup in its callers; the nothrow forms still
+ return null. As with configure, it takes effect only with //settings/flags:enable_cxx. jemalloc/jemalloc.h always
+ defines JEMALLOC_INFALLIBLE_NEW, to 1 when it is on and to 0 otherwise. jemalloc()'s cxx_infallible_new sets it per
+ target.
 - **//settings/flags:enable_force_getenv (--enable-force-getenv):** Off by default, so jemalloc reads MALLOC_CONF with
  secure_getenv, or ignores it in a setuid or setgid process where only issetugid is available. On, it always reads it
  with getenv, including in privileged processes. jemalloc()'s force_getenv sets it per target.

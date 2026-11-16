@@ -43,6 +43,7 @@ def _jemalloc_transition_impl(settings, attr):
     # Boolean flags
     bool_flags = {
         "//settings/flags:enable_cache_oblivious": attr.cache_oblivious,
+        "//settings/flags:enable_cxx_infallible_new": attr.cxx_infallible_new,
         "//settings/flags:enable_dss": attr.dss,
         "//settings/flags:enable_experimental_sdt": attr.experimental_sdt,
         "//settings/flags:enable_experimental_smallocx": attr.experimental_smallocx,
@@ -91,6 +92,7 @@ _jemalloc_transition = transition(
     inputs = [
         "//settings/flags:enable_cache_oblivious",
         "//settings/flags:enable_cxx",
+        "//settings/flags:enable_cxx_infallible_new",
         "//settings/flags:enable_debug",
         "//settings/flags:enable_dss",
         "//settings/flags:enable_experimental_sdt",
@@ -114,6 +116,7 @@ _jemalloc_transition = transition(
     outputs = [
         "//settings/flags:enable_cache_oblivious",
         "//settings/flags:enable_cxx",
+        "//settings/flags:enable_cxx_infallible_new",
         "//settings/flags:enable_debug",
         "//settings/flags:enable_dss",
         "//settings/flags:enable_experimental_sdt",
@@ -143,6 +146,7 @@ jemalloc = rule(
     attrs = {
         "cache_oblivious": attr.string(values = ["True", "False", ""]),
         "cxx": attr.string(values = ["True", "False", "__auto__", ""]),
+        "cxx_infallible_new": attr.string(values = ["True", "False", ""]),
         "debug": attr.string(values = ["yes", "no", "__auto__", ""]),
         "dss": attr.string(values = ["True", "False", ""]),
         "experimental_sdt": attr.string(values = ["True", "False", ""]),
