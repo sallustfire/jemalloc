@@ -1779,11 +1779,8 @@ autoconf(
 )
 
 # configure.ac adds -Werror only around these probes (JE_CFLAGS_SAVE/JE_CFLAGS_RESTORE), so a construct the compiler
-# merely warns about counts as unsupported. Each check carries the flag in its own copts: rules_cc_autoconf strips
-# -Werror from the target's copts. configure adds it through JE_CFLAGS_ADD, which keeps a flag only if the compiler
-# accepts it, and cl rejects it (D8021, an invalid /W level), so under configure cl's probes run without it. Only the
-# strerror_r header probe must pass with cl, so only it leaves the flag off there; the others probe constructs cl lacks
-# and fail with or without it.
+# merely warns about counts as unsupported. It adds the flag through JE_CFLAGS_ADD, which keeps a flag only if the
+# compiler accepts it, and cl rejects -Werror, so msvc-cl gets no flag.
 autoconf(
     name = "jemalloc_internal_defs_warnings_as_errors_checks",
     cc_deps = HOST_CC_DEPS + HOST_LIBS,
@@ -1798,7 +1795,6 @@ autoconf(
                     "               foo = 0;",
                 ],
             ),
-            copts = ["-Werror"],
         ),
         checks.AC_DEFINE_UNQUOTED(
             "JEMALLOC_TLS_MODEL",
@@ -1815,7 +1811,6 @@ autoconf(
                 ],
                 "\tsyscall(SYS_write, 2, \"hello\", 5);",
             ),
-            copts = ["-Werror"],
         ),
         checks.AC_DEFINE_UNQUOTED(
             "JEMALLOC_USE_SYSCALL",
@@ -1836,50 +1831,24 @@ autoconf(
                     "  printf(\"%s\\n\", error);",
                 ],
             ),
-            copts = [
-                "-D_GNU_SOURCE",
-                "-Werror",
-            ],
+            copts = ["-D_GNU_SOURCE"],
         ),
-    ] + select({
         # Where strerror_r does not return char *, configure.ac links the headers alone and stops if even that fails,
         # rather than assume the XSI strerror_r.
-        "@rules_cc//cc/compiler:msvc-cl": [
-            checks.AC_TRY_LINK(
-                name = "je_cv_strerror_r_header_pass",
-                code = utils.AC_LANG_PROGRAM(
-                    [
-                        "#include <errno.h>",
-                        "#include <stdio.h>",
-                        "#include <stdlib.h>",
-                        "#include <string.h>",
-                    ],
-                    "",
-                ),
-                copts = ["-D_GNU_SOURCE"],
-                requires = ["!je_cv_strerror_r_returns_char_with_gnu_source"],
-            ),
-        ],
-        "//conditions:default": [
-            checks.AC_TRY_LINK(
-                name = "je_cv_strerror_r_header_pass",
-                code = utils.AC_LANG_PROGRAM(
-                    [
-                        "#include <errno.h>",
-                        "#include <stdio.h>",
-                        "#include <stdlib.h>",
-                        "#include <string.h>",
-                    ],
-                    "",
-                ),
-                copts = [
-                    "-D_GNU_SOURCE",
-                    "-Werror",
+        checks.AC_TRY_LINK(
+            name = "je_cv_strerror_r_header_pass",
+            code = utils.AC_LANG_PROGRAM(
+                [
+                    "#include <errno.h>",
+                    "#include <stdio.h>",
+                    "#include <stdlib.h>",
+                    "#include <string.h>",
                 ],
-                requires = ["!je_cv_strerror_r_returns_char_with_gnu_source"],
+                "",
             ),
-        ],
-    }) + [
+            copts = ["-D_GNU_SOURCE"],
+            requires = ["!je_cv_strerror_r_returns_char_with_gnu_source"],
+        ),
         checks.AC_TRY_COMPILE(
             name = "strerror_r_return_type_known",
             code = utils.AC_LANG_PROGRAM("", ""),
@@ -1892,7 +1861,10 @@ autoconf(
         ),
     ],
     conlyopts = CONLYOPTS,
-    copts = HOST_CPPFLAGS,
+    copts = select({
+        "@rules_cc//cc/compiler:msvc-cl": [],
+        "//conditions:default": ["-Werror"],
+    }) + HOST_CPPFLAGS,
     features = C_FEATURES,
     tags = ["manual"],
 )

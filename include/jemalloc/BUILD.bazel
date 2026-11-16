@@ -217,8 +217,8 @@ autoconf(
 )
 
 # configure.ac adds -Werror only around these probes (JE_CFLAGS_SAVE/JE_CFLAGS_RESTORE), so a construct the compiler
-# merely warns about counts as unsupported. Each check carries the flag in its own copts: rules_cc_autoconf strips
-# -Werror from the target's copts. cl ignores -Werror with a warning, as it does under configure.
+# merely warns about counts as unsupported. It adds the flag through JE_CFLAGS_ADD, which keeps a flag only if the
+# compiler accepts it, and cl rejects -Werror, so msvc-cl gets no flag.
 autoconf(
     name = "jemalloc_defs_warnings_as_errors_checks",
     cc_deps = HOST_CC_DEPS,
@@ -226,7 +226,6 @@ autoconf(
         checks.AC_TRY_LINK(
             name = "je_cv_alloc_size",
             code = utils.AC_LANG_PROGRAM("#include <stdlib.h>", "void *foo(size_t size) __attribute__((alloc_size(1)));"),
-            copts = ["-Werror"],
         ),
         checks.AC_DEFINE_UNQUOTED(
             "JEMALLOC_HAVE_ATTR_ALLOC_SIZE",
@@ -235,7 +234,6 @@ autoconf(
         checks.AC_TRY_LINK(
             name = "je_cv_format_gnu_printf",
             code = utils.AC_LANG_PROGRAM("#include <stdlib.h>", "void *foo(const char *format, ...) __attribute__((format(gnu_printf, 1, 2)));"),
-            copts = ["-Werror"],
         ),
         checks.AC_DEFINE_UNQUOTED(
             "JEMALLOC_HAVE_ATTR_FORMAT_GNU_PRINTF",
@@ -244,7 +242,6 @@ autoconf(
         checks.AC_TRY_LINK(
             name = "je_cv_format_printf",
             code = utils.AC_LANG_PROGRAM("#include <stdlib.h>", "void *foo(const char *format, ...) __attribute__((format(printf, 1, 2)));"),
-            copts = ["-Werror"],
         ),
         checks.AC_DEFINE_UNQUOTED(
             "JEMALLOC_HAVE_ATTR_FORMAT_PRINTF",
@@ -253,7 +250,6 @@ autoconf(
         checks.AC_TRY_LINK(
             name = "je_cv_format_arg",
             code = utils.AC_LANG_PROGRAM("#include <stdlib.h>", "const char * __attribute__((__format_arg__(1))) foo(const char *format);"),
-            copts = ["-Werror"],
         ),
         checks.AC_DEFINE_UNQUOTED(
             "JEMALLOC_HAVE_ATTR_FORMAT_ARG",
@@ -262,7 +258,6 @@ autoconf(
         checks.AC_TRY_LINK(
             name = "je_cv_cold",
             code = utils.AC_LANG_PROGRAM("", "__attribute__((__cold__)) void foo();"),
-            copts = ["-Werror"],
         ),
         checks.AC_DEFINE_UNQUOTED(
             "JEMALLOC_HAVE_ATTR_COLD",
@@ -270,7 +265,10 @@ autoconf(
         ),
     ],
     conlyopts = CONLYOPTS,
-    copts = HOST_CPPFLAGS,
+    copts = select({
+        "@rules_cc//cc/compiler:msvc-cl": [],
+        "//conditions:default": ["-Werror"],
+    }) + HOST_CPPFLAGS,
     features = C_FEATURES,
     tags = ["manual"],
 )
