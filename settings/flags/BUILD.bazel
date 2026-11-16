@@ -116,7 +116,7 @@ unsupported(
 
 # JEMALLOC_DEBUG (--enable-debug). "__auto__" follows the compilation mode, defining it in -c dbg builds only;
 # "yes" and "no" set it in any compilation mode. configure's --enable-debug also drops the -O3 (-O2, -O) it otherwise
-# adds (configure.ac:1228-1240); here the compilation mode owns optimization, so that is not mirrored.
+# adds (configure.ac:1393-1405); here the compilation mode owns optimization, so that is not mirrored.
 string_flag(
     name = "enable_debug",
     build_setting_default = "__auto__",
