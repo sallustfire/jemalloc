@@ -43,6 +43,7 @@ def _jemalloc_transition_impl(settings, attr):
     # Boolean flags
     bool_flags = {
         "//settings/flags:enable_cache_oblivious": attr.cache_oblivious,
+        "//settings/flags:enable_cxx": attr.cxx,
         "//settings/flags:enable_cxx_infallible_new": attr.cxx_infallible_new,
         "//settings/flags:enable_dss": attr.dss,
         "//settings/flags:enable_experimental_fiber_safe_tls": attr.experimental_fiber_safe_tls,
@@ -67,9 +68,6 @@ def _jemalloc_transition_impl(settings, attr):
             result[flag] = False
 
     # String flags
-    if attr.cxx != "":
-        result["//settings/flags:enable_cxx"] = attr.cxx
-
     if attr.debug != "":
         result["//settings/flags:enable_debug"] = attr.debug
 
@@ -148,7 +146,7 @@ jemalloc = rule(
     implementation = _jemalloc_config_impl,
     attrs = {
         "cache_oblivious": attr.string(values = ["True", "False", ""]),
-        "cxx": attr.string(values = ["True", "False", "__auto__", ""]),
+        "cxx": attr.string(values = ["True", "False", ""]),
         "cxx_infallible_new": attr.string(values = ["True", "False", ""]),
         "debug": attr.string(values = ["yes", "no", "__auto__", ""]),
         "dss": attr.string(values = ["True", "False", ""]),
