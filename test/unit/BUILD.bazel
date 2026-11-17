@@ -1,3 +1,4 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@package_metadata//licenses/rules:license.bzl", "license")
 load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
@@ -88,7 +89,6 @@ UNIT_TESTS = [
     {"src": "counter.c"},
     {"src": "decay.c"},
     {"src": "div.c"},
-    {"src": "double_free.c"},
     {"src": "edata_cache.c"},
     {"src": "emitter.c"},
     {"src": "extent_quantize.c"},
@@ -390,6 +390,28 @@ cc_test(
         ":batch_alloc_c",
         ":testlib",
     ],
+)
+
+# Debug catches the double free only on the slow free path, which a debug build takes because fill turns junk on.
+# Without fill, free_fastpath caches the second free unchecked. Upstream's CI never builds debug without fill.
+selects.config_setting_group(
+    name = "debug_without_fill",
+    match_all = [
+        "//settings/flags:debug",
+        "//settings/flags:fill_disabled",
+    ],
+)
+
+cc_test(
+    name = "double_free",
+    src = "double_free.c",
+    linkstatic = True,
+    local_defines = ["JEMALLOC_UNIT_TEST"],
+    target_compatible_with = select({
+        ":debug_without_fill": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [":testlib"],
 )
 
 cc_test(
