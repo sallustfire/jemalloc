@@ -127,7 +127,8 @@ cc_test(
 
 # Case 11: Where the C library has pvalloc, plain pvalloc reaches jemalloc too, so free can release its memory. Only
 # an empty prefix makes jemalloc's pvalloc the plain one, so the test builds jemalloc without a prefix rather than under
-# whatever prefix the build is configured with.
+# whatever prefix the build is configured with. It runs on Linux, where glibc has pvalloc and the test fails without
+# the override; on a C library without pvalloc, such as musl, it passes without checking anything.
 jemalloc(
     name = "jemalloc_unprefixed",
     jemalloc_prefix = "",
@@ -138,7 +139,7 @@ cc_test(
     size = "small",
     srcs = ["test_pvalloc.c"],
     malloc = ":jemalloc_unprefixed",
-    target_compatible_with = _MALLOC_REPLACED,
+    target_compatible_with = ["@platforms//os:linux"],
 )
 
 # Case 12: A shared jemalloc is a cc_shared_library of @jemalloc, here under upstream's file names. A binary that links
