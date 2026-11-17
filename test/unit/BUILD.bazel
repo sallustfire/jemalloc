@@ -231,12 +231,19 @@ UNIT_CONF_TESTS = [
     },
 ]
 
+# jemalloc reads MALLOC_CONF only with //settings/flags:enable_user_config (JEMALLOC_CONFIG_ENV, src/conf.c), so a test
+# with a MALLOC_CONF is incompatible without it rather than run without its conf. Upstream's test scripts export it
+# regardless.
 [cc_test(
     name = test_name(test),
     src = test["src"],
     env = {"JE_TEST_MALLOC_CONF": test["conf"]},
     linkstatic = True,
     local_defines = ["JEMALLOC_UNIT_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [":testlib"],
 ) for test in UNIT_CONF_TESTS]
 
@@ -321,6 +328,11 @@ UNIT_PROF_CONF_TESTS = [
     }),
     linkstatic = True,
     local_defines = ["JEMALLOC_UNIT_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:no_prof": [],
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [":testlib"],
 ) for test in UNIT_PROF_CONF_TESTS]
 
@@ -335,6 +347,10 @@ cc_test(
     }),
     linkstatic = True,
     local_defines = ["JEMALLOC_UNIT_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [":testlib"],
 )
 
@@ -346,6 +362,9 @@ cc_test(
     local_defines = ["JEMALLOC_UNIT_TEST"],
     target_compatible_with = select({
         "//settings/flags:prof": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
@@ -363,6 +382,9 @@ cc_test(
     target_compatible_with = select({
         "//settings/flags:prof": [],
         "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
         ":batch_alloc_c",
@@ -379,6 +401,11 @@ cc_test(
     }),
     linkstatic = True,
     local_defines = ["JEMALLOC_UNIT_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:fill_disabled": [],
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [":testlib"],
 )
 
@@ -391,6 +418,11 @@ cc_test(
     }),
     linkstatic = True,
     local_defines = ["JEMALLOC_UNIT_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:fill_disabled": [],
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [
         ":junk_c",
         ":testlib",
@@ -406,6 +438,11 @@ cc_test(
     }),
     linkstatic = True,
     local_defines = ["JEMALLOC_UNIT_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:fill_disabled": [],
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [
         ":junk_c",
         ":testlib",
@@ -421,5 +458,10 @@ cc_test(
     }),
     linkstatic = True,
     local_defines = ["JEMALLOC_UNIT_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:fill_disabled": [],
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [":testlib"],
 )

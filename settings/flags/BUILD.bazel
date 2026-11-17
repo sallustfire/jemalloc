@@ -201,6 +201,11 @@ config_setting(
     flag_values = {":enable_fill": "True"},
 )
 
+config_setting(
+    name = "fill_disabled",
+    flag_values = {":enable_fill": "False"},
+)
+
 # JEMALLOC_FORCE_GETENV (--enable-force-getenv): read MALLOC_CONF with getenv rather than secure_getenv
 bool_flag(
     name = "enable_force_getenv",

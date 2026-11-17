@@ -4,6 +4,10 @@ load("//tools:transition.bzl", "with_settings")
 # Makefile.in runs each integration test (TESTS_INTEGRATION and TESTS_INTEGRATION_CPP) once per test.sh line of
 # check_integration, check_integration_decay and check_integration_prof, with that line's MALLOC_CONF joined after the
 # one the test's .sh exports (test/test.sh.in's export_malloc_conf). Each such line has a block of targets below.
+#
+# jemalloc reads MALLOC_CONF only with //settings/flags:enable_user_config (JEMALLOC_CONFIG_ENV, src/conf.c), so a test
+# with a MALLOC_CONF is incompatible without it rather than run without its conf. Upstream's test scripts export it
+# regardless.
 
 TESTLIB_SETTINGS = {
     "//settings:with_test": "integration",
@@ -65,6 +69,10 @@ INTEGRATION_CONF_TESTS = [
     src = test["src"],
     env = {"JE_TEST_MALLOC_CONF": test["conf"]},
     local_defines = ["JEMALLOC_INTEGRATION_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [":testlib"],
 ) for test in INTEGRATION_CONF_TESTS]
 
@@ -84,6 +92,11 @@ INTEGRATION_FILL_TESTS = [
         "//conditions:default": {"JE_TEST_MALLOC_CONF": ""},
     }),
     local_defines = ["JEMALLOC_INTEGRATION_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:fill_disabled": [],
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [":testlib"],
 ) for test in INTEGRATION_FILL_TESTS]
 
@@ -97,6 +110,10 @@ cc_test(
     local_defines = ["JEMALLOC_INTEGRATION_TEST"],
     target_compatible_with = select({
         "//settings/flags:experimental_smallocx_api": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:fill_disabled": [],
+        "//settings/flags:user_config": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib"],
@@ -139,6 +156,9 @@ INTEGRATION_CPP_CONF_TESTS = [
     target_compatible_with = select({
         "//settings/flags:cxx": [],
         "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib_cpp"],
 ) for test in INTEGRATION_CPP_CONF_TESTS]
@@ -152,6 +172,10 @@ INTEGRATION_CPP_CONF_TESTS = [
         "dirty_decay_ms:-1,muzzy_decay_ms:-1",
     )},
     local_defines = ["JEMALLOC_INTEGRATION_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [":testlib"],
 ) for test in INTEGRATION_TESTS + INTEGRATION_CONF_TESTS]
 
@@ -163,6 +187,10 @@ INTEGRATION_CPP_CONF_TESTS = [
         "//conditions:default": {"JE_TEST_MALLOC_CONF": "dirty_decay_ms:-1,muzzy_decay_ms:-1"},
     }),
     local_defines = ["JEMALLOC_INTEGRATION_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [":testlib"],
 ) for test in INTEGRATION_FILL_TESTS]
 
@@ -177,6 +205,9 @@ cc_test(
     target_compatible_with = select({
         "//settings/flags:experimental_smallocx_api": [],
         "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib"],
 )
@@ -192,6 +223,9 @@ cc_test(
     target_compatible_with = select({
         "//settings/flags:cxx": [],
         "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib_cpp"],
 ) for test in INTEGRATION_CPP_TESTS + INTEGRATION_CPP_CONF_TESTS]
@@ -205,6 +239,10 @@ cc_test(
         "dirty_decay_ms:0,muzzy_decay_ms:0",
     )},
     local_defines = ["JEMALLOC_INTEGRATION_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [":testlib"],
 ) for test in INTEGRATION_TESTS + INTEGRATION_CONF_TESTS]
 
@@ -216,6 +254,10 @@ cc_test(
         "//conditions:default": {"JE_TEST_MALLOC_CONF": "dirty_decay_ms:0,muzzy_decay_ms:0"},
     }),
     local_defines = ["JEMALLOC_INTEGRATION_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [":testlib"],
 ) for test in INTEGRATION_FILL_TESTS]
 
@@ -229,6 +271,9 @@ cc_test(
     local_defines = ["JEMALLOC_INTEGRATION_TEST"],
     target_compatible_with = select({
         "//settings/flags:experimental_smallocx_api": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib"],
@@ -244,6 +289,9 @@ cc_test(
     local_defines = ["JEMALLOC_INTEGRATION_CPP_TEST"],
     target_compatible_with = select({
         "//settings/flags:cxx": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib_cpp"],
@@ -261,6 +309,9 @@ cc_test(
     target_compatible_with = select({
         "//settings/flags:prof": [],
         "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib"],
 ) for test in INTEGRATION_TESTS + INTEGRATION_CONF_TESTS]
@@ -275,6 +326,9 @@ cc_test(
     local_defines = ["JEMALLOC_INTEGRATION_TEST"],
     target_compatible_with = select({
         "//settings/flags:prof": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib"],
@@ -294,6 +348,9 @@ cc_test(
     }) + select({
         "//settings/flags:prof": [],
         "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib"],
 )
@@ -312,6 +369,9 @@ cc_test(
     }) + select({
         "//settings/flags:prof": [],
         "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib_cpp"],
 ) for test in INTEGRATION_CPP_TESTS + INTEGRATION_CPP_CONF_TESTS]
@@ -328,6 +388,9 @@ cc_test(
     target_compatible_with = select({
         "//settings/flags:prof": [],
         "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib"],
 ) for test in INTEGRATION_TESTS + INTEGRATION_CONF_TESTS]
@@ -342,6 +405,9 @@ cc_test(
     local_defines = ["JEMALLOC_INTEGRATION_TEST"],
     target_compatible_with = select({
         "//settings/flags:prof": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib"],
@@ -361,6 +427,9 @@ cc_test(
     }) + select({
         "//settings/flags:prof": [],
         "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
+        "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib"],
 )
@@ -378,6 +447,9 @@ cc_test(
         "//conditions:default": ["@platforms//:incompatible"],
     }) + select({
         "//settings/flags:prof": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "//settings/flags:user_config": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [":testlib_cpp"],
