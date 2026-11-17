@@ -11,9 +11,10 @@ CONLYOPTS = select({
 })
 
 # The toolchain features that go with CONLYOPTS. From rules_cc 0.2.19, the toolchain for cl and clang-cl enables
-# default_c_std, which compiles C as /std:c17, and cl has no option that returns to its default. Under it jemalloc 5.3.0
-# declares variable-length arrays, which cl lacks, as its VARIABLE_ARRAY tests __STDC_VERSION__ alone
-# (include/jemalloc/internal/jemalloc_internal_types.h:125). A toolchain without the feature ignores its removal.
+# default_c_std, which compiles C as /std:c17, and cl has no option that returns to its default. The C standard is a
+# property of jemalloc's sources, not of the toolchain, and one the toolchain picks changes what they mean: under
+# /std:c17, jemalloc 5.3.0 declared variable-length arrays, which cl lacks. So the feature is removed. A toolchain
+# without it ignores its removal.
 C_FEATURES = ["-default_c_std"]
 
 CXXOPTS = select({
