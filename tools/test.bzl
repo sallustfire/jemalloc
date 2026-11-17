@@ -42,7 +42,7 @@ def test_name(data, suffix = None):
 def cc_test(name, src, **kwargs):
     """rules_cc's cc_test with the flags every jemalloc test program compiles with.
 
-    Each of upstream's test programs is built from one source file (Makefile.in:526, 530, 534); code a test shares with
+    Each of upstream's test programs is built from one source file (Makefile.in:560, 564, 568); code a test shares with
     another comes in through deps.
 
     Args:
@@ -56,13 +56,15 @@ def cc_test(name, src, **kwargs):
         conlyopts = CONLYOPTS,
         features = C_FEATURES,
         # The test library compiles with COPTS alone. The test programs' expect_*() and assert_*() calls pass empty
-        # messages, which -Wformat-zero-length flags (configure.ac:255).
+        # messages, which -Wformat-zero-length flags (configure.ac:281). Makefile.in compiles them with -fno-builtin
+        # ($(TESTS_OBJS): CFLAGS and $(TESTS_CPP_OBJS): CPPFLAGS), so the compiler cannot fold or elide the allocation
+        # calls a test makes to observe them; cl has no equivalent, and clang-cl takes it through /clang:.
         copts = COPTS + select({
-            "@rules_cc//cc/compiler:clang": ["-Wno-format-zero-length"],
-            "@rules_cc//cc/compiler:clang-cl": ["-Wno-format-zero-length"],
-            "@rules_cc//cc/compiler:emscripten": ["-Wno-format-zero-length"],
-            "@rules_cc//cc/compiler:gcc": ["-Wno-format-zero-length"],
-            "@rules_cc//cc/compiler:mingw-gcc": ["-Wno-format-zero-length"],
+            "@rules_cc//cc/compiler:clang": ["-Wno-format-zero-length", "-fno-builtin"],
+            "@rules_cc//cc/compiler:clang-cl": ["-Wno-format-zero-length", "/clang:-fno-builtin"],
+            "@rules_cc//cc/compiler:emscripten": ["-Wno-format-zero-length", "-fno-builtin"],
+            "@rules_cc//cc/compiler:gcc": ["-Wno-format-zero-length", "-fno-builtin"],
+            "@rules_cc//cc/compiler:mingw-gcc": ["-Wno-format-zero-length", "-fno-builtin"],
             "//conditions:default": [],
         }),
         cxxopts = CXXOPTS,

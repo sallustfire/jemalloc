@@ -46,9 +46,7 @@ int main(int argc, char* argv[]) {
 
     out << "#ifndef JEMALLOC_H_\n";
     out << "#define JEMALLOC_H_\n";
-    out << "#ifdef __cplusplus\n";
-    out << "extern \"C\" {\n";
-    out << "#endif\n";
+    out << "#pragma GCC system_header\n";
     out << "\n";
 
     for (int i = 2; i < argc; ++i) {
@@ -57,9 +55,6 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    out << "#ifdef __cplusplus\n";
-    out << "}\n";
-    out << "#endif\n";
     out << "#endif /* JEMALLOC_H_ */\n";
 
     return 0;

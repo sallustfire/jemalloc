@@ -20,6 +20,20 @@ config_setting(
     flag_values = {":enable_cache_oblivious": "True"},
 )
 
+# JEMALLOC_CONFIG_ENV and JEMALLOC_CONFIG_FILE (--disable-user-config): read the malloc conf from the MALLOC_CONF
+# environment variable and the /etc/malloc.conf link
+bool_flag(
+    name = "enable_user_config",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+    scope = "target",
+)
+
+config_setting(
+    name = "user_config",
+    flag_values = {":enable_user_config": "True"},
+)
+
 # JEMALLOC_ENABLE_CXX. jemalloc 5.3 cannot build its C++ support with cl or clang-cl: jemalloc_cpp.cpp throws with
 # libstdc++'s and libc++'s std::__throw_bad_alloc, which the MSVC STL lacks, and the internal headers it includes use C
 # compound literals, which cl rejects in C++. 5.4.0 drops both constructs (jemalloc/jemalloc 1a15fe33 and 70d4102f).
@@ -102,7 +116,7 @@ unsupported(
 
 # JEMALLOC_DEBUG (--enable-debug). "__auto__" follows the compilation mode, defining it in -c dbg builds only;
 # "yes" and "no" set it in any compilation mode. configure's --enable-debug also drops the -O3 (-O2, -O) it otherwise
-# adds (configure.ac:1228-1240); here the compilation mode owns optimization, so that is not mirrored.
+# adds (configure.ac:1393-1405); here the compilation mode owns optimization, so that is not mirrored.
 string_flag(
     name = "enable_debug",
     build_setting_default = "__auto__",
@@ -134,6 +148,19 @@ selects.config_setting_group(
     ],
 )
 
+# JEMALLOC_DSS (--disable-dss): allocate from the data segment with sbrk(2) where the target has it
+bool_flag(
+    name = "enable_dss",
+    build_setting_default = True,
+    visibility = ["//visibility:public"],
+    scope = "target",
+)
+
+config_setting(
+    name = "dss",
+    flag_values = {":enable_dss": "True"},
+)
+
 # JEMALLOC_EXPERIMENTAL_SMALLOCX_API
 bool_flag(
     name = "enable_experimental_smallocx",
@@ -147,6 +174,20 @@ config_setting(
     flag_values = {":enable_experimental_smallocx": "True"},
 )
 
+# JEMALLOC_EXPERIMENTAL_USDT_STAP or JEMALLOC_EXPERIMENTAL_USDT_CUSTOM (--enable-experimental-sdt): USDT probes for
+# systemtap, bpftrace and similar tracers
+bool_flag(
+    name = "enable_experimental_sdt",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+    scope = "target",
+)
+
+config_setting(
+    name = "experimental_sdt",
+    flag_values = {":enable_experimental_sdt": "True"},
+)
+
 # JEMALLOC_FILL (support for junk/zero filling)
 bool_flag(
     name = "enable_fill",
@@ -158,6 +199,24 @@ bool_flag(
 config_setting(
     name = "fill",
     flag_values = {":enable_fill": "True"},
+)
+
+config_setting(
+    name = "fill_disabled",
+    flag_values = {":enable_fill": "False"},
+)
+
+# JEMALLOC_FORCE_GETENV (--enable-force-getenv): read MALLOC_CONF with getenv rather than secure_getenv
+bool_flag(
+    name = "enable_force_getenv",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+    scope = "target",
+)
+
+config_setting(
+    name = "force_getenv",
+    flag_values = {":enable_force_getenv": "True"},
 )
 
 # JEMALLOC_LAZY_LOCK
@@ -236,6 +295,19 @@ bool_flag(
 config_setting(
     name = "opt_size_checks",
     flag_values = {":enable_opt_size_checks": "True"},
+)
+
+# JEMALLOC_PAGEID (--enable-pageid): name jemalloc's anonymous mappings with prctl(PR_SET_VMA_ANON_NAME)
+bool_flag(
+    name = "enable_pageid",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+    scope = "target",
+)
+
+config_setting(
+    name = "pageid",
+    flag_values = {":enable_pageid": "True"},
 )
 
 # JEMALLOC_STATS
@@ -378,6 +450,20 @@ string_flag(
     scope = "target",
 )
 
+# EXPERIMENTAL_SYS_PROCESS_MADVISE_NR (--with-experimental-sys-process-madvise): the process_madvise system call number,
+# written into the header as is, for C libraries whose headers lack SYS_process_madvise. Empty for none.
+string_flag(
+    name = "experimental_sys_process_madvise",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+    scope = "target",
+)
+
+config_setting(
+    name = "no_experimental_sys_process_madvise",
+    flag_values = {":experimental_sys_process_madvise": ""},
+)
+
 # JEMALLOC_EXPORT via --without-export which disables the export of the jemalloc API
 bool_flag(
     name = "without_export",
@@ -446,6 +532,7 @@ string_flag(
     name = "enable_prof",
     build_setting_default = "no",
     values = [
+        "frame_pointer",
         "gcc",
         "libgcc",
         "libunwind",
@@ -458,6 +545,7 @@ string_flag(
 selects.config_setting_group(
     name = "prof",
     match_any = [
+        ":prof_frame_pointer",
         ":prof_gcc",
         ":prof_libgcc",
         ":prof_libunwind",
@@ -467,6 +555,12 @@ selects.config_setting_group(
 config_setting(
     name = "no_prof",
     flag_values = {":enable_prof": "no"},
+)
+
+# JEMALLOC_PROF_FRAME_POINTER (--enable-prof-frameptr)
+config_setting(
+    name = "prof_frame_pointer",
+    flag_values = {":enable_prof": "frame_pointer"},
 )
 
 # JEMALLOC_PROF_GCC
