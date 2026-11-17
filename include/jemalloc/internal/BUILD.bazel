@@ -1889,14 +1889,6 @@ autoconf(
 # LG_VADDR: a native configure on an Intel Mac whose CPU has rdtscp defines the macro, and a cross build or
 # --with-lg-vaddr leaves it undefined, as this build does on every other target, where leaving it out has no effect. On
 # an x86_64 CPU without rdtscp, percpu_arena (off by default) reaches an illegal instruction instead.
-selects.config_setting_group(
-    name = "darwin_x86_64",
-    match_all = [
-        "//settings/platform:darwin",
-        "@platforms//cpu:x86_64",
-    ],
-)
-
 autoconf(
     name = "jemalloc_internal_defs_rdtscp",
     checks = select({
@@ -1904,6 +1896,14 @@ autoconf(
         "//conditions:default": [],
     }),
     tags = ["manual"],
+)
+
+selects.config_setting_group(
+    name = "darwin_x86_64",
+    match_all = [
+        "//settings/platform:darwin",
+        "@platforms//cpu:x86_64",
+    ],
 )
 
 autoconf(
