@@ -68,18 +68,12 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
 - **//settings/platform:lg_hugepage (--with-lg-hugepage):** Defaults to 21 (2 MiB), configure's value when it cannot
  read the huge page size. It must be at least lg_page, as configure requires, or the build fails; so on aarch64 Linux
  and Android and ppc64le Linux, where lg_page defaults to 16, a value below 16 needs lg_page set explicitly too.
-- **JEMALLOC_HAVE_RDTSCP (no configure option):** Whether the target CPU has the rdtscp instruction. It is defined on
- every x86_64 target and on no other CPU, with no flag to change it. configure instead runs a program on the build
- machine, only on x86_64 and, in 5.3.1, only while it detects LG_VADDR, so --with-lg-vaddr leaves it out (5.4.0's
- ChangeLog fixes that coupling as a bug: "Fix rdtscp detection with --with-lg-vaddr"); a cross build gets "no". Whether
- the CPU has rdtscp is a fact about the target that a build cannot observe, and configure's answer is right only when
- build and target match. Nearly all x86_64 CPUs have rdtscp; the exceptions are Intel's before Nehalem, AMD K8 before
- revision F, and the Bonnell and Saltwell Atoms. So where configure, cross building, leaves the macro undefined and
- this build defines it, the difference is intended. malloc_getcpu reads it only after _WIN32 and sched_getcpu, so it
- matters only on x86_64 Apple targets (Intel macOS) with percpu_arena enabled: those deployments require a CPU with
- rdtscp, and without the macro malloc_getcpu would reach not_reached(). The pre-Nehalem exceptions include the Core 2
- and Xeon CPUs of Intel Macs sold until 2011, which run macOS no later than 10.13; percpu_arena on one of those
- reaches an illegal instruction instead.
+- **JEMALLOC_HAVE_RDTSCP (no configure option):** Defined on x86_64 Apple targets and nowhere else, with no flag to
+ change it. There percpu_arena needs it: malloc_getcpu reads it only where neither _WIN32 nor sched_getcpu applies,
+ and without it percpu_arena reaches not_reached(). A native configure on an Intel Mac whose CPU has rdtscp defines
+ it; a cross build or --with-lg-vaddr leaves it undefined, as this build does on every other target, where leaving it
+ out has no effect. On an x86_64 CPU without rdtscp (Intel's before Nehalem, AMD K8 before revision F, the Bonnell and
+ Saltwell Atoms), percpu_arena, which is off by default, reaches an illegal instruction instead.
 - **glibc:** Without a prefix, the __libc_* functions and __posix_memalign are probed and listed (exempt from private
  renaming) wherever they link, and on Linux the hooks __malloc_hook, __realloc_hook, __free_hook and __memalign_hook
  where they still link (glibc before 2.34), exactly as configure does. jemalloc defines the hooks, and aliases the
