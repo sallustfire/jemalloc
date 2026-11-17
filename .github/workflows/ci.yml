@@ -180,7 +180,7 @@ jobs:
           # Every configure option this build mirrors as a flag, each away from its default, so that each flag is
           # checked against the macro configure writes for it. Left out: --with-jemalloc-prefix, which the prefix
           # entries cover; --enable-prof-libunwind, which needs libunwind; --enable-prof-frameptr, since a profiling
-          # backend takes one value and the prof-frame-pointer job covers it; and --disable-zone-allocator, which is
+          # backend takes one value and upstream removes the option in 5.4.0; and --disable-zone-allocator, which is
           # Darwin's.
           - name: options
             os: ubuntu-24.04
