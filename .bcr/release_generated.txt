@@ -1,23 +1,6 @@
 # Files upstream's release process generates into its tarball and the fork does not commit. The entry ships them as the
 # tarball has them. One sorted path per line.
-#
-# Beside configure and the docs, this release's tarball ships the rest of the configured tree it was packed from (see
-# tarball_removals.txt). Nothing in the build reads it.
 
-Makefile
-bin/jemalloc-config
-bin/jemalloc.sh
-bin/jeprof
-config.log
-config.stamp
-config.status
 configure
-doc/html.xsl
 doc/jemalloc.3
 doc/jemalloc.html
-doc/jemalloc.xml
-doc/manpages.xsl
-include/jemalloc/internal/private_symbols.awk
-include/jemalloc/internal/private_symbols_jet.awk
-jemalloc.pc
-test/test.sh
