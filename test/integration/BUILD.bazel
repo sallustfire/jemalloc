@@ -33,7 +33,7 @@ with_settings(
     visibility = ["//:__subpackages__"],
 )
 
-# Makefile.in:746, check_integration.
+# Makefile.in:791, check_integration.
 
 # Tests without a .sh.
 INTEGRATION_TESTS = [
@@ -77,7 +77,7 @@ INTEGRATION_CONF_TESTS = [
     deps = [":testlib"],
 ) for test in INTEGRATION_CONF_TESTS]
 
-# Tests whose .sh exports junk:false only if enable_fill. smallocx.sh does too, but Makefile.in:334 adds smallocx.c only
+# Tests whose .sh exports junk:false only if enable_fill. smallocx.sh does too, but Makefile.in:354 adds smallocx.c only
 # with --enable-experimental-smallocx, so it has targets of its own.
 INTEGRATION_FILL_TESTS = [
     {"src": "extent.c"},
@@ -127,7 +127,7 @@ cc_test(
 # test-owned transition nor the build's own flags can turn on portably (Bazel's thin_lto feature is distributed ThinLTO
 # for clang only), and without LTO the test cannot observe it.
 
-# Makefile.in:338 empties TESTS_INTEGRATION_CPP unless @enable_cxx@ (on by default; --disable-cxx turns it off).
+# Makefile.in:373 empties TESTS_INTEGRATION_CPP unless @enable_cxx@ (on by default; --disable-cxx turns it off).
 INTEGRATION_CPP_TESTS = [
     {"src": "cpp/basic.cpp"},
 ]
@@ -195,7 +195,7 @@ cc_test(
     deps = [":testlib_cpp"],
 )
 
-# Makefile.in:743, check_integration_decay.
+# Makefile.in:788, check_integration_decay.
 [cc_test(
     name = test_name(test, "decay_minus_one"),
     src = test["src"],
@@ -304,7 +304,7 @@ cc_test(
     deps = [":testlib_cpp"],
 )
 
-# Makefile.in:744, check_integration_decay.
+# Makefile.in:789, check_integration_decay.
 [cc_test(
     name = test_name(test, "decay_zero"),
     src = test["src"],
@@ -413,7 +413,7 @@ cc_test(
     deps = [":testlib_cpp"],
 )
 
-# Makefile.in:739, check_integration_prof.
+# Makefile.in:784, check_integration_prof.
 [cc_test(
     name = test_name(test, "prof"),
     src = test["src"],
@@ -540,7 +540,7 @@ cc_test(
     deps = [":testlib_cpp"],
 )
 
-# Makefile.in:740, check_integration_prof.
+# Makefile.in:785, check_integration_prof.
 [cc_test(
     name = test_name(test, "prof_active_false"),
     src = test["src"],
