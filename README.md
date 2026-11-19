@@ -183,17 +183,17 @@ follow.
 
 ## Validated Platforms
 
-Tested in CI with the latest Bazel 7.x, 8.x and 9.x:
+Tested in CI with the latest Bazel 8.x and 9.x:
 
 - Ubuntu 22.04, 24.04 & 26.04 (x86_64)
 - Ubuntu 24.04 (aarch64)
 - MacOS 15 & 26 (arm64)
 
-The minimum supported Bazel, 7.4.0, is tested on Ubuntu 24.04 (x86_64), on Windows Server 2025 with MSVC and, for the
+The minimum supported Bazel, 8.5.0, is tested on Ubuntu 24.04 (x86_64), on Windows Server 2025 with MSVC and, for the
 host toolchain examples only, MacOS 15.
-Windows Server 2025 (x86_64) is tested with MSVC (msvc-cl), host toolchain examples included, on the latest Bazel 7.x,
-8.x and 9.x, and with clang-cl on the latest 9.x, without the fidelity checks, whose gawk, grep and sed dev dependencies
-do not build for Windows.
+Windows Server 2025 (x86_64) is tested with MSVC (msvc-cl), host toolchain examples included, on the latest Bazel 8.x
+and 9.x, and with clang-cl on the latest 9.x, without the fidelity checks, whose gawk, grep and sed dev dependencies do
+not build for Windows.
 Profiling (`--config=prof-*`) is tested on Linux only.
 Debug is tested with prof-libgcc, log on and cache oblivious off, on Ubuntu 24.04 (x86_64) with the latest Bazel 9.x
 only. The host toolchain examples build a jemalloc() target with debug on every tested platform.
@@ -244,6 +244,7 @@ re-rolled upstream asset cannot slip into a new `.bcr.N`. `.bcr/presubmit.yml` b
 
 ## Upgrading from 5.3.1
 
+- Bazel 8.5.0 or later is required; Bazel 7 is no longer supported.
 - enable_prof=frame_pointer and the .bazelrc prof-frame-pointer config are removed, since upstream removed
  --enable-prof-frameptr.
 - //settings/flags:enable_cxx is a bool_flag again, and "__auto__" is rejected, as is jemalloc()'s cxx = "__auto__".

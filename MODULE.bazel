@@ -1,7 +1,8 @@
 module(
     name = "jemalloc",
     version = "5.4.0",
-    bazel_compatibility = [">=7.4.0"],  # need support for "overlay" directory and cxxopts in cc_binary
+    # The oldest Bazel that takes .bazelrc's bazel8 flags. The registry requires a floor for a module with an overlay.
+    bazel_compatibility = [">=8.5.0"],
     compatibility_level = 5,
 )
 

@@ -22,14 +22,16 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, macos-15, macos-26]
-        bazel_version: ["7.x", "8.x", "9.x"]
+        bazel_version: ["8.x", "9.x"]
         include:
           - bazel_version: "8.x"
             bazel_config: "--config=bazel8"
           - bazel_version: "9.x"
             bazel_config: "--config=bazel9"
+          # The minimum supported Bazel
           - os: ubuntu-24.04
-            bazel_version: "7.4.0"
+            bazel_version: "8.5.0"
+            bazel_config: "--config=bazel8"
           # The sed dev dependency compiles its SELinux calls where the host has libselinux headers (ubuntu-22.04
           # does) but never links -lselinux: rules_cc_autoconf's gnulib port probes selinux/selinux.h whatever
           # with_selinux says. Remove once a rules_cc_autoconf release gates that probe as gnulib does.
@@ -57,7 +59,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04, ubuntu-24.04-arm]
-        bazel_version: ["7.x", "8.x", "9.x"]
+        bazel_version: ["8.x", "9.x"]
         include:
           - bazel_version: "8.x"
             bazel_config: "--config=bazel8"
@@ -88,7 +90,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, ubuntu-24.04-arm]
-        bazel_version: ["7.x", "8.x", "9.x"]
+        bazel_version: ["8.x", "9.x"]
         include:
           - bazel_version: "8.x"
             bazel_config: "--config=bazel8"
@@ -122,7 +124,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04]
-        bazel_version: ["7.x", "8.x", "9.x"]
+        bazel_version: ["8.x", "9.x"]
         include:
           - bazel_version: "8.x"
             bazel_config: "--config=bazel8"
@@ -326,18 +328,22 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, macos-15, macos-26, windows-2025]
-        bazel_version: ["7.x", "8.x", "9.x"]
+        bazel_version: ["8.x", "9.x"]
         include:
           - bazel_version: "8.x"
             bazel_config: "--config=bazel8"
           - bazel_version: "9.x"
             bazel_config: "--config=bazel9"
+          # The minimum supported Bazel
           - os: ubuntu-24.04
-            bazel_version: "7.4.0"
+            bazel_version: "8.5.0"
+            bazel_config: "--config=bazel8"
           - os: macos-15
-            bazel_version: "7.4.0"
+            bazel_version: "8.5.0"
+            bazel_config: "--config=bazel8"
           - os: windows-2025
-            bazel_version: "7.4.0"
+            bazel_version: "8.5.0"
+            bazel_config: "--config=bazel8"
     steps:
       - uses: actions/checkout@v4
       - uses: bazel-contrib/setup-bazel@0.14.0
@@ -393,17 +399,19 @@ jobs:
         os: [windows-2025]
         # Bazel's auto-configured Windows toolchain. clang-cl and mingw-gcc each need a platform of their own.
         compiler: [msvc-cl]
-        bazel_version: ["7.x", "8.x", "9.x"]
+        bazel_version: ["8.x", "9.x"]
         include:
           - bazel_version: "8.x"
             bazel_config: "--config=bazel8"
           - bazel_version: "9.x"
             bazel_config: "--config=bazel9"
+          # The minimum supported Bazel
           - os: windows-2025
             compiler: msvc-cl
-            bazel_version: "7.4.0"
+            bazel_version: "8.5.0"
+            bazel_config: "--config=bazel8"
           # The auto-configured clang-cl toolchain, chosen ahead of msvc-cl through .github/platforms, on one Bazel
-          # version. Bazel 7 configures C++ with its built-in cc_configure, under other labels.
+          # version.
           - os: windows-2025
             compiler: clang-cl
             bazel_version: "9.x"
