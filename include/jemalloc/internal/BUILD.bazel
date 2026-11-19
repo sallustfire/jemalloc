@@ -1824,6 +1824,8 @@ autoconf(
     cxxopts = CXXOPTS,
     features = C_FEATURES,
     tags = ["manual"],
+    # test/integration chooses the C++ allocation-failure tests' sources by JEMALLOC_HAVE_CXX_EXCEPTIONS.
+    visibility = ["//test/integration:__pkg__"],
     deps = ["//include/jemalloc:jemalloc_defs_checks"],
 )
 

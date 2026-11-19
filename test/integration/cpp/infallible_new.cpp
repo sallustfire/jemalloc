@@ -48,17 +48,12 @@ TEST_BEGIN(test_failing_alloc) {
 	expect_true(own_operator_new(), "No operator new overload");
 #endif
 	void *volatile ptr = (void *)1;
-#ifdef JEMALLOC_HAVE_CXX_EXCEPTIONS
 	try {
 		/* Too big of an allocation to succeed. */
 		ptr = ::operator new((size_t)-1);
 	} catch (...) {
 		abort();
 	}
-#else
-	/* Too big of an allocation to succeed. */
-	ptr = ::operator new((size_t)-1);
-#endif
 	expect_ptr_null(ptr, "Allocation should have failed");
 	expect_b_eq(fake_abort_called, true, "Abort hook not invoked");
 	test_hooks_safety_check_abort = NULL;

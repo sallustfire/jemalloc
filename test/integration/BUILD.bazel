@@ -1,3 +1,4 @@
+load("@rules_cc_autoconf//autoconf:autoconf_srcs.bzl", "autoconf_srcs")
 load("//tools:test.bzl", "cc_test", "join_conf", "test_name")
 load("//tools:transition.bzl", "with_settings")
 
@@ -144,16 +145,37 @@ INTEGRATION_CPP_TESTS = [
 ) for test in INTEGRATION_CPP_TESTS]
 
 # Makefile.in:376-381 adds infallible_new.cpp with --enable-cxx-infallible-new and failing_new.cpp without it, both only
-# where the C++ toolchain has exceptions. Both build without exceptions too, branching on JEMALLOC_HAVE_CXX_EXCEPTIONS:
-# failing_new reports a skip, and infallible_new runs its assertions without its try/catch.
+# where the C++ toolchain has exceptions. Whether it does is configure's probe (je_cv_cxx_exceptions, which defines
+# JEMALLOC_HAVE_CXX_EXCEPTIONS), known only once the probe has compiled, so each test's source comes from autoconf_srcs:
+# upstream's file where the probe succeeds and cpp/no_cxx_exceptions.cpp, which reports a skip, where it fails. The
+# sources are generated in the test library's configuration, so the probe is the one the test library's headers carry.
 #
 # Their .sh files set xmalloc:false only where enable_xmalloc is 1, so that jemalloc returns null to operator new rather
 # than aborting. test.sh.in never passes enable_xmalloc to them, so that guard is inactive upstream, and it puts the
 # per-test conf before the global MALLOC_CONF, so a global xmalloc:true would win anyway. This build honours the
 # scripts' intent and sets xmalloc:false under //settings/flags:enable_xmalloc.
+autoconf_srcs(
+    name = "cpp_failing_new_sources",
+    srcs = {
+        "cpp/failing_new.cpp": "je_cv_cxx_exceptions",
+        "cpp/no_cxx_exceptions.cpp": "!je_cv_cxx_exceptions",
+    },
+    naming = "per_target",
+    tags = ["manual"],
+    wrap = "include",
+    deps = ["//include/jemalloc/internal:jemalloc_internal_defs_checks"],
+)
+
+with_settings(
+    name = "cpp_failing_new_sources_test_config",
+    testonly = True,
+    src = ":cpp_failing_new_sources",
+    settings = TESTLIB_SETTINGS | {"//settings:with_test": "integration_cpp"},
+)
+
 cc_test(
     name = "cpp_failing_new",
-    src = "cpp/failing_new.cpp",
+    src = ":cpp_failing_new_sources_test_config",
     env = select({
         "//settings/flags:xmalloc": {"JE_TEST_MALLOC_CONF": "xmalloc:false"},
         "//conditions:default": {"JE_TEST_MALLOC_CONF": ""},
@@ -170,12 +192,34 @@ cc_test(
         "//settings/flags:user_config": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    deps = [":testlib_cpp"],
+    deps = [
+        ":cpp_failing_new_sources_test_config",
+        ":testlib_cpp",
+    ],
+)
+
+autoconf_srcs(
+    name = "cpp_infallible_new_sources",
+    srcs = {
+        "cpp/infallible_new.cpp": "je_cv_cxx_exceptions",
+        "cpp/no_cxx_exceptions.cpp": "!je_cv_cxx_exceptions",
+    },
+    naming = "per_target",
+    tags = ["manual"],
+    wrap = "include",
+    deps = ["//include/jemalloc/internal:jemalloc_internal_defs_checks"],
+)
+
+with_settings(
+    name = "cpp_infallible_new_sources_test_config",
+    testonly = True,
+    src = ":cpp_infallible_new_sources",
+    settings = TESTLIB_SETTINGS | {"//settings:with_test": "integration_cpp"},
 )
 
 cc_test(
     name = "cpp_infallible_new",
-    src = "cpp/infallible_new.cpp",
+    src = ":cpp_infallible_new_sources_test_config",
     env = select({
         "//settings/flags:xmalloc": {"JE_TEST_MALLOC_CONF": "xmalloc:false"},
         "//conditions:default": {"JE_TEST_MALLOC_CONF": ""},
@@ -192,7 +236,10 @@ cc_test(
         "//settings/flags:user_config": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    deps = [":testlib_cpp"],
+    deps = [
+        ":cpp_infallible_new_sources_test_config",
+        ":testlib_cpp",
+    ],
 )
 
 # Not upstream's: this build compiles jemalloc's C++ support with every compiler, cl and clang-cl included, where
