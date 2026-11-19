@@ -1279,7 +1279,11 @@ autoconf(
             # the kernel accepts the clock is an assumption this build makes about the target, true on the kernels
             # glibc, musl, FreeBSD's libc and Android's Bionic support, not something the link observes. So where
             # configure, cross compiling, leaves the macro undefined and this build defines it, the difference is
-            # intended. Darwin has no pthread_condattr_setclock, so it fails there as it does under configure.
+            # intended. Where the target's kernel rejects CLOCK_MONOTONIC for a condition variable, jemalloc fails to
+            # initialize: background_thread_boot1 initializes the background threads' condition variables whenever
+            # background-thread support is built, and os_cond_init (os/posix/cond.h) fails, so malloc_init_hard fails
+            # and allocations fail, where configure's build would wait on the wall clock instead. Darwin has no
+            # pthread_condattr_setclock, so it fails there as it does under configure.
             checks.AC_TRY_LINK(
                 name = "je_cv_pthread_cond_timedwait_monotonic",
                 code = utils.AC_LANG_PROGRAM(

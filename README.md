@@ -88,7 +88,11 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
  which shows only that the C library provides the functions and the constant. That the kernel accepts CLOCK_MONOTONIC is
  an assumption this build makes about the target, true on the kernels glibc, musl, Bionic and FreeBSD's libc support,
  not something the link observes. So where configure, cross building, leaves the macro undefined and this build defines
- it, the difference is intended. Darwin has no pthread_condattr_setclock, so it is undefined there.
+ it, the difference is intended. Where the target's kernel rejects CLOCK_MONOTONIC for a condition variable, jemalloc
+ fails to initialize: background_thread_boot1 initializes the background threads' condition variables whenever
+ background-thread support is built, and os_cond_init (os/posix/cond.h) fails, so malloc_init_hard fails and
+ allocations fail, where configure's build would wait on the wall clock instead. Darwin has no
+ pthread_condattr_setclock, so it is undefined there.
 - **glibc:** Without a prefix, the __libc_* functions and __posix_memalign are probed and listed (exempt from private
  renaming) wherever they link, and on Linux the hooks __malloc_hook, __realloc_hook, __free_hook and __memalign_hook
  where they still link (glibc before 2.34), exactly as configure does. jemalloc defines the hooks, and aliases the
