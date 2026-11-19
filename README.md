@@ -110,10 +110,12 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
  CONFIG_ANON_VMA_NAME applies the names, and other kernels ignore them. jemalloc()'s pageid sets it per target.
 - **//settings/flags:enable_cxx (--disable-cxx):** True by default with every C++ compiler, cl and clang-cl included.
  With it jemalloc's C++ support (src/jemalloc_cpp.cpp) is compiled, so a program linking @jemalloc gets jemalloc's
- operator new and delete rather than the C++ runtime's (with cl and clang-cl, rather than the CRT's). configure turns
- C++ off for cl whatever --enable-cxx says, because its C++14 check reads __cplusplus, which cl reports as 199711L;
- this build does not follow that check, a deliberate difference. False is the opt-out and keeps the runtime's
- operators. jemalloc()'s cxx sets it per target.
+ operator new and delete rather than the C++ runtime's (with cl and clang-cl, rather than the CRT's). On Windows that
+ replacement holds per module, and malloc stays with the CRT, so memory one module allocates with new must be deleted
+ by a module that links @jemalloc too; a program that hands such memory to a DLL without jemalloc's operators needs
+ False. configure turns C++ off for cl whatever --enable-cxx says, because its C++14 check reads __cplusplus, which cl
+ reports as 199711L; this build does not follow that check, a deliberate difference. False is the opt-out and keeps
+ the runtime's operators. jemalloc()'s cxx sets it per target.
 - **//settings/flags:enable_cxx_infallible_new (--enable-cxx-infallible-new):** Off by default. On, the throwing
  operator new aborts with the requested size logged when an allocation fails, instead of calling the new handler and
  throwing std::bad_alloc, which with LTO lets the compiler drop exception cleanup in its callers; the nothrow forms still
@@ -245,6 +247,8 @@ re-rolled upstream asset cannot slip into a new `.bcr.N`. `.bcr/presubmit.yml` b
 - enable_prof=frame_pointer and the .bazelrc prof-frame-pointer config are removed, since upstream removed
  --enable-prof-frameptr.
 - //settings/flags:enable_cxx is a bool_flag again, and "__auto__" is rejected, as is jemalloc()'s cxx = "__auto__".
+- With cl and clang-cl, a program linking @jemalloc now gets jemalloc's operator new and delete rather than the CRT's,
+ per module; see //settings/flags:enable_cxx for memory that crosses a DLL boundary.
 - 5.3.1's experimental_infallible_new run-time option is gone upstream; //settings/flags:enable_cxx_infallible_new
  (--enable-cxx-infallible-new) replaces it at build time.
 - //settings/platform:lg_page below 8 and lg_hugepage not greater than lg_page now fail analysis, as configure does.

@@ -195,6 +195,24 @@ cc_test(
     deps = [":testlib_cpp"],
 )
 
+# Not upstream's: this build compiles jemalloc's C++ support with every compiler, cl and clang-cl included, where
+# configure leaves it off, so a program linking jemalloc must get its operator new rather than the C++ runtime's.
+# infallible_new.cpp checks that only off Windows, and only with //settings/flags:enable_cxx_infallible_new. Upstream
+# expects the replacement to fail with MinGW (infallible_new.cpp:41-44).
+cc_test(
+    name = "cpp_operator_new_owned",
+    src = "cpp/operator_new_owned.cpp",
+    local_defines = ["JEMALLOC_INTEGRATION_CPP_TEST"],
+    target_compatible_with = select({
+        "//settings/flags:cxx": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }) + select({
+        "@rules_cc//cc/compiler:mingw-gcc": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [":testlib_cpp"],
+)
+
 # Makefile.in:788, check_integration_decay.
 [cc_test(
     name = test_name(test, "decay_minus_one"),
