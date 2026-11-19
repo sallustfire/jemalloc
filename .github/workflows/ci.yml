@@ -158,8 +158,8 @@ jobs:
             configure_args: --with-jemalloc-prefix=je_
             bazel_args: --//settings/flags:jemalloc_prefix=je_
           # Every configure option this build mirrors as a flag, each away from its default, so that each flag is
-          # checked against the macro configure writes for it. Left out: --disable-cxx, which forces
-          # --enable-cxx-infallible-new off; --with-jemalloc-prefix, which the prefix entries cover;
+          # checked against the macro configure writes for it. --disable-cxx has its own entry, `no cxx`, because it
+          # forces --enable-cxx-infallible-new off. Left out: --with-jemalloc-prefix, which the prefix entries cover;
           # --enable-prof-libunwind, which needs libunwind; and --disable-zone-allocator, which is Darwin's.
           - name: options
             os: ubuntu-24.04
@@ -213,6 +213,10 @@ jobs:
               --//settings/flags:lg_quantum=4
               --//settings/flags:experimental_sys_process_madvise=440
               --//settings/flags:without_export=True
+          - name: no cxx
+            os: ubuntu-24.04
+            configure_args: --disable-cxx
+            bazel_args: --//settings/flags:enable_cxx=False
           - name: macOS default
             os: macos-15
           - name: Alpine default
