@@ -703,7 +703,7 @@ autoconf(
         # -fno-exceptions fails it. Here the check only compiles it, as C++ with --copt and --cxxopt as the library's
         # C++ source sees them: whether throw and catch are available is a compiler fact, and the link adds only that
         # the C++ runtime provides the exception ABI (__cxa_throw and the rest), which this build expects of any C++
-        # toolchain it supports. Linking also failed on ld.bfd hosts (Alpine), where rules_cc_autoconf 0.34 puts the
+        # toolchain it supports. Linking also failed on ld.bfd hosts (Alpine), where rules_cc_autoconf 0.37.0 puts the
         # toolchain's as-needed -lstdc++ before the probe's object, so the linker drops libstdc++ and __cxa_throw is
         # undefined.
         checks.AC_TRY_COMPILE(
