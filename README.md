@@ -109,6 +109,12 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
 - **//settings/flags:enable_pageid (--enable-pageid):** Off by default. On, jemalloc names its anonymous mappings
  (jemalloc_pg, or jemalloc_pg_overcommit) in /proc/<pid>/maps, where the target has prctl; Linux 5.17 or later with
  CONFIG_ANON_VMA_NAME applies the names, and other kernels ignore them. jemalloc()'s pageid sets it per target.
+- **//settings/flags:enable_cxx (--disable-cxx):** True by default with every C++ compiler, cl and clang-cl included.
+ With it jemalloc's C++ support (src/jemalloc_cpp.cpp) is compiled, so a program linking @jemalloc gets jemalloc's
+ operator new and delete rather than the C++ runtime's (with cl and clang-cl, rather than the CRT's). configure turns
+ C++ off for cl whatever --enable-cxx says, because its C++14 check reads __cplusplus, which cl reports as 199711L;
+ this build does not follow that check, a deliberate difference. False is the opt-out and keeps the runtime's
+ operators. jemalloc()'s cxx sets it per target.
 - **//settings/flags:enable_cxx_infallible_new (--enable-cxx-infallible-new):** Off by default. On, the throwing
  operator new aborts with the requested size logged when an allocation fails, instead of calling the new handler and
  throwing std::bad_alloc, which with LTO lets the compiler drop exception cleanup in its callers; the nothrow forms still
