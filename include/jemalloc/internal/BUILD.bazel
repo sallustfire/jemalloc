@@ -1988,21 +1988,15 @@ autoconf(
     tags = ["manual"],
 )
 
-# JEMALLOC_HAVE_RDTSCP is defined on x86_64 and nowhere else. 5.4.0's configure runs its rdtscp program on an x86_64
-# build machine whatever --with-lg-vaddr says (configure.ac:623-644), so a native configure on any x86_64 CPU with the
-# instruction defines it, and a cross build gets "no". A build cannot observe the target's CPU; nearly all x86_64 CPUs
-# have rdtscp (the exceptions are Intel's before Nehalem, AMD K8 before revision F, and the Bonnell and Saltwell Atoms),
-# so this build answers as a native configure does. Only os/posix/cpu.h reads it, in os_cpu_current after
-# sched_getcpu, for percpu_arena, which outside Windows and Apple needs JEMALLOC_HAVE_SCHED_GETCPU
-# (jemalloc_preamble.h.in), so the rdtscp branch never runs.
-autoconf(
-    name = "jemalloc_internal_defs_rdtscp",
-    checks = select({
-        "@platforms//cpu:x86_64": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_RDTSCP", "")],
-        "//conditions:default": [],
-    }),
-    tags = ["manual"],
-)
+# JEMALLOC_HAVE_RDTSCP is never defined. 5.4.0's configure defines it by running its rdtscp program on an x86_64 build
+# machine (configure.ac:623-644), which says whether the machine running configure has the instruction, not whether the
+# target's CPU does, and no toolchain check can tell. Nothing reachable reads it: only os/posix/cpu.h:77 does, after
+# sched_getcpu, and the POSIX backend supports percpu_arena, os_cpu_current's only user, only with
+# JEMALLOC_HAVE_SCHED_GETCPU (jemalloc_preamble.h.in:240). The upstream oracle gives configure the same answer
+# (je_cv_rdtscp=no). Should a release read it where it can run, it becomes a //settings/platform flag, as the other
+# facts configure learns by running a program are:
+#
+#     checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_RDTSCP", "")
 
 autoconf(
     name = "jemalloc_internal_defs_lg_vaddr",
@@ -2066,7 +2060,7 @@ autoconf_hdr(
         "@platforms//cpu:x86_32": [":jemalloc_internal_defs_x86_spinwait_checks"],
         "@platforms//cpu:x86_64": [":jemalloc_internal_defs_x86_spinwait_checks"],
         "//conditions:default": [],
-    }) + [":jemalloc_internal_defs_rdtscp"] + select({
+    }) + select({
         "//settings/flags:no_experimental_sys_process_madvise": [],
         "//conditions:default": [":jemalloc_internal_defs_experimental_sys_process_madvise"],
     }),

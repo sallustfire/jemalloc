@@ -12,7 +12,7 @@ byte order) are copies of configure.ac's test programs, compiled or linked by ru
 toolchain. configure's host table is expressed as platform selects. What configure learns by running a program on the
 build machine (page size, virtual address bits, huge page size) is set by flags under //settings/platform, and lg_page
 and lg_vaddr have per-platform defaults. Whether the CPU has rdtscp, which configure also learns by running a program,
-is a platform select; see JEMALLOC_HAVE_RDTSCP below. Where configure runs a program to confirm that the running kernel
+is left undefined; see JEMALLOC_HAVE_RDTSCP below. Where configure runs a program to confirm that the running kernel
 supports an interface the C library provides, the check only links it for the target and assumes that support; see
 JEMALLOC_HAVE_PTHREAD_COND_TIMEDWAIT_MONOTONIC below.
 
@@ -74,13 +74,12 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
  read the huge page size. It is an integer flag. It must be greater than lg_page, as configure requires, or the build
  fails; so on aarch64 Linux and Android and ppc64le Linux, where lg_page defaults to 16, a value of 16 or below needs
  lg_page set explicitly too. The comparison is skipped when lg_page does not read as an integer.
-- **JEMALLOC_HAVE_RDTSCP (no configure option):** Defined on x86_64 targets and nowhere else, with no flag to change
- it. 5.4.0's configure runs a program on an x86_64 build machine to decide it, so a native configure defines it on
- nearly every x86_64 CPU and a cross build leaves it undefined; this build answers as a native configure does, which
- is wrong only for x86_64 CPUs without rdtscp (Intel's before Nehalem, AMD K8 before revision F, the Bonnell and
- Saltwell Atoms). Nothing that runs depends on it: only the POSIX CPU backend reads it, after sched_getcpu, and outside
- Windows and Apple percpu_arena, its only caller, needs sched_getcpu. Intel macOS reads the CPU number from the
- interrupt descriptor table instead (os/darwin/cpu.h).
+- **JEMALLOC_HAVE_RDTSCP (no configure option):** Never defined, with no flag to change it. configure decides it by
+ running a program on an x86_64 build machine, so a native configure defines it on nearly every x86_64 CPU and a cross
+ build leaves it undefined; which CPU the program ran on says nothing about the target's, and no toolchain check can.
+ Nothing reachable reads it: only the POSIX CPU backend does, after sched_getcpu, and that backend supports
+ percpu_arena, its only caller, only with sched_getcpu. Should a release read it where it can run, it becomes a
+ //settings/platform flag.
 - **JEMALLOC_HAVE_PTHREAD_COND_TIMEDWAIT_MONOTONIC (no configure option):** Whether the background thread's condition
  variable waits on CLOCK_MONOTONIC, so a change to the wall clock does not move its deadlines. configure runs a program
  that sets the clock with pthread_condattr_setclock and checks that each call succeeds, which confirms that the running
@@ -249,6 +248,7 @@ re-rolled upstream asset cannot slip into a new `.bcr.N`. `.bcr/presubmit.yml` b
 - 5.3.1's experimental_infallible_new run-time option is gone upstream; //settings/flags:enable_cxx_infallible_new
  (--enable-cxx-infallible-new) replaces it at build time.
 - //settings/platform:lg_page below 8 and lg_hugepage not greater than lg_page now fail analysis, as configure does.
+- JEMALLOC_HAVE_RDTSCP is no longer defined on x86_64 macOS, or anywhere; 5.4.0's macOS CPU backend does not read it.
 
 The module's compatibility_level stays 5.
 
