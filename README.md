@@ -241,6 +241,17 @@ only, so the export also stops if the ref commits an upstream file as a symlink 
 stops, too, if an entry already in the registry for the same upstream release fetches a different tarball, so a
 re-rolled upstream asset cannot slip into a new `.bcr.N`. `.bcr/presubmit.yml` becomes the entry's presubmit.
 
+## Upgrading from 5.3.1
+
+- enable_prof=frame_pointer and the .bazelrc prof-frame-pointer config are removed, since upstream removed
+ --enable-prof-frameptr.
+- //settings/flags:enable_cxx is a bool_flag again, and "__auto__" is rejected, as is jemalloc()'s cxx = "__auto__".
+- 5.3.1's experimental_infallible_new run-time option is gone upstream; //settings/flags:enable_cxx_infallible_new
+ (--enable-cxx-infallible-new) replaces it at build time.
+- //settings/platform:lg_page below 8 and lg_hugepage not greater than lg_page now fail analysis, as configure does.
+
+The module's compatibility_level stays 5.
+
 ## Contributing
 
 Send changes as pull requests to https://github.com/sallustfire/jemalloc, against the branch for the jemalloc version,
