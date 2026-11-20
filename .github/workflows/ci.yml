@@ -426,6 +426,25 @@ jobs:
         with:
           bazelisk-cache: true
           repository-cache: true
+      # rules_cc finds clang-cl in a standalone LLVM, apart from the Visual Studio whose headers and STL it compiles
+      # against, so the two can be versions that STL rejects. Visual Studio's own clang-cl ships with its STL. The query
+      # is rules_cc's, so this names the installation rules_cc uses.
+      - name: Use Visual Studio's own clang-cl
+        if: matrix.compiler == 'clang-cl'
+        shell: bash
+        run: |
+          vs="$("/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe" \
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath -latest \
+            | tr -d '\r')"
+          llvm="$vs\\VC\\Tools\\Llvm\\x64"
+          for tool in clang-cl lld-link llvm-lib llvm-nm; do
+            if [[ ! -f "$(cygpath -u "$llvm")/bin/$tool.exe" ]]; then
+              echo "::error::$llvm\\bin has no $tool.exe"
+              exit 1
+            fi
+          done
+          "$(cygpath -u "$llvm")/bin/clang-cl.exe" --version
+          echo "BAZEL_LLVM=$llvm" >> "$GITHUB_ENV"
       - name: Build
         shell: bash
         env:
