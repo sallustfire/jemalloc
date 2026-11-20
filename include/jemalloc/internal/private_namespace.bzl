@@ -177,7 +177,7 @@ def _private_namespace_impl(ctx):
 def _transition_impl(_settings, attr):
     return {
         # Only C sources are used for symbol extraction
-        "//settings/flags:enable_cxx": "False",
+        "//settings/flags:enable_cxx": False,
         "//settings:enable_no_private_namespace": True,
         "//settings:enable_jet": attr.enable_jet,
     }

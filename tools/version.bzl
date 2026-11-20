@@ -2,7 +2,7 @@
 
 # Upstream's VERSION file (`git describe --long --abbrev=40`), which configure reads. A constant because Starlark cannot
 # read a source file while BUILD files load.
-UPSTREAM_VERSION = "5.3.1-0-g81034ce1f1373e37dc865038e1bc8eeecf559ce8"
+UPSTREAM_VERSION = "5.4.0-0-g7a34f18502e7b222724097cdcd499b437d189acc"
 
 def _parse_version(version):
     """Splits a VERSION string, `<major>.<minor>.<bugfix>-<nrev>-g<gid>`, into configure's components."""

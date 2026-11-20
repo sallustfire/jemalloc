@@ -6,7 +6,7 @@ load("//tools:cc.bzl", "CONLYOPTS", "COPTS", "CXXOPTS", "C_FEATURES")
 
 ####
 # Due to the complexity of the build, the overlay is maintained independently.
-# See https://github.com/sallustfire/jemalloc/tree/bcr-5.3.1?tab=readme-ov-file#bazel-build-of-jemalloc
+# See https://github.com/sallustfire/jemalloc/tree/bcr-5.4.0?tab=readme-ov-file#bazel-build-of-jemalloc
 ####
 
 license(
@@ -37,6 +37,7 @@ cc_library(
     name = "jemalloc",
     srcs = [
         "src/arena.c",
+        "src/arenas_management.c",
         "src/background_thread.c",
         "src/base.c",
         "src/bin.c",
@@ -61,7 +62,6 @@ cc_library(
         "src/extent_dss.c",
         "src/extent_mmap.c",
         "src/fxp.c",
-        "src/hook.c",
         "src/hpa.c",
         "src/hpa_central.c",
         "src/hpa_hooks.c",
@@ -69,8 +69,11 @@ cc_library(
         "src/hpdata.c",
         "src/inspect.c",
         "src/jemalloc.c",
+        "src/jemalloc_fork.c",
+        "src/jemalloc_init.c",
         "src/large.c",
         "src/log.c",
+        "src/malloc_dispatch.c",
         "src/malloc_io.c",
         "src/mutex.c",
         "src/nstime.c",
@@ -83,7 +86,6 @@ cc_library(
         "src/prof_data.c",
         "src/prof_log.c",
         "src/prof_recent.c",
-        "src/prof_stack_range.c",
         "src/prof_stats.c",
         "src/prof_sys.c",
         "src/psset.c",
@@ -173,11 +175,6 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = ["//include/jemalloc/internal"] + select({
         "//settings/flags:prof_libunwind": ["@libunwind"],
-        "//conditions:default": [],
-    }) + select({
-        # Fails analysis: enable_cxx=True with cl or clang-cl is unsupported (settings/flags/BUILD.bazel).
-        "//settings/flags:cxx_with_clang_cl": ["//settings/flags:cxx_unsupported_with_cl"],
-        "//settings/flags:cxx_with_msvc_cl": ["//settings/flags:cxx_unsupported_with_cl"],
         "//conditions:default": [],
     }),
 )

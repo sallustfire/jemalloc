@@ -43,7 +43,10 @@ def _jemalloc_transition_impl(settings, attr):
     # Boolean flags
     bool_flags = {
         "//settings/flags:enable_cache_oblivious": attr.cache_oblivious,
+        "//settings/flags:enable_cxx": attr.cxx,
+        "//settings/flags:enable_cxx_infallible_new": attr.cxx_infallible_new,
         "//settings/flags:enable_dss": attr.dss,
+        "//settings/flags:enable_experimental_fiber_safe_tls": attr.experimental_fiber_safe_tls,
         "//settings/flags:enable_experimental_sdt": attr.experimental_sdt,
         "//settings/flags:enable_experimental_smallocx": attr.experimental_smallocx,
         "//settings/flags:enable_fill": attr.fill,
@@ -65,9 +68,6 @@ def _jemalloc_transition_impl(settings, attr):
             result[flag] = False
 
     # String flags
-    if attr.cxx != "":
-        result["//settings/flags:enable_cxx"] = attr.cxx
-
     if attr.debug != "":
         result["//settings/flags:enable_debug"] = attr.debug
 
@@ -91,8 +91,10 @@ _jemalloc_transition = transition(
     inputs = [
         "//settings/flags:enable_cache_oblivious",
         "//settings/flags:enable_cxx",
+        "//settings/flags:enable_cxx_infallible_new",
         "//settings/flags:enable_debug",
         "//settings/flags:enable_dss",
+        "//settings/flags:enable_experimental_fiber_safe_tls",
         "//settings/flags:enable_experimental_sdt",
         "//settings/flags:enable_experimental_smallocx",
         "//settings/flags:enable_fill",
@@ -114,8 +116,10 @@ _jemalloc_transition = transition(
     outputs = [
         "//settings/flags:enable_cache_oblivious",
         "//settings/flags:enable_cxx",
+        "//settings/flags:enable_cxx_infallible_new",
         "//settings/flags:enable_debug",
         "//settings/flags:enable_dss",
+        "//settings/flags:enable_experimental_fiber_safe_tls",
         "//settings/flags:enable_experimental_sdt",
         "//settings/flags:enable_experimental_smallocx",
         "//settings/flags:enable_fill",
@@ -142,9 +146,11 @@ jemalloc = rule(
     implementation = _jemalloc_config_impl,
     attrs = {
         "cache_oblivious": attr.string(values = ["True", "False", ""]),
-        "cxx": attr.string(values = ["True", "False", "__auto__", ""]),
+        "cxx": attr.string(values = ["True", "False", ""]),
+        "cxx_infallible_new": attr.string(values = ["True", "False", ""]),
         "debug": attr.string(values = ["yes", "no", "__auto__", ""]),
         "dss": attr.string(values = ["True", "False", ""]),
+        "experimental_fiber_safe_tls": attr.string(values = ["True", "False", ""]),
         "experimental_sdt": attr.string(values = ["True", "False", ""]),
         "experimental_smallocx": attr.string(values = ["True", "False", ""]),
         "fill": attr.string(values = ["True", "False", ""]),

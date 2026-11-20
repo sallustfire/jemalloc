@@ -59,6 +59,9 @@ for macro in LG_PAGE LG_VADDR LG_HUGEPAGE; do
   option="$(echo "${macro}" | tr "A-Z_" "a-z-")"
   configure_args+=("--with-${option}=${value}")
 done
+# Whether the CPU has rdtscp describes the machine too. The build never defines JEMALLOC_HAVE_RDTSCP, which nothing
+# reachable reads (include/jemalloc/internal/BUILD.bazel), so configure gets the answer it gives a cross build.
+configure_args+=("je_cv_rdtscp=no")
 
 echo "::group::${upstream##*/}: ./configure ${configure_args[*]}"
 (

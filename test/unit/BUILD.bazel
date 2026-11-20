@@ -59,7 +59,6 @@ with_settings(
     )
     for src in [
         "arena_reset.c",
-        "batch_alloc.c",
         "junk.c",
     ]
 ]
@@ -68,6 +67,7 @@ with_settings(
 UNIT_TESTS = [
     {"src": "a0.c"},
     {"src": "arena_reset.c"},
+    {"src": "arenas_management.c"},
     {"src": "atomic.c"},
     {"src": "background_thread.c"},
     {"src": "background_thread_enable.c"},
@@ -90,7 +90,10 @@ UNIT_TESTS = [
     {"src": "decay.c"},
     {"src": "div.c"},
     {"src": "edata_cache.c"},
+    {"src": "emap.c"},
     {"src": "emitter.c"},
+    {"src": "eset.c"},
+    {"src": "extent_dss.c"},
     {"src": "extent_quantize.c"},
     {"src": "fb.c"},
     {"src": "fork.c"},
@@ -100,13 +103,17 @@ UNIT_TESTS = [
         "name": "hash",
         "src": ":smhasher_test_sources",
     },
-    {"src": "hook.c"},
+    {"src": "hpa_central.c"},
+    {"src": "hpa_pageslab_packing.c"},
     {"src": "hpdata.c"},
+    {"src": "extent_alloc_flags.c"},
     {"src": "huge.c"},
+    {"src": "jemalloc_init.c"},
     {"src": "json_stats.c"},
     {"src": "large_ralloc.c"},
     {"src": "log.c"},
     {"src": "mallctl.c"},
+    {"src": "malloc_dispatch.c"},
     {"src": "malloc_io.c"},
     {"src": "math.c"},
     {"src": "mpsc_queue.c"},
@@ -116,6 +123,8 @@ UNIT_TESTS = [
     {"src": "ncached_max.c"},
     {"src": "oversize_threshold.c"},
     {"src": "pa.c"},
+    {"src": "pac.c"},
+    {"src": "pac_sec_integration.c"},
     {"src": "pages.c"},
     {"src": "peak.c"},
     {"src": "ph.c"},
@@ -128,7 +137,6 @@ UNIT_TESTS = [
     {"src": "rtree.c"},
     {"src": "sc.c"},
     {"src": "sec.c"},
-    {"src": "seq.c"},
     {
         "name": "sfmt",
         "src": ":sfmt_test_sources",
@@ -140,6 +148,8 @@ UNIT_TESTS = [
     {"src": "stats_print.c"},
     {"src": "sz.c"},
     {"src": "tcache_init.c"},
+    {"src": "tcache_gc.c"},
+    {"src": "tcache_ncached_target.c"},
     {"src": "test_hooks.c"},
     {"src": "ticker.c"},
     {"src": "tsd.c"},
@@ -157,14 +167,6 @@ UNIT_TESTS = [
 
 # Tests whose .sh exports a MALLOC_CONF in every configuration.
 UNIT_CONF_TESTS = [
-    {
-        "src": "arena_decay.c",
-        "conf": "dirty_decay_ms:1000,muzzy_decay_ms:1000,tcache_max:1024",
-    },
-    {
-        "src": "batch_alloc.c",
-        "conf": "tcache_gc_incr_bytes:2147483648",
-    },
     {
         "src": "binshard.c",
         "conf": "narenas:1,bin_shards:1-160:16|129-512:4|256-256:8|513-8070450532247928832:1",
@@ -202,8 +204,16 @@ UNIT_CONF_TESTS = [
         "conf": "dirty_decay_ms:500",
     },
     {
+        "src": "pac_decay.c",
+        "conf": "dirty_decay_ms:1000,muzzy_decay_ms:1000,tcache_max:1024,background_thread:false",
+    },
+    {
         "src": "pack.c",
         "conf": "dirty_decay_ms:0,muzzy_decay_ms:0",
+    },
+    {
+        "src": "percpu_arena_resume.c",
+        "conf": "percpu_arena:percpu",
     },
     {
         "src": "size_classes.c",
@@ -249,6 +259,10 @@ UNIT_CONF_TESTS = [
 
 # Tests whose .sh exports a MALLOC_CONF only if enable_prof.
 UNIT_PROF_CONF_TESTS = [
+    {
+        "src": "san_prof.c",
+        "conf": "prof:true,lg_prof_sample:0,san_guard_large:1,san_guard_small:0",
+    },
     {
         "src": "inspect.c",
         "conf": "prof:false",
@@ -369,25 +383,6 @@ cc_test(
     }),
     deps = [
         ":arena_reset_c",
-        ":testlib",
-    ],
-)
-
-cc_test(
-    name = "batch_alloc_prof",
-    src = "batch_alloc_prof.c",
-    env = {"JE_TEST_MALLOC_CONF": "prof:true,lg_prof_sample:14"},
-    linkstatic = True,
-    local_defines = ["JEMALLOC_UNIT_TEST"],
-    target_compatible_with = select({
-        "//settings/flags:prof": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }) + select({
-        "//settings/flags:user_config": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
-    deps = [
-        ":batch_alloc_c",
         ":testlib",
     ],
 )

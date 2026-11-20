@@ -42,7 +42,8 @@ def _upstream_output_impl(ctx):
         ctx.actions.symlink(output = link, target_file = src)
         staged.append(link)
 
-    # A registry overlay delivers files without their executable bit on Bazel 7, so run an executable copy.
+    # A registry overlay delivers files without their executable bit before Bazel 8.6.0, the module's floor included,
+    # so run an executable copy.
     script = ctx.actions.declare_file("{}.script/{}".format(ctx.label.name, ctx.file.script.basename))
     ctx.actions.expand_template(template = ctx.file.script, output = script, substitutions = {}, is_executable = True)
 

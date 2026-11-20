@@ -12,7 +12,9 @@ byte order) are copies of configure.ac's test programs, compiled or linked by ru
 toolchain. configure's host table is expressed as platform selects. What configure learns by running a program on the
 build machine (page size, virtual address bits, huge page size) is set by flags under //settings/platform, and lg_page
 and lg_vaddr have per-platform defaults. Whether the CPU has rdtscp, which configure also learns by running a program,
-is a platform select; see JEMALLOC_HAVE_RDTSCP below.
+is left undefined; see JEMALLOC_HAVE_RDTSCP below. Where configure runs a program to confirm that the running kernel
+supports an interface the C library provides, the check only links it for the target and assumes that support; see
+JEMALLOC_HAVE_PTHREAD_COND_TIMEDWAIT_MONOTONIC below.
 
 ## Usage
 
@@ -64,16 +66,32 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
 - **//settings/platform:lg_page (--with-lg-page):** Defaults to 16 (64 KiB) on aarch64 Linux and Android and on ppc64le
  Linux, so one build runs on kernels with 4K, 16K or 64K pages, at the cost of a coarser page granularity on 4K
  kernels (configure's cross compilation value is 12, which fails at startup on a 16K or 64K kernel). Darwin defaults
- to 14 and everything else to 12. Set it explicitly to override.
+ to 14 and everything else to 12. Set it explicitly to override. It must be at least 8 (256-byte pages), as configure
+ requires, or the build fails. It is a string flag, written into the header as given; like configure's `test`, the
+ checks read it as an integer when it is an optional sign and decimal digits, with or without surrounding spaces or
+ tabs, and any other value passes through unchecked.
 - **//settings/platform:lg_hugepage (--with-lg-hugepage):** Defaults to 21 (2 MiB), configure's value when it cannot
- read the huge page size. It must be at least lg_page, as configure requires, or the build fails; so on aarch64 Linux
- and Android and ppc64le Linux, where lg_page defaults to 16, a value below 16 needs lg_page set explicitly too.
-- **JEMALLOC_HAVE_RDTSCP (no configure option):** Defined on x86_64 Apple targets and nowhere else, with no flag to
- change it. There percpu_arena needs it: malloc_getcpu reads it only where neither _WIN32 nor sched_getcpu applies,
- and without it percpu_arena reaches not_reached(). A native configure on an Intel Mac whose CPU has rdtscp defines
- it; a cross build or --with-lg-vaddr leaves it undefined, as this build does on every other target, where leaving it
- out has no effect. On an x86_64 CPU without rdtscp (Intel's before Nehalem, AMD K8 before revision F, the Bonnell and
- Saltwell Atoms), percpu_arena, which is off by default, reaches an illegal instruction instead.
+ read the huge page size. It is an integer flag. It must be greater than lg_page, as configure requires, or the build
+ fails; so on aarch64 Linux and Android and ppc64le Linux, where lg_page defaults to 16, a value of 16 or below needs
+ lg_page set explicitly too. The comparison is skipped when lg_page does not read as an integer.
+- **JEMALLOC_HAVE_RDTSCP (no configure option):** Never defined, with no flag to change it. configure decides it by
+ running a program on an x86_64 build machine, so a native configure defines it on nearly every x86_64 CPU and a cross
+ build leaves it undefined; which CPU the program ran on says nothing about the target's, and no toolchain check can.
+ Nothing reachable reads it: only the POSIX CPU backend does, after sched_getcpu, and that backend supports
+ percpu_arena, its only caller, only with sched_getcpu. Should a release read it where it can run, it becomes a
+ //settings/platform flag.
+- **JEMALLOC_HAVE_PTHREAD_COND_TIMEDWAIT_MONOTONIC (no configure option):** Whether the background thread's condition
+ variable waits on CLOCK_MONOTONIC, so a change to the wall clock does not move its deadlines. configure runs a program
+ that sets the clock with pthread_condattr_setclock and checks that each call succeeds, which confirms that the running
+ kernel accepts CLOCK_MONOTONIC; a cross build gets "no". Here a check links the same program for the target instead,
+ which shows only that the C library provides the functions and the constant. That the kernel accepts CLOCK_MONOTONIC is
+ an assumption this build makes about the target, true on the kernels glibc, musl, Bionic and FreeBSD's libc support,
+ not something the link observes. So where configure, cross building, leaves the macro undefined and this build defines
+ it, the difference is intended. Where the target's kernel rejects CLOCK_MONOTONIC for a condition variable, jemalloc
+ fails to initialize: background_thread_boot1 initializes the background threads' condition variables whenever
+ background-thread support is built, and os_cond_init (os/posix/cond.h) fails, so malloc_init_hard fails and
+ allocations fail, where configure's build would wait on the wall clock instead. Darwin has no
+ pthread_condattr_setclock, so it is undefined there.
 - **glibc:** Without a prefix, the __libc_* functions and __posix_memalign are probed and listed (exempt from private
  renaming) wherever they link, and on Linux the hooks __malloc_hook, __realloc_hook, __free_hook and __memalign_hook
  where they still link (glibc before 2.34), exactly as configure does. jemalloc defines the hooks, and aliases the
@@ -90,6 +108,20 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
 - **//settings/flags:enable_pageid (--enable-pageid):** Off by default. On, jemalloc names its anonymous mappings
  (jemalloc_pg, or jemalloc_pg_overcommit) in /proc/<pid>/maps, where the target has prctl; Linux 5.17 or later with
  CONFIG_ANON_VMA_NAME applies the names, and other kernels ignore them. jemalloc()'s pageid sets it per target.
+- **//settings/flags:enable_cxx (--disable-cxx):** True by default with every C++ compiler, cl and clang-cl included.
+ With it jemalloc's C++ support (src/jemalloc_cpp.cpp) is compiled, so a program linking @jemalloc gets jemalloc's
+ operator new and delete rather than the C++ runtime's (with cl and clang-cl, rather than the CRT's). On Windows that
+ replacement holds per module, and malloc stays with the CRT, so memory one module allocates with new must be deleted
+ by a module that links @jemalloc too; a program that hands such memory to a DLL without jemalloc's operators needs
+ False. configure turns C++ off for cl whatever --enable-cxx says, because its C++14 check reads __cplusplus, which cl
+ reports as 199711L; this build does not follow that check, a deliberate difference. False is the opt-out and keeps
+ the runtime's operators. jemalloc()'s cxx sets it per target.
+- **//settings/flags:enable_cxx_infallible_new (--enable-cxx-infallible-new):** Off by default. On, the throwing
+ operator new aborts with the requested size logged when an allocation fails, instead of calling the new handler and
+ throwing std::bad_alloc, which with LTO lets the compiler drop exception cleanup in its callers; the nothrow forms still
+ return null. As with configure, it takes effect only with //settings/flags:enable_cxx. jemalloc/jemalloc.h always
+ defines JEMALLOC_INFALLIBLE_NEW, to 1 when it is on and to 0 otherwise. jemalloc()'s cxx_infallible_new sets it per
+ target.
 - **//settings/flags:enable_force_getenv (--enable-force-getenv):** Off by default, so jemalloc reads MALLOC_CONF with
  secure_getenv, or ignores it in a setuid or setgid process where only issetugid is available. On, it always reads it
  with getenv, including in privileged processes. jemalloc()'s force_getenv sets it per target.
@@ -98,6 +130,13 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
  else jemalloc's own on Linux x86_64, aarch64 and 32-bit Arm and on Android aarch64 and x86_64. As with configure, any
  other Linux or Android CPU gets no probes and no error, and any other platform fails the build. jemalloc()'s
  experimental_sdt sets it per target.
+- **//settings/flags:enable_experimental_fiber_safe_tls (--enable-experimental-fiber-safe-tls):** Off by default. On,
+ jemalloc's TSD get and set accessors recompute the thread-local data's address through an out-of-line function behind
+ an optimization barrier, so a fiber or stackful coroutine that migrates between threads across a user-space context
+ switch does not keep using the previous thread's tcache, which the compiler may otherwise cache when it inlines the
+ allocator into the caller, as whole-program LTO does. It covers only those accessors, not every thread-local access
+ jemalloc or its caller makes; see INSTALL.md. The accessor is GNU inline assembly, so the build fails with a compiler
+ that does not define __GNUC__, such as cl. jemalloc()'s experimental_fiber_safe_tls sets it per target.
 - **//settings/flags:experimental_sys_process_madvise (--with-experimental-sys-process-madvise):** Empty by default.
  jemalloc uses process_madvise (for batched purging, which opt.process_madvise_max_batch enables) where the C library's
  headers declare SYS_process_madvise and PIDFD_SELF. Set it to the system call number, for example 440, to use it on a
@@ -105,17 +144,13 @@ See the [examples/host_toolchain/BUILD.bazel](examples/host_toolchain/BUILD.baze
  written into the header as is. Unlike configure, the build also writes EXPERIMENTAL_SYS_PROCESS_MADVISE_NR where the
  probe passes or madvise is missing, where nothing reads it.
 - **//settings/flags:enable_prof (--enable-prof):** "no" by default. "libunwind", "libgcc" and "gcc" choose configure's
- backtrace methods; "frame_pointer" is --enable-prof-frameptr, which compiles jemalloc with -fno-omit-frame-pointer.
- musl has no <execinfo.h>, so frame_pointer does not build there, as with configure. configure offers frame_pointer
- only on Linux with a GCC-compatible compiler and silently picks another method elsewhere; here any other platform or
- compiler fails the build.
+ backtrace methods.
 - **--enable-tsan, --enable-ubsan and --with-cxx-stdlib:** configure's sanitizer options only add -fsanitize=thread
  or -fsanitize=undefined to the compile and link flags, and --with-cxx-stdlib only chooses -lstdc++ or -lc++. Here the
  C and C++ toolchain owns both, so there are no flags for them: enable a sanitizer through the toolchain's features or
  --copt and --linkopt, and choose the C++ standard library with the C++ toolchain.
 
 Settings whose "__auto__" default jemalloc resolves for the target platform:
-- //settings/flags:enable_cxx (by the C++ compiler: off for cl and clang-cl)
 - //settings/flags:enable_lazy_lock
 - //settings/flags:enable_zone_allocator
 - //settings/flags:jemalloc_prefix
@@ -148,17 +183,17 @@ follow.
 
 ## Validated Platforms
 
-Tested in CI with the latest Bazel 7.x, 8.x and 9.x:
+Tested in CI with the latest Bazel 8.x and 9.x:
 
 - Ubuntu 22.04, 24.04 & 26.04 (x86_64)
 - Ubuntu 24.04 (aarch64)
 - MacOS 15 & 26 (arm64)
 
-The minimum supported Bazel, 7.4.0, is tested on Ubuntu 24.04 (x86_64), on Windows Server 2025 with MSVC and, for the
+The minimum supported Bazel, 8.5.0, is tested on Ubuntu 24.04 (x86_64), on Windows Server 2025 with MSVC and, for the
 host toolchain examples only, MacOS 15.
-Windows Server 2025 (x86_64) is tested with MSVC (msvc-cl), host toolchain examples included, on the latest Bazel 7.x,
-8.x and 9.x, and with clang-cl on the latest 9.x, without the fidelity checks, whose gawk, grep and sed dev dependencies
-do not build for Windows.
+Windows Server 2025 (x86_64) is tested with MSVC (msvc-cl), host toolchain examples included, on the latest Bazel 8.x
+and 9.x, and with clang-cl on the latest 9.x, without the fidelity checks, whose gawk, grep and sed dev dependencies do
+not build for Windows.
 Profiling (`--config=prof-*`) is tested on Linux only.
 Debug is tested with prof-libgcc, log on and cache oblivious off, on Ubuntu 24.04 (x86_64) with the latest Bazel 9.x
 only. The host toolchain examples build a jemalloc() target with debug on every tested platform.
@@ -168,19 +203,19 @@ only. The host toolchain examples build a jemalloc() target with debug on every 
 - **Windows:**
   - MinGW-w64 builds are cross-compiled in CI with hermetic LLVM, from Linux and macOS, but their programs are not run.
     MSYS2's mingw-gcc is not built in CI.
-  - jemalloc 5.3's C++ support (`operator new`/`delete`) needs libstdc++ or libc++, so with cl and clang-cl
-    `//settings/flags:enable_cxx`'s `__auto__` default turns it off, and a program's `operator new` and `delete` use
-    the C runtime's allocator. Setting it to True with them fails analysis. Configure drops C++ for cl silently, even
-    when asked for. Upstream's 5.4.0 removes both obstacles.
   - With cl and clang-cl, `@jemalloc` is a static library only: its API is declared with an empty `JEMALLOC_EXPORT`,
     so a DLL made from it with `cc_shared_library` exports none of it.
-- **FreeBSD:** configure's FreeBSD settings are translated (lazy lock, the vm.overcommit sysctl, -D_BSD_SOURCE for
-  probes), but nothing has been built on FreeBSD.
+- **macOS 11 and earlier (arm64):** 5.4.0 reads the current CPU number on arm64 Darwin from the low bits of tpidr_el0
+  (include/jemalloc/internal/os/darwin/cpu.h), which assumes macOS 12 or later; on macOS 11 the CPU number is kept
+  elsewhere and is misread. Only percpu_arena (MALLOC_CONF's `percpu_arena:percpu` or `percpu_arena:phycpu`) reads it,
+  and that is off by default, so it matters only where percpu_arena is turned on.
+- **FreeBSD:** configure's FreeBSD settings are translated (lazy lock, -D_BSD_SOURCE for probes), but nothing has
+  been built on FreeBSD.
 
 ## How the registry entry is produced
 
-The registry entry does not fetch the repository above. It fetches upstream's release tarball (for 5.3.1,
-`jemalloc-5.3.1.tar.bz2` from jemalloc's GitHub releases) and adds the Bazel build to it:
+The registry entry does not fetch the repository above. It fetches upstream's release tarball (for 5.4.0,
+`jemalloc-5.4.0.tar.bz2` from jemalloc's GitHub releases) and adds the Bazel build to it:
 
 - **overlay/** holds every committed file the tarball lacks: the BUILD and .bzl files, MODULE.bazel, settings/, tools/,
   examples/ and this README. The repository's own tooling, listed in `.bcr/fork_only.txt`, stays out.
@@ -207,10 +242,25 @@ only, so the export also stops if the ref commits an upstream file as a symlink 
 stops, too, if an entry already in the registry for the same upstream release fetches a different tarball, so a
 re-rolled upstream asset cannot slip into a new `.bcr.N`. `.bcr/presubmit.yml` becomes the entry's presubmit.
 
+## Upgrading from 5.3.1
+
+- Bazel 8.5.0 or later is required; Bazel 7 is no longer supported.
+- enable_prof=frame_pointer and the .bazelrc prof-frame-pointer config are removed, since upstream removed
+ --enable-prof-frameptr.
+- //settings/flags:enable_cxx is a bool_flag again, and "__auto__" is rejected, as is jemalloc()'s cxx = "__auto__".
+- With cl and clang-cl, a program linking @jemalloc now gets jemalloc's operator new and delete rather than the CRT's,
+ per module; see //settings/flags:enable_cxx for memory that crosses a DLL boundary.
+- 5.3.1's experimental_infallible_new run-time option is gone upstream; //settings/flags:enable_cxx_infallible_new
+ (--enable-cxx-infallible-new) replaces it at build time.
+- //settings/platform:lg_page below 8 and lg_hugepage not greater than lg_page now fail analysis, as configure does.
+- JEMALLOC_HAVE_RDTSCP is no longer defined on x86_64 macOS, or anywhere; 5.4.0's macOS CPU backend does not read it.
+
+The module's compatibility_level stays 5.
+
 ## Contributing
 
 Send changes as pull requests to https://github.com/sallustfire/jemalloc, against the branch for the jemalloc version,
-such as `bcr-5.3.1`. Support for a new jemalloc release starts as a new `bcr-<version>` branch.
+such as `bcr-5.4.0`. Support for a new jemalloc release starts as a new `bcr-<version>` branch.
 
 - Leave upstream's files as upstream ships them where you can. Each edit to one ships to the registry as a patch, so
   edit one only when the Bazel build needs it, and say why in a comment beside the edit.

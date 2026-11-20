@@ -104,6 +104,11 @@ autoconf(
             checks.AC_DEFINE_UNQUOTED("JEMALLOC_CONFIG_FILE", ""),
         ],
         "//conditions:default": [],
+    }) + select({
+        # configure.ac defines it as 1 with --enable-cxx-infallible-new and C++, and leaves it undefined otherwise, so
+        # jemalloc_defs.h.in defines it as 0. jemalloc_internal_defs.h.in has the same #undef, which this fills too.
+        "//settings/flags:cxx_infallible_new": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_INFALLIBLE_NEW", "1")],
+        "//conditions:default": [],
     }) + [
         # configure.ac skips this probe for MSVC compilers; jemalloc_internal_defs.h reads it for JEMALLOC_RETAIN, which
         # MSVC compilers never get.
@@ -269,6 +274,15 @@ autoconf(
 autoconf_hdr(
     name = "jemalloc_defs",
     out = "jemalloc_defs.h",
+    # config.status rewrites every "#define NAME" line of a defined macro, not only its "#undef NAME", so configure's
+    # header carries JEMALLOC_INFALLIBLE_NEW's value into the #ifndef fallback too. rules_cc_autoconf rewrites only the
+    # #undef lines, so the fallback is rewritten here, under the setting that defines the macro.
+    substitutions = select({
+        "//settings/flags:cxx_infallible_new": {
+            "#  define JEMALLOC_INFALLIBLE_NEW 0": "#  define JEMALLOC_INFALLIBLE_NEW 1",
+        },
+        "//conditions:default": {},
+    }),
     tags = ["manual"],
     template = "jemalloc_defs.h.in",
     visibility = [

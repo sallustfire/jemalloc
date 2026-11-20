@@ -231,7 +231,8 @@ def check_overlay(fork, overlay):
     for path in overlay:
         mode = fork[path][0]
         if mode != "100644":
-            # Bazel 7 delivers overlay files without an executable bit, so nothing in the overlay may rely on one.
+            # Bazel before 8.6.0, the module's floor included, delivers overlay files without an executable bit (8.6.0
+            # and later mark every one executable), so nothing in the overlay may rely on one.
             errors.append(f"{path}: mode {mode}; overlay files must be plain 100644 files")
     if errors:
         raise ExportError("overlay:\n  " + "\n  ".join(errors))

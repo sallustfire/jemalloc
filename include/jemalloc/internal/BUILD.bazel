@@ -10,6 +10,7 @@ load("@rules_cc_autoconf//autoconf:checks.bzl", "checks", "macros", "utils")
 load("//tools:cc.bzl", "CONLYOPTS", "CXXOPTS", "C_FEATURES")
 load("//tools:configure_host.bzl", "HOST_CC_DEPS", "HOST_CPPFLAGS", "HOST_LIBS")
 load(":lg_hugepage.bzl", "checked_lg_hugepage")
+load(":lg_page.bzl", "checked_lg_page")
 load(":private_namespace.bzl", "JET_PREFIX", "jemalloc_private_namespace", "private_namespace", "private_namespace_leak_test")
 load(":public_symbols.bzl", "public_symbols", "public_symbols_header", "symbol_list")
 load(":symbols.bzl", "OPTIONAL_PUBLIC_SYMBOLS", "OPTIONAL_WRAP_SYMBOLS", "PUBLIC_SYMBOLS", "SYM_PREFIX", "WRAP_SYMBOLS")
@@ -55,27 +56,24 @@ filegroup(
 cc_library(
     name = "internal",
     hdrs = [
-        "arena_externs.h",
-        "arena_inlines_a.h",
-        "arena_inlines_b.h",
+        "arena.h",
+        "arena_decay_constants.h",
+        "arena_inlines.h",
         "arena_stats.h",
-        "arena_structs.h",
-        "arena_types.h",
+        "arenas_management.h",
         "assert.h",
         "atomic.h",
         "atomic_c11.h",
         "atomic_gcc_atomic.h",
         "atomic_gcc_sync.h",
         "atomic_msvc.h",
-        "background_thread_externs.h",
+        "background_thread.h",
         "background_thread_inlines.h",
-        "background_thread_structs.h",
         "base.h",
         "bin.h",
         "bin_info.h",
         "bin_inlines.h",
         "bin_stats.h",
-        "bin_types.h",
         "bit_util.h",
         "bitmap.h",
         "buf_writer.h",
@@ -85,6 +83,7 @@ cc_library(
         "counter.h",
         "ctl.h",
         "decay.h",
+        "deferral.h",
         "div.h",
         "ecache.h",
         "edata.h",
@@ -99,7 +98,6 @@ cc_library(
         "extent_mmap.h",
         "fb.h",
         "fxp.h",
-        "hook.h",
         "hpa.h",
         "hpa_central.h",
         "hpa_hooks.h",
@@ -107,11 +105,11 @@ cc_library(
         "hpa_utils.h",
         "hpdata.h",
         "inspect.h",
+        "jemalloc_fork.h",
+        "jemalloc_init.h",
         "jemalloc_internal_decls.h",
         "jemalloc_internal_externs.h",
-        "jemalloc_internal_includes.h",
         "jemalloc_internal_inlines_a.h",
-        "jemalloc_internal_inlines_b.h",
         "jemalloc_internal_inlines_c.h",
         "jemalloc_internal_macros.h",
         "jemalloc_internal_overrides.h",
@@ -119,32 +117,73 @@ cc_library(
         "jemalloc_probe.h",
         "jemalloc_probe_custom.h",
         "jemalloc_probe_stap.h",
-        "large_externs.h",
+        "large.h",
         "lockedint.h",
         "log.h",
+        "malloc_dispatch.h",
+        "malloc_dispatch_inlines.h",
         "malloc_io.h",
         "mpsc_queue.h",
         "mutex.h",
         "mutex_prof.h",
         "nstime.h",
+        "os.h",
+        "os/cond.h",
+        "os/cpu.h",
+        "os/darwin/cpu.h",
+        "os/darwin/mutex.h",
+        "os/darwin/proc_maps.h",
+        "os/detect.h",
+        "os/error.h",
+        "os/file.h",
+        "os/fmt.h",
+        "os/freebsd/overcommit.h",
+        "os/freebsd/proc_maps.h",
+        "os/linux/overcommit.h",
+        "os/mutex.h",
+        "os/overcommit.h",
+        "os/posix/cond.h",
+        "os/posix/cpu.h",
+        "os/posix/error.h",
+        "os/posix/file.h",
+        "os/posix/fmt.h",
+        "os/posix/mutex.h",
+        "os/posix/overcommit.h",
+        "os/posix/proc_maps.h",
+        "os/posix/process.h",
+        "os/posix/sigmask.h",
+        "os/posix/time.h",
+        "os/posix/vm.h",
+        "os/proc_maps.h",
+        "os/process.h",
+        "os/sigmask.h",
+        "os/time.h",
+        "os/vm.h",
+        "os/windows/cpu.h",
+        "os/windows/error.h",
+        "os/windows/file.h",
+        "os/windows/fmt.h",
+        "os/windows/mutex.h",
+        "os/windows/overcommit.h",
+        "os/windows/proc_maps.h",
+        "os/windows/process.h",
+        "os/windows/time.h",
+        "os/windows/vm.h",
         "pa.h",
         "pac.h",
         "pages.h",
-        "pai.h",
         "peak.h",
         "peak_event.h",
         "ph.h",
         "prng.h",
+        "prof.h",
         "prof_data.h",
-        "prof_externs.h",
         "prof_hook.h",
         "prof_inlines.h",
         "prof_log.h",
         "prof_recent.h",
         "prof_stats.h",
-        "prof_structs.h",
         "prof_sys.h",
-        "prof_types.h",
         "psset.h",
         "ql.h",
         "qr.h",
@@ -158,25 +197,26 @@ cc_library(
         "sc.h",
         "sec.h",
         "sec_opts.h",
-        "seq.h",
         "slab_data.h",
         "smoothstep.h",
         "spin.h",
         "stats.h",
+        "stats_internal.h",
         "sz.h",
-        "tcache_externs.h",
+        "tcache.h",
         "tcache_inlines.h",
-        "tcache_structs.h",
-        "tcache_types.h",
+        "tcache_ncached_target.h",
         "test_hooks.h",
         "thread_event.h",
         "thread_event_registry.h",
         "ticker.h",
         "tsd.h",
+        "tsd_binshards.h",
         "tsd_generic.h",
         "tsd_internals.h",
         "tsd_malloc_thread_cleanup.h",
         "tsd_tls.h",
+        "tsd_tls_addr.h",
         "tsd_types.h",
         "tsd_win.h",
         "typed_list.h",
@@ -223,6 +263,10 @@ jemalloc_private_namespace(
 
 checked_lg_hugepage(
     name = "lg_hugepage",
+)
+
+checked_lg_page(
+    name = "lg_page",
 )
 
 selects.config_setting_group(
@@ -273,13 +317,6 @@ _EXPERIMENTAL_SDT_CUSTOM_PLATFORMS = [
     )
     for os, cpu in _EXPERIMENTAL_SDT_CUSTOM_PLATFORMS
 ]
-
-config_setting(
-    name = "linux_prof_frame_pointer",
-    constraint_values = ["@platforms//os:linux"],
-    flag_values = {"//settings/flags:enable_prof": "frame_pointer"},
-    visibility = ["//visibility:private"],
-)
 
 config_setting(
     name = "android_x86_32",
@@ -334,7 +371,7 @@ autoconf(
         checks.AC_BUILD_SETTING(
             name = "LG_PAGE",
             define = "LG_PAGE",
-            target = "//settings/platform:lg_page_resolved",
+            target = ":lg_page",
             unquote = True,
         ),
         checks.AC_BUILD_SETTING(
@@ -616,35 +653,21 @@ autoconf(
     }) + select({
         "//settings/flags:experimental_smallocx_api": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_EXPERIMENTAL_SMALLOCX_API", "")],
         "//conditions:default": [],
-    }) + select(
-        {
-            # configure.ac offers --enable-prof-frameptr only on Linux and uses it only with a GCC-compatible compiler.
-            ":linux_prof_frame_pointer": [
-                checks.AC_TRY_COMPILE(
-                    name = "prof_frame_pointer_gcc",
-                    code = utils.AC_LANG_PROGRAM("", ""),
-                    error = "//settings/flags:enable_prof=frame_pointer (--enable-prof-frameptr) needs a GCC-compatible compiler",
-                    requires = ["ac_cv_c_compiler_gnu"],
-                ),
-                checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
-                checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_FRAME_POINTER", ""),
-            ],
-            "//settings/flags:prof_gcc": [
-                checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
-                checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_GCC", ""),
-            ],
-            "//settings/flags:prof_libgcc": [
-                checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
-                checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_LIBGCC", ""),
-            ],
-            "//settings/flags:prof_libunwind": [
-                checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
-                checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_LIBUNWIND", ""),
-            ],
-            "//settings/flags:no_prof": [],
-        },
-        no_match_error = "//settings/flags:enable_prof=frame_pointer (--enable-prof-frameptr) is only supported on Linux",
-    ) + select({
+    }) + select({
+        "//settings/flags:prof_gcc": [
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_GCC", ""),
+        ],
+        "//settings/flags:prof_libgcc": [
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_LIBGCC", ""),
+        ],
+        "//settings/flags:prof_libunwind": [
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF", ""),
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROF_LIBUNWIND", ""),
+        ],
+        "//conditions:default": [],
+    }) + select({
         "//settings/flags:fill": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_FILL", "")],
         "//conditions:default": [],
     }) + select({
@@ -672,6 +695,36 @@ autoconf(
         "//settings/flags:cxx": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_ENABLE_CXX", "")],
         "//conditions:default": [],
     }) + select({
+        # configure.ac's enable_cxx.
+        "//settings/flags:cxx": [checks.M4_VARIABLE("enable_cxx", "1")],
+        "//conditions:default": [checks.M4_VARIABLE("enable_cxx", "0")],
+    }) + [
+        # configure.ac links this C++ program (JE_COMPILABLE) only with C++ enabled, under the user's C++ flags, so
+        # -fno-exceptions fails it. Here the check only compiles it, as C++ with --copt and --cxxopt as the library's
+        # C++ source sees them: whether throw and catch are available is a compiler fact, and the link adds only that
+        # the C++ runtime provides the exception ABI (__cxa_throw and the rest), which this build expects of any C++
+        # toolchain it supports. Linking also failed on ld.bfd hosts (Alpine), where rules_cc_autoconf 0.37.0 puts the
+        # toolchain's as-needed -lstdc++ before the probe's object, so the linker drops libstdc++ and __cxa_throw is
+        # undefined.
+        checks.AC_TRY_COMPILE(
+            name = "je_cv_cxx_exceptions",
+            code = utils.AC_LANG_PROGRAM(
+                "#include <new>",
+                [
+                    "\ttry {",
+                    "\t\tthrow std::bad_alloc();",
+                    "\t} catch (const std::bad_alloc &) {",
+                    "\t}",
+                ],
+            ),
+            language = "cpp",
+            requires = ["enable_cxx"],
+        ),
+        checks.AC_DEFINE_UNQUOTED(
+            "JEMALLOC_HAVE_CXX_EXCEPTIONS",
+            condition = "je_cv_cxx_exceptions",
+        ),
+    ] + select({
         # configure.ac's enable_experimental_sdt.
         "//settings/flags:experimental_sdt": [checks.M4_VARIABLE("enable_experimental_sdt", "1")],
         "//conditions:default": [checks.M4_VARIABLE("enable_experimental_sdt", "0")],
@@ -711,10 +764,14 @@ autoconf(
             ),
         ],
     }) + select({
-        "//settings/flags:force_getenv": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_FORCE_GETENV", "")],
+        # tsd_tls_addr.h fails the compile with an #error where the compiler does not define __GNUC__, as configure,
+        # which checks nothing for this option, leaves it to.
+        "//settings/flags:experimental_fiber_safe_tls": [
+            checks.AC_DEFINE_UNQUOTED("JEMALLOC_EXPERIMENTAL_FIBER_SAFE_TLS", ""),
+        ],
         "//conditions:default": [],
     }) + select({
-        "//settings/flags:pageid": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PAGEID", "")],
+        "//settings/flags:force_getenv": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_FORCE_GETENV", "")],
         "//conditions:default": [],
     }) + select({
         "//settings/flags:lazy_lock": [
@@ -775,13 +832,6 @@ autoconf(
         "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAS_ALLOCA_H", "")],
         "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAS_ALLOCA_H", "")],
         "@platforms//os:qnx": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAS_ALLOCA_H", "")],
-        "//conditions:default": [],
-    }) + select({
-        "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROC_SYS_VM_OVERCOMMIT_MEMORY", "")],
-        "@platforms//os:linux": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_PROC_SYS_VM_OVERCOMMIT_MEMORY", "")],
-        "//conditions:default": [],
-    }) + select({
-        "@platforms//os:freebsd": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_SYSCTL_VM_OVERCOMMIT", "")],
         "//conditions:default": [],
     }) + select({
         "@platforms//os:android": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_THREADED_INIT", "")],
@@ -1118,6 +1168,15 @@ autoconf(
             condition = "ac_cv_func_prctl",
         ),
     ] + select({
+        # configure.ac defines it only where prctl links as well, and without prctl goes on without an error.
+        "//settings/flags:pageid": [
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_PAGEID",
+                condition = "ac_cv_func_prctl",
+            ),
+        ],
+        "//conditions:default": [],
+    }) + select({
         "@platforms//os:windows": [],
         "//conditions:default": macros.AC_CHECK_HEADERS(["dlfcn.h"]) + [
             checks.AC_CHECK_FUNC(
@@ -1213,6 +1272,52 @@ autoconf(
             checks.AC_DEFINE_UNQUOTED(
                 "JEMALLOC_HAVE_PTHREAD_GET_NAME_NP",
                 condition = "je_cv_pthread_get_name_np",
+            ),
+            # configure.ac runs this program on the build machine, checking that each call succeeds, which confirms that
+            # the running kernel accepts CLOCK_MONOTONIC, and says no when it fails or when cross compiling. This link
+            # check shows only that the target's C library provides pthread_condattr_setclock and CLOCK_MONOTONIC. That
+            # the kernel accepts the clock is an assumption this build makes about the target, true on the kernels
+            # glibc, musl, FreeBSD's libc and Android's Bionic support, not something the link observes. So where
+            # configure, cross compiling, leaves the macro undefined and this build defines it, the difference is
+            # intended. Where the target's kernel rejects CLOCK_MONOTONIC for a condition variable, jemalloc fails to
+            # initialize: background_thread_boot1 initializes the background threads' condition variables whenever
+            # background-thread support is built, and os_cond_init (os/posix/cond.h) fails, so malloc_init_hard fails
+            # and allocations fail, where configure's build would wait on the wall clock instead. Darwin has no
+            # pthread_condattr_setclock, so it fails there as it does under configure.
+            checks.AC_TRY_LINK(
+                name = "je_cv_pthread_cond_timedwait_monotonic",
+                code = utils.AC_LANG_PROGRAM(
+                    [
+                        "#include <pthread.h>",
+                        "#include <time.h>",
+                    ],
+                    [
+                        "  pthread_condattr_t attr;",
+                        "  pthread_cond_t cond;",
+                        "  struct timespec ts;",
+                        "  int ret = pthread_condattr_init(&attr);",
+                        "  if (ret != 0) {",
+                        "    return 1;",
+                        "  }",
+                        "  ret = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);",
+                        "  if (ret != 0) {",
+                        "    pthread_condattr_destroy(&attr);",
+                        "    return 1;",
+                        "  }",
+                        "  ret = pthread_cond_init(&cond, &attr);",
+                        "  pthread_condattr_destroy(&attr);",
+                        "  if (ret != 0) {",
+                        "    return 1;",
+                        "  }",
+                        "  ret = clock_gettime(CLOCK_MONOTONIC, &ts);",
+                        "  pthread_cond_destroy(&cond);",
+                        "  return ret != 0;",
+                    ],
+                ),
+            ),
+            checks.AC_DEFINE_UNQUOTED(
+                "JEMALLOC_HAVE_PTHREAD_COND_TIMEDWAIT_MONOTONIC",
+                condition = "je_cv_pthread_cond_timedwait_monotonic",
             ),
         ],
     }) + [
@@ -1719,6 +1824,8 @@ autoconf(
     cxxopts = CXXOPTS,
     features = C_FEATURES,
     tags = ["manual"],
+    # test/integration chooses the C++ allocation-failure tests' sources by JEMALLOC_HAVE_CXX_EXCEPTIONS.
+    visibility = ["//test/integration:__pkg__"],
     deps = ["//include/jemalloc:jemalloc_defs_checks"],
 )
 
@@ -1883,28 +1990,15 @@ autoconf(
     tags = ["manual"],
 )
 
-# JEMALLOC_HAVE_RDTSCP is defined on x86_64 Apple targets and nowhere else. malloc_getcpu reads it only where neither
-# _WIN32 nor JEMALLOC_HAVE_SCHED_GETCPU applies, and jemalloc_preamble.h supports percpu_arena on every Apple target, so
-# without it percpu_arena on Intel macOS reaches not_reached(). configure runs its rdtscp program only while it detects
-# LG_VADDR: a native configure on an Intel Mac whose CPU has rdtscp defines the macro, and a cross build or
-# --with-lg-vaddr leaves it undefined, as this build does on every other target, where leaving it out has no effect. On
-# an x86_64 CPU without rdtscp, percpu_arena (off by default) reaches an illegal instruction instead.
-autoconf(
-    name = "jemalloc_internal_defs_rdtscp",
-    checks = select({
-        ":darwin_x86_64": [checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_RDTSCP", "")],
-        "//conditions:default": [],
-    }),
-    tags = ["manual"],
-)
-
-selects.config_setting_group(
-    name = "darwin_x86_64",
-    match_all = [
-        "//settings/platform:darwin",
-        "@platforms//cpu:x86_64",
-    ],
-)
+# JEMALLOC_HAVE_RDTSCP is never defined. 5.4.0's configure defines it by running its rdtscp program on an x86_64 build
+# machine (configure.ac:623-644), which says whether the machine running configure has the instruction, not whether the
+# target's CPU does, and no toolchain check can tell. Nothing reachable reads it: only os/posix/cpu.h:77 does, after
+# sched_getcpu, and the POSIX backend supports percpu_arena, os_cpu_current's only user, only with
+# JEMALLOC_HAVE_SCHED_GETCPU (jemalloc_preamble.h.in:240). The upstream oracle gives configure the same answer
+# (je_cv_rdtscp=no). Should a release read it where it can run, it becomes a //settings/platform flag, as the other
+# facts configure learns by running a program are:
+#
+#     checks.AC_DEFINE_UNQUOTED("JEMALLOC_HAVE_RDTSCP", "")
 
 autoconf(
     name = "jemalloc_internal_defs_lg_vaddr",
@@ -1968,7 +2062,7 @@ autoconf_hdr(
         "@platforms//cpu:x86_32": [":jemalloc_internal_defs_x86_spinwait_checks"],
         "@platforms//cpu:x86_64": [":jemalloc_internal_defs_x86_spinwait_checks"],
         "//conditions:default": [],
-    }) + [":jemalloc_internal_defs_rdtscp"] + select({
+    }) + select({
         "//settings/flags:no_experimental_sys_process_madvise": [],
         "//conditions:default": [":jemalloc_internal_defs_experimental_sys_process_madvise"],
     }),
