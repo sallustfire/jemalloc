@@ -3,19 +3,16 @@
 # The language standards jemalloc's sources are written in, configure.ac's
 # preferred -std=gnu11 and -std=c++17. They are a property of these sources, so
 # they are declared here rather than left to the toolchain's default. MSVC has
-# no GNU C dialect, so C compiles there keep cl's default, as upstream's msvc/
-# projects do.
+# no GNU C dialect, so cl and clang-cl get C11, as upstream's configure gives cl
+# (AC_PROG_CC adds -std:c11); 5.4.0's unit tests use C11's _Static_assert.
 CONLYOPTS = select({
-    "//settings/compiler:msvc_compatible": [],
+    "//settings/compiler:msvc_compatible": ["/std:c11"],
     "//conditions:default": ["-std=gnu11"],
 })
 
 # The toolchain features that go with CONLYOPTS. From rules_cc 0.2.19, the toolchain for cl and clang-cl enables
-# default_c_std, which compiles C as /std:c17, and cl has no option that returns to its default. The C standard is a
-# property of jemalloc's sources, not of the toolchain, and one the toolchain picks changes what they mean: under
-# /std:c17, jemalloc 5.3.0's VARIABLE_ARRAY, which tested __STDC_VERSION__ alone, declared variable-length arrays, which
-# cl lacks (upstream be65438f added the __STDC_NO_VLA__ test). So the feature is removed. A toolchain without it ignores
-# its removal.
+# default_c_std, which compiles C as /std:c17. The C standard is a property of jemalloc's sources, not of the toolchain,
+# so the feature is removed and CONLYOPTS alone sets it. A toolchain without it ignores its removal.
 C_FEATURES = ["-default_c_std"]
 
 CXXOPTS = select({
