@@ -1,8 +1,7 @@
 matrix:
   platform:
     - rockylinux8
-    - debian11
-    - ubuntu2004
+    - debian12
     - ubuntu2204
     - ubuntu2404
     - ubuntu2404_arm64
@@ -24,8 +23,7 @@ bcr_test_module:
   matrix:
     platform:
       - rockylinux8
-      - debian11
-      - ubuntu2004
+      - debian12
       - ubuntu2204
       - ubuntu2404
       - ubuntu2404_arm64
@@ -35,8 +33,7 @@ bcr_test_module:
       - windows
     bazel: ["8.5.0", "8.x", "9.x", "rolling"]
     llvm_platform:
-      - debian11
-      - ubuntu2004
+      - rockylinux8
       - macos_arm64
     # Not rolling: it resets --@jemalloc//settings/flags:nm in exec configurations, so private_namespace.h falls back to
     # the toolchain's nm, which the llvm toolchain does not declare.
